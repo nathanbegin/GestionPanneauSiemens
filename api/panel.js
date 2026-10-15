@@ -1,6 +1,6 @@
 import {neon} from '@neondatabase/serverless';
 import {createHash,timingSafeEqual} from 'node:crypto';
-import {blank,validate,normalize} from '../public/model.js';
+import {blank,validate,normalize,mergeSurvey} from '../public/model.js';
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  if(!['GET','PUT','POST'].includes(req.method)){res.setHeader('Allow','GET, PUT, POST');return res.status(405).json({error:'Méthode non permise.'});}
@@ -10,10 +10,12 @@ export default async function handler(req,res){
  if(!timingSafeEqual(hash(supplied),hash(process.env.PANEL_ACCESS_KEY)))return res.status(401).json({error:'Clé d’accès incorrecte.'});
  try{
  const sql=neon(process.env.DATABASE_URL);
+ const survey=process.env.PANEL_SURVEY_CONFIG?JSON.parse(process.env.PANEL_SURVEY_CONFIG):null;
+ if(survey){validate(survey.baseline);validate(survey.circuits);}
  const photo=process.env.PANEL_PHOTO_CONFIG?validate(JSON.parse(process.env.PANEL_PHOTO_CONFIG)):null;
  await sql`CREATE TABLE IF NOT EXISTS panel_state (id integer PRIMARY KEY CHECK(id=1), circuits jsonb NOT NULL, revision integer NOT NULL DEFAULT 0, updated_at timestamptz NOT NULL DEFAULT now())`;
  await sql`CREATE TABLE IF NOT EXISTS panel_history (id bigserial PRIMARY KEY, revision integer NOT NULL, circuits jsonb NOT NULL, saved_at timestamptz NOT NULL DEFAULT now())`;
- await sql`INSERT INTO panel_state(id,circuits) VALUES(1,${JSON.stringify(photo||blank())}::jsonb) ON CONFLICT DO NOTHING`;
+ await sql`INSERT INTO panel_state(id,circuits) VALUES(1,${JSON.stringify(survey?.baseline||photo||blank())}::jsonb) ON CONFLICT DO NOTHING`;
  if(req.method==='GET'){
  let [row]=await sql`SELECT circuits,revision,updated_at FROM panel_state WHERE id=1`;
  // Only replace an untouched v1 placeholder; preserve every user-edited repertoire.
@@ -23,6 +25,20 @@ export default async function handler(req,res){
  sql`INSERT INTO panel_history(revision,circuits) SELECT revision,circuits FROM panel_state WHERE id=1 AND revision=${row.revision} AND circuits=${old}::jsonb`,
  sql`UPDATE panel_state SET circuits=${next}::jsonb,revision=revision+1,updated_at=now() WHERE id=1 AND revision=${row.revision} AND circuits=${old}::jsonb RETURNING circuits,revision,updated_at`
  ]);if(results[1].length)row=results[1][0];else [row]=await sql`SELECT circuits,revision,updated_at FROM panel_state WHERE id=1`;
+ }
+ if(survey){
+ await sql`CREATE TABLE IF NOT EXISTS panel_migrations (id text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`;
+ const applied=await sql`SELECT id FROM panel_migrations WHERE id=${survey.id}`;
+ if(!applied.length){
+ const previous=JSON.stringify(row.circuits),merged=JSON.stringify(validate(mergeSurvey(normalize(row.circuits),survey)));
+ await sql`WITH changed AS (
+ UPDATE panel_state SET circuits=${merged}::jsonb,revision=revision+1,updated_at=now()
+ WHERE id=1 AND revision=${row.revision} AND NOT EXISTS(SELECT 1 FROM panel_migrations WHERE id=${survey.id}) RETURNING revision
+ ), history AS (
+ INSERT INTO panel_history(revision,circuits) SELECT ${row.revision},${previous}::jsonb FROM changed
+ ) INSERT INTO panel_migrations(id) SELECT ${survey.id} FROM changed ON CONFLICT DO NOTHING`;
+ [row]=await sql`SELECT circuits,revision,updated_at FROM panel_state WHERE id=1`;
+ }
  }
  return res.status(200).json({...row,circuits:normalize(row.circuits)});
  }
