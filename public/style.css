@@ -43,7 +43,7 @@
 .detail-item strong{font-size:11px;color:#526a5e}
 .detail-item p{font-size:14px;color:var(--ink);margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .breaker.selected-breaker{outline:3px solid #c9b375;outline-offset:1px;z-index:2}
-@media(max-width:700px){
+@media screen and (max-width:700px){
  header{position:sticky;top:0;z-index:20;padding:0 16px}
  .brand{font-size:11px;letter-spacing:.8px}.brand-icon{font-size:24px;padding:3px 9px}
  .header-end{gap:10px}.menu-toggle{display:block;font-size:23px;line-height:1;border:0;background:transparent;padding:10px;min-width:44px;min-height:44px}
