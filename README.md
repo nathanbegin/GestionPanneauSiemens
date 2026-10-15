@@ -1,4 +1,4 @@
-# GestionPanneauSiemens — v1.2.0
+# GestionPanneauSiemens — v1.3.0
 Répertoire personnel en français pour un panneau Siemens EQ, 40 positions, principal 200 A.
 
 ## Fonctions
@@ -35,3 +35,6 @@ La transcription personnelle est conservée dans la variable serveur privée `PA
 Tags structurés : `locations`, `functions`, `devices`. Recherche sans accents, filtrage par tag, surlignage des circuits et édition dans chaque fiche. Exports JSON schema 2 compatibles avec les anciennes sauvegardes, tags inclus dans les impressions.
 
 Le relevé utilisateur est injecté uniquement via `PANEL_SURVEY_CONFIG` (configuration privée comprenant identifiant de migration, baseline et circuits enrichis). À la première lecture authentifiée, une migration avec garde de révision sauvegarde le répertoire précédent dans `panel_history` et applique les champs dont les valeurs correspondent encore à la baseline. Les descriptions et notes originales sont conservées. Les champs modifiés depuis le relevé sont préservés. `panel_migrations` empêche une nouvelle application automatique. Aucun relevé personnel ne doit être commité dans le dépôt public.
+
+## Version 1.3.0 — Exceptions et détails
+Chaque circuit dispose d'un champ `exceptions` distinct des notes et tags. Le champ est visible dans la nomenclature et à l'impression, modifiable dans la fiche et inclus dans les exports JSON et la recherche. Les anciens fichiers sans ce champ sont normalisés à une chaîne vide à l'import. Le relevé personnel et les exceptions propres au domicile doivent être enregistrés dans la base privée et non dans le dépôt public.
