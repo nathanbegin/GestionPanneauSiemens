@@ -1,4 +1,4 @@
-# GestionPanneauSiemens — v1.4.0
+# GestionPanneauSiemens — v1.5.0
 Répertoire personnel en français pour un panneau Siemens EQ, 40 positions, principal 200 A.
 
 ## Fonctions
@@ -41,3 +41,6 @@ Chaque circuit dispose d'un champ `exceptions` distinct des notes et tags. Le ch
 
 ## Version 1.4.0 — métadonnées de l'impression PDF
 Lors de l'impression du répertoire (ou Enregistrer au format PDF), l'en-tête affiche la date et l'heure locales de l'export ainsi que la version de l'application affichée dans l'interface. L'horodatage est actualisé à l'ouverture de la boîte de dialogue d'impression, y compris via la commande Imprimer du navigateur.
+
+## Version 1.5.0 — formats PDF
+Choix du papier avant impression : Lettre 8,5 × 11 po (par défaut), Légal 8,5 × 14 po, long 8,5 × 16 po (format personnalisé). Mise en page imprimable compacte à deux colonnes, avec tags et exceptions plus petits, tout en conservant la date et la version. Les descriptions restent intégrales; un répertoire particulièrement long peut encore nécessiter plusieurs pages. Dans la boîte d'impression, sélectionner le format de papier correspondant si le navigateur ou l'imprimante ne respecte pas le format CSS.
