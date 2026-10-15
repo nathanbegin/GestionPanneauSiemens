@@ -1,4 +1,4 @@
-# GestionPanneauSiemens — v1.3.0
+# GestionPanneauSiemens — v1.4.0
 Répertoire personnel en français pour un panneau Siemens EQ, 40 positions, principal 200 A.
 
 ## Fonctions
@@ -38,3 +38,6 @@ Le relevé utilisateur est injecté uniquement via `PANEL_SURVEY_CONFIG` (config
 
 ## Version 1.3.0 — Exceptions et détails
 Chaque circuit dispose d'un champ `exceptions` distinct des notes et tags. Le champ est visible dans la nomenclature et à l'impression, modifiable dans la fiche et inclus dans les exports JSON et la recherche. Les anciens fichiers sans ce champ sont normalisés à une chaîne vide à l'import. Le relevé personnel et les exceptions propres au domicile doivent être enregistrés dans la base privée et non dans le dépôt public.
+
+## Version 1.4.0 — métadonnées de l'impression PDF
+Lors de l'impression du répertoire (ou Enregistrer au format PDF), l'en-tête affiche la date et l'heure locales de l'export ainsi que la version de l'application affichée dans l'interface. L'horodatage est actualisé à l'ouverture de la boîte de dialogue d'impression, y compris via la commande Imprimer du navigateur.
