@@ -10,7 +10,8 @@ export function validate(data){
  if(!Array.isArray(c.slots)||!c.slots.length||c.slots.length>4)throw Error('Emplacements invalides.');
  let previous;
  for(const s of c.slots){if(!validSlot(s)||used.has(s))throw Error('Emplacement invalide ou occupé : '+s);used.add(s);const n=parseInt(s),order=Math.floor((n-1)/2)*2+(s.endsWith('B')?1:0);if(previous&&(n%2!==previous.parity||order!==previous.order+1))throw Error('Les emplacements doivent être consécutifs dans la même colonne.');previous={parity:n%2,order};}
- for(const [k,max] of [['label',100],['room',80],['notes',2000],['exceptions',2000]])if(typeof c[k]!=='string'||c[k].length>max)throw Error('Champ invalide : '+k);
+ for(const [k,max] of [['label',100],['room',80],['notes',2000]])if(typeof c[k]!=='string'||c[k].length>max)throw Error('Champ invalide : '+k);
+ if(c.exceptions!==undefined&&(typeof c.exceptions!=='string'||c.exceptions.length>2000))throw Error('Champ invalide : exceptions');
  if(c.tags!==undefined){if(!c.tags||typeof c.tags!=='object'||Array.isArray(c.tags))throw Error('Tags invalides.');for(const k of ['locations','functions','devices']){const a=c.tags[k];if(!Array.isArray(a)||a.length>30||a.some(t=>typeof t!=='string'||!t.trim()||t.length>80))throw Error('Tags invalides : '+k);}}
  for(const k of ['originalLabel','originalNotes','surveyDate'])if(c[k]!==undefined&&(typeof c[k]!=='string'||c[k].length>3000))throw Error('Historique invalide.');
  if(!usages.includes(c.usage)||!states.includes(c.status)||!(c.amps===null||[15,20,25,30,40,50,60,70,80,90,100,125].includes(c.amps)))throw Error('Caractéristiques invalides.');
