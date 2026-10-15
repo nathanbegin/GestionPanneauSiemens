@@ -6,3 +6,32 @@
 
 .circuit-exceptions{margin:0 15px 13px;padding:9px 12px;border-left:3px solid #bb8a41;background:#f8f5e9;color:#67552e;font-size:12px;line-height:1.5;white-space:pre-wrap}@media print{.circuit-exceptions{border-left:2px solid #888;background:transparent;color:#333}}
 .print-report-header{display:none}@media print{.print-report-header{display:block;margin-bottom:18px;break-after:avoid}.print-report-overline{font-weight:700;font-size:12px;letter-spacing:1px}.print-report-header h2{font-size:19px;margin:7px 0 10px}.print-report-header p{font-size:10px;color:#444;margin:3px 0}.directory:before{content:none!important}#directoryList,.list-only #directoryList{margin-top:10px}}
+
+/* v1.5 : mise en page dense, formats Lettre/Légal/long, sans couper le texte */
+.print-format{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--ink)}
+.print-format select{background:#fff;border:1px solid var(--line);border-radius:7px;padding:9px;max-width:none;font-size:11px}
+@media(max-width:700px){.print-format{width:100%;justify-content:flex-start}.print-format select{max-width:75%}}
+@media print{
+  html,body{width:auto!important;margin:0!important;padding:0!important;background:#fff!important}
+  main,.workspace,.directory{width:100%!important;max-width:none!important;min-width:0!important;margin:0!important;padding:0!important}
+  .print-report-header{margin:0 0 3mm!important;padding-bottom:2mm;border-bottom:1px solid #ccc}
+  .print-report-overline{font-size:9pt!important;letter-spacing:.04em}
+  .print-report-header h2{font-size:13pt!important;line-height:1.05!important;margin:1.2mm 0!important}
+  .print-report-header p{font-size:7pt!important;line-height:1.15!important;margin:.5mm 0!important}
+  #directoryList,.list-only #directoryList{
+    display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    column-gap:3mm!important;row-gap:1mm!important;align-content:start!important;
+    overflow:visible!important;max-height:none!important;margin:0!important;padding:0!important;
+  }
+  .circuit-card{min-width:0!important;min-height:0!important;break-inside:avoid!important;page-break-inside:avoid!important;border:1px solid #ddd!important;border-radius:2px!important;background:white!important}
+  .circuit-open{display:flex!important;gap:1.4mm!important;min-width:0!important;padding:1mm 1.2mm .5mm!important;min-height:0!important;align-items:center!important}
+  .card-number{width:5mm!important;min-width:5mm!important;height:5mm!important;font-size:6.5pt!important;border-radius:2px!important;flex-shrink:0!important}
+  .card-text{min-width:0!important;overflow-wrap:anywhere!important}
+  .card-text strong{font-size:7.5pt!important;line-height:1.13!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;font-weight:650!important}
+  .card-text small{font-size:6.1pt!important;line-height:1.1!important;margin-top:.35mm!important;white-space:normal!important}
+  .card-meta{font-size:6.5pt!important;line-height:1.1!important}
+  .card-meta small{font-size:5.6pt!important;margin-top:.4mm!important}
+  .tags{padding:0 1mm .7mm 7mm!important;gap:.6mm!important}
+  .tag{font-size:5.6pt!important;line-height:1.05!important;padding:.3mm .8mm!important;border-radius:2px!important;white-space:normal!important}
+  .circuit-exceptions{font-size:6pt!important;line-height:1.12!important;padding:.5mm 1mm!important;margin:0 1mm .7mm 7mm!important;overflow-wrap:anywhere!important}
+}
