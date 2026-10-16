@@ -2,13 +2,16 @@ import {blank,validate,normalize,designation,tagGroups,allTags,fold,searchable} 
 const $=id=>document.getElementById(id),cacheKey='siemens-eq-v2';
 let circuits=blank(),revision=0,key='',connected=false,dirty=false,selected='',busy=false;
 try{const cached=JSON.parse(localStorage.getItem(cacheKey)||localStorage.getItem('siemens-eq-v1'));if(cached){circuits=normalize(cached.circuits);dirty=!!cached.dirty;revision=cached.revision||0;}}catch{}
-let selectedTag='';
+let selectedTag='',activeUid='siemens-eq',activePanelName='Panneau principal · Siemens EQ',panelList=[{uid:'siemens-eq',name:activePanelName}];
+const panelCache=uid=>'siemens-eq-v2-'+uid;
 function node(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
 const statusClass=c=>c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
 function toast(message){$('toast').textContent=message;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',6500);}
-function persist(){try{localStorage.setItem(cacheKey,JSON.stringify({circuits,revision,dirty}));return true;}catch{toast('Stockage local indisponible : exportez une copie.');return false;}}
+function persist(){try{localStorage.setItem(panelCache(activeUid),JSON.stringify({circuits,revision,dirty}));if(activeUid==='siemens-eq')localStorage.setItem(cacheKey,JSON.stringify({circuits,revision,dirty}));return true;}catch{toast('Stockage local indisponible : exportez une copie.');return false;}}
 function syncLabel(message){$('sync').textContent=message||(connected?(dirty?'Modifications locales · synchronisation en attente':'● Synchronisé avec votre base'):'○ Brouillon local · connectez-vous pour charger votre panneau');$('connect').textContent=connected?'Déconnexion':'Connexion';}
 function render(){
+ $('panelUid').textContent='UID : '+activeUid;
+ $('printPanelName').textContent=activePanelName+' — Siemens EQ · 200 A';
  $('breakers').replaceChildren();$('directoryList').replaceChildren();
  const q=fold($('search').value),filter=$('filter').value;let shown=0;
  $('tagFilter').replaceChildren();
@@ -34,7 +37,7 @@ for(const a of [15,20,25,30,40,50,60,70,80,90,100,125])$('circuitForm').elements
 $('circuitForm').onsubmit=async e=>{e.preventDefault();if(busy)return;const f=new FormData(e.target),next=structuredClone(circuits),c=next.find(c=>c.id===selected);Object.assign(c,{label:f.get('label').trim(),room:f.get('room').trim(),usage:f.get('usage'),amps:f.get('amps')===''?null:Number(f.get('amps')),status:f.get('status'),notes:f.get('notes').trim(),exceptions:f.get('exceptions').trim()});c.tags=Object.fromEntries(tagGroups.map(k=>[k,[...new Set(f.get(k).split(',').map(t=>t.trim()).filter(Boolean))]]));try{validate(next);}catch(err){$('formError').textContent=err.message;return;}circuits=next;dirty=true;persist();$('editor').close();render();if(connected)await save();else toast('Modification conservée localement.');};
 $('close').onclick=$('cancel').onclick=()=>$('editor').close();$('search').oninput=$('filter').onchange=render;
 for(const [id,list] of [['panelView',false],['listView',true]])$(id).onclick=()=>{document.querySelector('.workspace').classList.toggle('list-only',list);closeMenu();$('panelView').classList.toggle('active',!list);$('listView').classList.toggle('active',list);};
-function download(){const url=URL.createObjectURL(new Blob([JSON.stringify({schema:2,panel:'Siemens EQ',visiblePositions:32,mainAmps:200,circuits},null,2)],{type:'application/json'}));const a=node('a');a.href=url;a.download='GestionPanneauSiemens.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function download(){const url=URL.createObjectURL(new Blob([JSON.stringify({schema:2,id:activeUid,panel:activePanelName,visiblePositions:32,mainAmps:200,circuits},null,2)],{type:'application/json'}));const a=node('a');a.href=url;a.download='GestionPanneauSiemens.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('export').onclick=download;
 $('labels').onclick=async()=>{
  if(busy){toast('Une synchronisation est en cours.');return;}
@@ -43,7 +46,7 @@ $('labels').onclick=async()=>{
  const button=$('labels');button.disabled=true;button.textContent='Envoi à ZebraHD…';
  $('labelResult').hidden=true;
  try{
-  const response=await fetch('/api/etiquettes',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({circuits})});
+  const response=await fetch('/api/etiquettes',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({id:activeUid,panel:activePanelName,circuits})});
   const out=await response.json().catch(()=>({}));
   if(!response.ok||!out.ok||!out.url)throw Error(out.error||'Création des étiquettes impossible.');
   const target=new URL(out.url);
@@ -62,9 +65,56 @@ $('printFormat').addEventListener('change',updatePrintPageSize);updatePrintPageS
 function updatePrintMetadata(){updatePrintPageSize();const now=new Date();const date=new Intl.DateTimeFormat('fr-CA',{dateStyle:'long',timeStyle:'short'}).format(now);$('printExportedAt').textContent='Exporté le '+date+' (heure locale)';$('printAppVersion').textContent='Version de l’application : '+document.querySelector('.version').textContent.trim();}
 window.addEventListener('beforeprint',updatePrintMetadata);
 $('print').onclick=()=>{updatePrintMetadata();const q=$('search').value,f=$('filter').value,t=selectedTag;selectedTag='';$('search').value='';$('filter').value='';render();window.print();$('search').value=q;$('filter').value=f;selectedTag=t;render();};
-async function request(method='GET',data){const response=await fetch('/api/panel',{method,headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},...(data?{body:JSON.stringify(data)}:{})});let result;try{result=await response.json();}catch{throw Error('Réponse du serveur indisponible.');}if(!response.ok)throw Error(result.error||'Échec de la synchronisation.');return result;}
+async function request(method='GET',data){const path=activeUid==='siemens-eq'?'/api/panel':'/api/panels-manager?uid='+encodeURIComponent(activeUid);const payload=data&&activeUid!=='siemens-eq'?{...data,name:activePanelName}:data;const response=await fetch(path,{method,headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},...(payload?{body:JSON.stringify(payload)}:{})});let result;try{result=await response.json();}catch{throw Error('Réponse du serveur indisponible.');}if(!response.ok)throw Error(result.error||'Échec de la synchronisation.');return result;}
 async function save(){if(busy)return;busy=true;syncLabel('Synchronisation…');try{const out=await request('PUT',{circuits,revision});revision=out.revision;dirty=false;persist();syncLabel();toast('Modifications synchronisées.');}catch(err){syncLabel('⚠ '+err.message);toast(err.message);}finally{busy=false;}}
 $('connect').onclick=()=>{if(connected){key='';connected=false;syncLabel();return;}$('loginError').textContent='';$('login').showModal();};$('loginClose').onclick=()=>$('login').close();
-$('loginForm').onsubmit=async e=>{e.preventDefault();if(busy)return;key=e.target.elements.key.value;busy=true;const button=e.target.querySelector('.primary');button.disabled=true;try{const data=await request();const next=normalize(data.circuits);if(dirty&&!confirm('Charger la version de la base ? Annulez pour exporter votre brouillon avant son remplacement.')){key='';return;}circuits=next;revision=data.revision;connected=true;dirty=false;persist();render();$('login').close();e.target.reset();toast('Panneau chargé.');}catch(err){key='';$('loginError').textContent=err.message;}finally{busy=false;button.disabled=false;}};
-$('photos').onclick=async()=>{if(!connected){toast('Connectez-vous pour charger la configuration privée des photos.');$('login').showModal();return;}if(busy)return;if(!confirm('Appliquer la transcription des photos ? La version actuelle sera sauvegardée dans la base avant remplacement.'))return;busy=true;try{const data=await request('POST',{action:'apply-photos',revision});circuits=validate(data.circuits);revision=data.revision;dirty=false;persist();render();toast('Configuration des photos appliquée. Les usages restent à confirmer.');}catch(err){toast(err.message);}finally{busy=false;}};
+$('loginForm').onsubmit=async e=>{e.preventDefault();if(busy)return;key=e.target.elements.key.value;busy=true;const button=e.target.querySelector('.primary');button.disabled=true;try{const data=await request();const next=normalize(data.circuits);if(dirty&&!confirm('Charger la version de la base ? Annulez pour exporter votre brouillon avant son remplacement.')){key='';return;}circuits=next;revision=data.revision;connected=true;activePanelName=data.name||activePanelName;await refreshPanels();dirty=false;persist();render();$('login').close();e.target.reset();toast('Panneau chargé.');}catch(err){key='';$('loginError').textContent=err.message;}finally{busy=false;button.disabled=false;}};
+$('photos').onclick=async()=>{if(activeUid!=='siemens-eq'){toast('Configuration photos réservée au panneau principal.');return;}if(!connected){toast('Connectez-vous pour charger la configuration privée des photos.');$('login').showModal();return;}if(busy)return;if(!confirm('Appliquer la transcription des photos ? La version actuelle sera sauvegardée dans la base avant remplacement.'))return;busy=true;try{const data=await request('POST',{action:'apply-photos',revision});circuits=validate(data.circuits);revision=data.revision;dirty=false;persist();render();toast('Configuration des photos appliquée. Les usages restent à confirmer.');}catch(err){toast(err.message);}finally{busy=false;}};
+
+async function refreshPanels(){
+ if(!connected)return;
+ try{
+  const r=await fetch('/api/panels-manager',{headers:{Authorization:'Bearer '+key},cache:'no-store'});
+  const data=await r.json();if(!r.ok)throw Error(data.error);
+  panelList=data.panels;$('panelSelector').replaceChildren(...panelList.map(p=>new Option(p.name,p.uid)));
+  $('panelSelector').value=activeUid;
+ }catch(err){toast('Liste de panneaux indisponible : '+err.message);}
+}
+async function selectPanel(uid){
+ if(uid===activeUid)return;
+ if(dirty&&!confirm('Le panneau contient des modifications non synchronisées. Changer de panneau ?')){$('panelSelector').value=activeUid;return;}
+ const previous={uid:activeUid,name:activePanelName,circuits,revision,dirty};
+ activeUid=uid;activePanelName=panelList.find(p=>p.uid===uid)?.name||'Panneau Siemens EQ';
+ const cached=localStorage.getItem(panelCache(uid));
+ circuits=blank();revision=0;dirty=false;
+ try{if(cached){const c=JSON.parse(cached);circuits=normalize(c.circuits);revision=c.revision||0;dirty=!!c.dirty;}}catch{}
+ if(connected)try{
+  const data=await request();if(dirty&&!confirm('Charger le panneau enregistré en remplaçant le brouillon local ?')){render();return;}
+  circuits=normalize(data.circuits);revision=data.revision;activePanelName=data.name||activePanelName;dirty=false;persist();
+ }catch(err){activeUid=previous.uid;activePanelName=previous.name;circuits=previous.circuits;revision=previous.revision;dirty=previous.dirty;toast(err.message);}
+ $('panelSelector').value=activeUid;selectedTag='';render();
+}
+$('panelSelector').onchange=e=>selectPanel(e.target.value);
+$('panelCreate').onclick=async()=>{
+ if(!connected){toast('Connectez-vous pour ajouter un panneau.');return;}
+ const name=prompt('Nom du nouveau panneau électrique :','Panneau secondaire');
+ if(!name?.trim())return;
+ try{const r=await fetch('/api/panels-manager',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:name.trim()})});const data=await r.json();if(!r.ok)throw Error(data.error);
+ await refreshPanels();await selectPanel(data.uid);toast('Panneau créé : '+data.uid);
+ }catch(err){toast(err.message);}
+};
+$('panelRename').onclick=async()=>{
+ if(!connected){toast('Connectez-vous pour renommer.');return;}
+ if(activeUid==='siemens-eq'){toast('Le nom du panneau principal est réservé.');return;}
+ const name=prompt('Nouveau nom du panneau :',activePanelName);if(!name?.trim())return;
+ activePanelName=name.trim();dirty=true;persist();render();await save();await refreshPanels();
+};
+$('panelDelete').onclick=async()=>{
+ if(!connected||activeUid==='siemens-eq'){toast('Connectez-vous; le panneau principal ne peut pas être supprimé.');return;}
+ if(!confirm('Supprimer définitivement « '+activePanelName+' » et tous ses circuits ?'))return;
+ const id=activeUid;
+ try{const r=await fetch('/api/panels-manager?uid='+encodeURIComponent(id),{method:'DELETE',headers:{Authorization:'Bearer '+key}});const data=await r.json();if(!r.ok)throw Error(data.error);localStorage.removeItem(panelCache(id));await refreshPanels();await selectPanel('siemens-eq');toast('Panneau supprimé.');
+ }catch(err){toast(err.message);}
+};
+
 render();
