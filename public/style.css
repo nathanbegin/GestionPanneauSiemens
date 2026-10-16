@@ -80,3 +80,5 @@
 }
 @media(min-width:701px){.mobile-panel-tip{display:none}}
 @media print{.menu-toggle,.circuit-details,.mobile-panel-tip{display:none!important}}
+
+#labels{background:#e2eee1;border-color:#aec7af;font-weight:700}.label-result{padding:11px 15px;margin:12px 0;background:#edf4ed;border:1px solid #b6cdb6;border-radius:8px}.label-result a{color:#195943;font-weight:700}@media(max-width:700px){#labels{width:100%}}
