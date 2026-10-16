@@ -18,7 +18,7 @@ export default async function handler(req,res){
    const panels=await sql`SELECT uid,name,revision,updated_at FROM panels_extra ORDER BY name`;
    return res.status(200).json({panels:[{uid:first,name:'Panneau principal · Siemens EQ',primary:true},...panels]});
   }
-  if(!uidOk(uid)||uid===first)return res.status(400).json({error:'UID invalide ou réservé au panneau principal.'});
+  if(req.method!=='POST'&&(!uidOk(uid)||uid===first))return res.status(400).json({error:'UID invalide ou réservé au panneau principal.'});
   if(req.method==='GET'){
    const [row]=await sql`SELECT uid,name,circuits,revision,updated_at FROM panels_extra WHERE uid=${uid}`;
    if(!row)return res.status(404).json({error:'Panneau introuvable.'});
