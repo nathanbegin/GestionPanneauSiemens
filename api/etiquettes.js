@@ -2,7 +2,6 @@ import {createHash,timingSafeEqual} from 'node:crypto';
 import {normalize} from '../public/model.js';
 
 const ZEBRA_ORIGIN='https://zebra.nathanbegin.xyz';
-const PANEL_ID='siemens-eq';
 const MAX_BYTES=400000;
 const equal=(a,b)=>{const hash=s=>createHash('sha256').update(String(s)).digest();return timingSafeEqual(hash(a),hash(b));};
 
@@ -19,7 +18,9 @@ export default async function handler(req,res){
   const body=typeof req.body==='string'?JSON.parse(req.body):req.body;
   if(!body||typeof body!=='object'||!Array.isArray(body.circuits))throw Error('Circuits manquants.');
   const circuits=normalize(body.circuits);
-  payload={id:PANEL_ID,schema:2,panel:'Siemens EQ',mainAmps:200,visiblePositions:32,circuits};
+  const id=body.id||'siemens-eq';if(typeof id!=='string'||!/^([a-z0-9][a-z0-9-]{0,79})$/.test(id))throw Error('UID de panneau invalide.');
+  const name=typeof body.panel==='string'&&body.panel.trim()?body.panel.trim().slice(0,100):'Siemens EQ';
+  payload={id,schema:2,panel:name,mainAmps:200,visiblePositions:32,circuits};
   if(Buffer.byteLength(JSON.stringify(payload),'utf8')>MAX_BYTES)throw Error('Données trop volumineuses.');
  }catch(e){return res.status(400).json({error:e.message||'Panneau invalide.'});}
  try{
@@ -29,7 +30,7 @@ export default async function handler(req,res){
   try{response=await fetch(ZEBRA_ORIGIN+'/api/panels',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':zebraKey},body:JSON.stringify(payload),signal:controller.signal});}
   finally{clearTimeout(timeout);}
   const result=await response.json().catch(()=>null);
-  if(!response.ok||!result?.ok||result.id!==PANEL_ID)return res.status(502).json({error:result?.error||'Envoi à ZebraHD impossible.',upstreamStatus:response.status});
+  if(!response.ok||!result?.ok||result.id!==payload.id)return res.status(502).json({error:result?.error||'Envoi à ZebraHD impossible.',upstreamStatus:response.status});
   return res.status(200).json({ok:true,count:result.count,url:ZEBRA_ORIGIN+'/etiquettes.html#panel='+encodeURIComponent(result.id)});
  }catch(e){return res.status(502).json({error:e.name==='AbortError'?'ZebraHD ne répond pas assez rapidement.':'Impossible de joindre ZebraHD.'});}
 }
