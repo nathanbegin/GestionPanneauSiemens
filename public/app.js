@@ -36,6 +36,25 @@ $('close').onclick=$('cancel').onclick=()=>$('editor').close();$('search').oninp
 for(const [id,list] of [['panelView',false],['listView',true]])$(id).onclick=()=>{document.querySelector('.workspace').classList.toggle('list-only',list);closeMenu();$('panelView').classList.toggle('active',!list);$('listView').classList.toggle('active',list);};
 function download(){const url=URL.createObjectURL(new Blob([JSON.stringify({schema:2,panel:'Siemens EQ',visiblePositions:32,mainAmps:200,circuits},null,2)],{type:'application/json'}));const a=node('a');a.href=url;a.download='GestionPanneauSiemens.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('export').onclick=download;
+$('labels').onclick=async()=>{
+ if(busy){toast('Une synchronisation est en cours.');return;}
+ if(!connected||!key){toast('Connectez-vous pour envoyer le panneau à ZebraHD.');$('login').showModal();return;}
+ const destination=window.open('about:blank','_blank');
+ const button=$('labels');button.disabled=true;button.textContent='Envoi à ZebraHD…';
+ $('labelResult').hidden=true;
+ try{
+  const response=await fetch('/api/etiquettes',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({circuits})});
+  const out=await response.json().catch(()=>({}));
+  if(!response.ok||!out.ok||!out.url)throw Error(out.error||'Création des étiquettes impossible.');
+  const target=new URL(out.url);
+  if(target.origin!=='https://zebra.nathanbegin.xyz')throw Error('Adresse ZebraHD inattendue.');
+  if(destination){destination.location.replace(target.href);}
+  else{const link=node('a');link.href=target.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Ouvrir les étiquettes ZebraHD';$('labelResult').replaceChildren(link);$('labelResult').hidden=false;}
+  toast((out.count??circuits.length)+' circuits transmis à ZebraHD.');
+ }catch(err){if(destination)destination.close();toast(err.message);}
+ finally{button.disabled=false;button.textContent='🏷 Créer des étiquettes';}
+};
+
 $('import').onchange=async e=>{try{if(busy)throw Error('Attendez la synchronisation.');const file=e.target.files[0];if(!file)return;if(file.size>200000)throw Error('Fichier trop volumineux.');const data=JSON.parse(await file.text());if(![1,2].includes(data.schema))throw Error('Format non pris en charge.');const next=normalize(data.circuits);if(!confirm('Remplacer le répertoire par le fichier importé ?'))return;circuits=next;dirty=true;persist();render();if(connected)await save();}catch(err){toast(err.message);}finally{e.target.value='';}};
 const printPageStyle=document.createElement('style');printPageStyle.id='page-size-print';document.head.append(printPageStyle);
 function updatePrintPageSize(){const sizes={letter:'8.5in 11in',legal:'8.5in 14in',extended:'8.5in 16in'};const format=$('printFormat').value;document.body.dataset.printFormat=format;printPageStyle.textContent=`@page{size:${sizes[format]||sizes.letter};margin:8mm}`;}
