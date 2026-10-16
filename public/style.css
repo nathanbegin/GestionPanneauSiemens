@@ -82,3 +82,13 @@
 @media print{.menu-toggle,.circuit-details,.mobile-panel-tip{display:none!important}}
 
 #labels{background:#e2eee1;border-color:#aec7af;font-weight:700}.label-result{padding:11px 15px;margin:12px 0;background:#edf4ed;border:1px solid #b6cdb6;border-radius:8px}.label-result a{color:#195943;font-weight:700}@media(max-width:700px){#labels{width:100%}}
+
+/* v1.9 — multi-panneaux */
+.panel-switcher{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:12px 14px;margin:0 0 16px;background:#f9fbf7;border:1px solid var(--line);border-radius:10px}
+.panel-switcher label{font-size:11px;font-weight:700}
+.panel-switcher select{min-width:200px;max-width:400px;flex:1;padding:10px;background:white;border:1px solid var(--line);border-radius:7px;font-size:13px}
+.panel-switcher button{padding:10px 12px;min-height:42px}
+#panelDelete{color:#a13228}
+#panelUid{font-size:10px;letter-spacing:.02em;color:var(--muted);overflow-wrap:anywhere}
+@media screen and (max-width:700px){.panel-switcher{padding:10px;gap:7px;margin-bottom:12px}.panel-switcher label{width:100%}.panel-switcher select{min-width:0;flex-basis:100%;max-width:none;font-size:14px}.panel-switcher button{flex:1}.panel-switcher #panelUid{width:100%}}
+@media print{.panel-switcher{display:none!important}}
