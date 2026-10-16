@@ -10,8 +10,8 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({error:'Méthode non permise.'});}
  const panelKey=process.env.PANEL_ACCESS_KEY;
- const zebraKey=process.env.ETIQUETTES_API_KEY||process.env.ZEBRAHD_API_KEY;
- if(!panelKey||!zebraKey)return res.status(503).json({error:'Clé d’accès ou clé ZebraHD absente de Vercel. Vérifiez PANEL_ACCESS_KEY et ETIQUETTES_API_KEY.'});
+ const zebraKey=process.env.PANELS_API_KEY||process.env.ETIQUETTES_API_KEY||process.env.ZEBRAHD_API_KEY;
+ if(!panelKey||!zebraKey)return res.status(503).json({error:'Clé d’accès ou clé ZebraHD absente de Vercel. Vérifiez PANEL_ACCESS_KEY et PANELS_API_KEY.'});
  const provided=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
  if(!equal(provided,panelKey))return res.status(401).json({error:'Connectez-vous au panneau avant de créer les étiquettes.'});
  let payload;
