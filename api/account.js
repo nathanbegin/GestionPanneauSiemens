@@ -1,0 +1,62 @@
+// Profil, mot de passe, suppression du compte et import de l'ancienne version (clé d'accès unique).
+import {createHash,timingSafeEqual} from 'node:crypto';
+import {getSql} from './_lib/db.js';
+import {route,body,HttpError,clientIp} from './_lib/http.js';
+import {requireUser,publicUser,verifyPassword,hashPassword,checkPassword,newId,rateLimit,recordAttempt,clearSessionCookie,readToken} from './_lib/auth.js';
+import {normalize,highestPosition,resize} from '../public/model.js';
+
+const s=(v,max)=>String(v??'').trim().slice(0,max);
+function cleanProfile(p={}){
+ return {accountType:p.accountType==='pro'?'pro':'particulier',company:s(p.company,120),licence:s(p.licence,60),phone:s(p.phone,40),proEmail:s(p.proEmail,200),address:s(p.address,200)};
+}
+const same=(a,b)=>{const h=v=>createHash('sha256').update(String(v)).digest();return timingSafeEqual(h(a),h(b));};
+
+export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
+ const sql=await getSql();
+ const user=await requireUser(req,sql);
+ const action=String(req.query?.action||'');
+ if(req.method==='GET')return res.status(200).json({user:publicUser(user)});
+ const data=body(req);
+ if(req.method==='PUT'&&action==='password'){
+  await rateLimit(sql,'pwd:'+user.id,8,15);
+  if(!await verifyPassword(String(data.current||''),user.password_hash)){await recordAttempt(sql,'pwd:'+user.id);throw new HttpError(400,'Mot de passe actuel incorrect.');}
+  checkPassword(data.password);
+  const hash=await hashPassword(data.password);
+  await sql`UPDATE app_users SET password_hash=${hash},updated_at=now() WHERE id=${user.id}`;
+  // Ferme les autres sessions.
+  const current=createHash('sha256').update(readToken(req).token).digest('hex');
+  await sql`DELETE FROM app_sessions WHERE user_id=${user.id} AND id<>${current}`;
+  return res.status(200).json({ok:true});
+ }
+ if(req.method==='PUT'){
+  const name=s(data.name,100);if(!name)throw new HttpError(400,'Indiquez votre nom.');
+  const profile=cleanProfile(data.profile);
+  const [u]=await sql`UPDATE app_users SET name=${name},profile=${JSON.stringify(profile)}::jsonb,updated_at=now() WHERE id=${user.id} RETURNING *`;
+  return res.status(200).json({user:publicUser(u)});
+ }
+ if(req.method==='DELETE'){
+  if(!await verifyPassword(String(data.password||''),user.password_hash))throw new HttpError(400,'Mot de passe incorrect. Le compte n’a pas été supprimé.');
+  await sql`DELETE FROM app_users WHERE id=${user.id}`;
+  clearSessionCookie(req,res);
+  return res.status(200).json({ok:true});
+ }
+ if(req.method==='POST'&&action==='legacy-import'){
+  // Copie (sans rien supprimer) les panneaux de la version 1.x protégés par PANEL_ACCESS_KEY.
+  await rateLimit(sql,'legacy:'+clientIp(req),6,30);
+  if(!process.env.PANEL_ACCESS_KEY)throw new HttpError(404,'Aucune ancienne version n’est configurée sur ce serveur.');
+  if(!same(String(data.key||''),process.env.PANEL_ACCESS_KEY)){await recordAttempt(sql,'legacy:'+clientIp(req));throw new HttpError(401,'Clé d’accès de l’ancienne version incorrecte.');}
+  const panels=[];
+  try{const [row]=await sql`SELECT circuits FROM panel_state WHERE id=1`;if(row)panels.push({name:'Panneau principal',kind:'Principal',circuits:row.circuits});}catch{}
+  try{for(const r of await sql`SELECT name,circuits FROM panels_extra ORDER BY name`)panels.push({name:r.name,kind:'Sous-panneau',circuits:r.circuits});}catch{}
+  if(!panels.length)throw new HttpError(404,'Aucun panneau trouvé dans l’ancienne version.');
+  const siteId=newId();
+  await sql`INSERT INTO app_sites(id,user_id,name,notes) VALUES(${siteId},${user.id},${s(data.siteName,100)||'Ma maison'},'Importé depuis la version 1.x.')`;
+  for(const p of panels){
+   let circuits=normalize(p.circuits),positions=Math.max(32,highestPosition(circuits));if(positions%2)positions++;
+   circuits=resize(circuits,positions);
+   await sql`INSERT INTO app_panels(id,user_id,site_id,name,kind,positions,details,circuits) VALUES(${newId()},${user.id},${siteId},${s(p.name,100)},${p.kind},${positions},${JSON.stringify({brand:'Siemens',model:'EQ',mainAmps:200,voltage:'120/240 V monophasé'})}::jsonb,${JSON.stringify(circuits)}::jsonb)`;
+  }
+  return res.status(201).json({siteId,count:panels.length});
+ }
+ throw new HttpError(404,'Action inconnue.');
+});

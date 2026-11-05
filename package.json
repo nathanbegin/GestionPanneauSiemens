@@ -1,15 +1,23 @@
 {
   "name": "gestion-panneau-siemens",
-  "version": "1.9.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "dev": "node scripts/dev-server.mjs",
+    "icons": "NODE_PATH=$(npm root -g) node scripts/icons.mjs",
+    "mobile": "cd mobile && npm run build"
   },
   "dependencies": {
-    "@neondatabase/serverless": "1.0.2"
-  }
+    "@neondatabase/serverless": "1.0.2",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "pg": "^8.23.1"
+  },
+  "description": "Mon Panneau — nomenclature de panneaux électriques (web, iOS, Android)."
 }

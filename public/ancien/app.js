@@ -1,4 +1,4 @@
-import {blank,validate,normalize,designation,tagGroups,allTags,fold,searchable} from './model.js';
+import {blank,validate,normalize,designation,tagGroups,allTags,fold,searchable} from '../model.js';
 const $=id=>document.getElementById(id),cacheKey='siemens-eq-v2';
 let circuits=blank(),revision=0,key='',connected=false,dirty=false,selected='',busy=false;
 try{const cached=JSON.parse(localStorage.getItem(cacheKey)||localStorage.getItem('siemens-eq-v1'));if(cached){circuits=normalize(cached.circuits);dirty=!!cached.dirty;revision=cached.revision||0;}}catch{}
