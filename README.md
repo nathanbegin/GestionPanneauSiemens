@@ -67,6 +67,13 @@ Ces valeurs sont insérées au premier démarrage, puis **se modifient dans la c
 - **Webhook** `POST /api/stripe-webhook` : signature vérifiée, idempotent. Événements : `checkout.session.completed`, `customer.subscription.created|updated|deleted`, `invoice.payment_failed`, `charge.refunded`.
 - **Mobile** : pas d'achat dans l'application (règles Apple/Google). Les boutons ouvrent la page web.
 
+### Codes promo (sans paiement)
+Variable Vercel `PROMO_CODES`, codes séparés par des virgules, insensibles à la casse (4 caractères minimum) :
+- `MONCODE` → forfait caché **Accès complet** (toutes les fonctions, panneaux et sites illimités), sans date de fin ;
+- `ESSAI:electricien-solo:90` → forfait Électricien Solo pendant 90 jours.
+
+L'utilisateur entre le code dans *Mon abonnement*. Fonctionne sans Stripe. Tentatives limitées, utilisation inscrite au journal de la console. Retirer un code de la variable empêche les nouvelles utilisations ; pour retirer l'accès à quelqu'un, annulez son forfait dans la console.
+
 ### Activer Stripe (le moment venu)
 1. Créer le compte Stripe (entreprise, compte bancaire canadien), puis activer **Stripe Tax** (inscriptions TPS/TVQ) si applicable.
 2. Dans Vercel : `STRIPE_SECRET_KEY` (commencer par `sk_test_…`), `ADMIN_EMAILS`, et `STRIPE_TAX=1` si Stripe Tax est activé.

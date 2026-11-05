@@ -1,6 +1,6 @@
 // Forfaits, droits et quotas. Les forfaits par défaut sont insérés une seule fois :
 // ensuite, ils se modifient dans la console d'administration.
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash,timingSafeEqual} from 'node:crypto';
 import {HttpError} from './http.js';
 
 export const FREE_PLAN='gratuit';
@@ -13,11 +13,13 @@ const DEFAULT_PLANS=[
  {id:'gestionnaire',name:'Gestionnaire d’immeuble',audience:'gestionnaire',description:'Copropriétés et immeubles : sites illimités et plusieurs utilisateurs.',price_month:2400,price_year:24000,quota_type:'active',panel_limit:150,site_limit:null,seats:3,features:{qr:true},sort:20},
  {id:'electricien-solo',name:'Électricien Solo',audience:'electricien',description:'Maître électricien : planification avancée et rapports à votre image.',price_month:3400,price_year:34000,quota_type:'monthly',panel_limit:25,site_limit:null,seats:1,features:{planning:true,branding:true},sort:30},
  {id:'electricien-equipe',name:'Électricien Équipe',audience:'electricien',description:'Entreprise : 5 utilisateurs et volume élevé.',price_month:8900,price_year:89000,quota_type:'monthly',panel_limit:120,site_limit:null,seats:5,features:{planning:true,branding:true,team:true},sort:40},
+// Forfait caché attribué par code promo : toutes les fonctions, sans limite.
+ {id:'acces-complet',name:'Accès complet',audience:'electricien',description:'Toutes les fonctionnalités, sans limite (code promo).',price_month:null,price_year:null,quota_type:'active',panel_limit:null,site_limit:null,seats:5,features:{planning:true,branding:true,team:true,qr:true},sort:90,public:false},
 ];
 const DEFAULT_PACKS=[{id:'pack-10',name:'10 panneaux',panels:10,price:2900,validity_days:365}];
 
 export async function seedPlans(sql){
- for(const p of DEFAULT_PLANS)await sql`INSERT INTO app_plans(id,name,audience,description,price_month,price_year,quota_type,panel_limit,site_limit,seats,features,sort) VALUES(${p.id},${p.name},${p.audience},${p.description},${p.price_month},${p.price_year},${p.quota_type},${p.panel_limit},${p.site_limit},${p.seats},${JSON.stringify(p.features)}::jsonb,${p.sort}) ON CONFLICT (id) DO NOTHING`;
+ for(const p of DEFAULT_PLANS)await sql`INSERT INTO app_plans(id,name,audience,description,price_month,price_year,quota_type,panel_limit,site_limit,seats,features,sort,public) VALUES(${p.id},${p.name},${p.audience},${p.description},${p.price_month},${p.price_year},${p.quota_type},${p.panel_limit},${p.site_limit},${p.seats},${JSON.stringify(p.features)}::jsonb,${p.sort},${p.public!==false}) ON CONFLICT (id) DO NOTHING`;
  for(const k of DEFAULT_PACKS)await sql`INSERT INTO app_packs(id,name,panels,price,validity_days) VALUES(${k.id},${k.name},${k.panels},${k.price},${k.validity_days}) ON CONFLICT (id) DO NOTHING`;
 }
 export const planOut=p=>({id:p.id,name:p.name,audience:p.audience,description:p.description,priceMonth:p.price_month,priceYear:p.price_year,quotaType:p.quota_type,panelLimit:p.panel_limit,siteLimit:p.site_limit,seats:p.seats,features:p.features||{},trialDays:p.trial_days,active:p.active,public:p.public,sort:p.sort});
@@ -82,4 +84,23 @@ export async function consumePanelQuota(sql,userId,panelId){
 }
 export async function grantCredits(sql,{userId,packId=null,panels,validityDays=365,source,reference=null}){
  await sql`INSERT INTO app_credits(id,user_id,pack_id,panels,remaining,expires_at,source,reference) VALUES(${randomUUID()},${userId},${packId},${panels},${panels},now()+make_interval(days=>${validityDays}),${source},${reference}) ON CONFLICT (reference) DO NOTHING`;
+}
+
+// Codes promo définis dans la variable PROMO_CODES (séparés par des virgules).
+// Format : CODE  ou  CODE:forfait  ou  CODE:forfait:jours   (défaut : acces-complet, sans fin).
+// Exemple : PROMO_CODES=NATHAN2026,ESSAI-PRO:electricien-solo:90
+export function parsePromoCodes(raw=process.env.PROMO_CODES){
+ return String(raw||'').split(',').map(s=>s.trim()).filter(Boolean).map(entry=>{
+  const [code,plan,days]=entry.split(':').map(x=>x.trim());
+  return {code,plan:plan||'acces-complet',days:days&&Number(days)>0?Math.floor(Number(days)):null};
+ }).filter(p=>p.code.length>=4);
+}
+export function findPromo(input,codes=parsePromoCodes()){
+ const given=String(input||'').trim().toUpperCase();
+ if(!given)return null;
+ // Comparaison à temps constant (empreintes de même longueur).
+ const h=v=>createHash('sha256').update(v).digest();
+ let found=null;
+ for(const p of codes)if(timingSafeEqual(h(p.code.toUpperCase()),h(given)))found=p;
+ return found;
 }

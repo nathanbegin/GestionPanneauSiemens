@@ -12,3 +12,12 @@ test('signature des webhooks Stripe',()=>{
  assert.throws(()=>verifyWebhook(raw,`t=${t-1000},v1=${sig}`,'whsec_a'));
  assert.throws(()=>verifyWebhook(raw+' ',`t=${t},v1=${sig}`,'whsec_a'));
 });
+import {parsePromoCodes,findPromo} from '../api/_lib/plans.js';
+test('codes promo',()=>{
+ const codes=parsePromoCodes('NATHAN2026, essai-pro:electricien-solo:90,abc');
+ assert.equal(codes.length,2);
+ assert.deepEqual(findPromo(' nathan2026 ',codes),{code:'NATHAN2026',plan:'acces-complet',days:null});
+ assert.equal(findPromo('ESSAI-PRO',codes).days,90);
+ assert.equal(findPromo('faux',codes),null);assert.equal(findPromo('',codes),null);
+ assert.equal(parsePromoCodes('').length,0);
+});
