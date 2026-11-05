@@ -56,8 +56,12 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  if(!row)throw new HttpError(404,'Panneau introuvable.');
  if(req.method==='GET'){
   const [site]=await sql`SELECT * FROM app_sites WHERE id=${row.site_id}`;
-  const siblings=await sql`SELECT id,name,tag,kind FROM app_panels WHERE site_id=${row.site_id} ORDER BY created_at`;
-  return res.status(200).json({panel:panelOut(row),site:siteOut(site),siblings});
+  const all=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${row.site_id} ORDER BY created_at`;
+  const siblings=all.map(({id,name,tag,kind})=>({id,name,tag,kind}));
+  // Sous-panneaux alimentés directement ou indirectement par ce panneau (pour le bilan de charge).
+  const children=[],queue=[row.id],seen=new Set([row.id]);
+  while(queue.length){const parent=queue.shift();for(const p of all)if(p.details?.fedFrom===parent&&!seen.has(p.id)){seen.add(p.id);queue.push(p.id);children.push({id:p.id,name:p.name,tag:p.tag,kind:p.kind,circuits:p.circuits});}}
+  return res.status(200).json({panel:panelOut(row),site:siteOut(site),siblings,children});
  }
  if(req.method==='DELETE'){
   await sql`DELETE FROM app_panels WHERE id=${id} AND user_id=${user.id}`;

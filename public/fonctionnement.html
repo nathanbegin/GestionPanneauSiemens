@@ -33,7 +33,7 @@
   <h1>Comment fonctionne <em>Mon Panneau</em></h1>
   <p class="lead">Une démarche en quatre niveaux, toujours dans le même ordre. Le fil d’Ariane en haut de l’application vous indique à chaque instant où vous êtes.</p>
   <nav class="toc" aria-label="Sommaire">
-   <a href="#organisation">Organisation</a><a href="#compte">1. Compte</a><a href="#site">2. Site</a><a href="#panneau">3. Panneau</a><a href="#circuits">4. Circuits</a><a href="#formats">Formats de disjoncteurs</a><a href="#documents">PDF et étiquettes</a><a href="#pro">Électriciens</a><a href="#mobile">Mobile</a><a href="#faq">Questions</a>
+   <a href="#organisation">Organisation</a><a href="#compte">1. Compte</a><a href="#site">2. Site</a><a href="#panneau">3. Panneau</a><a href="#circuits">4. Circuits</a><a href="#formats">Formats de disjoncteurs</a><a href="#documents">PDF et étiquettes</a><a href="#planification">Planification et charges</a><a href="#pro">Électriciens</a><a href="#mobile">Mobile</a><a href="#faq">Questions</a>
   </nav>
  </section>
 
@@ -98,6 +98,23 @@
   <li><strong>Export JSON</strong> : une sauvegarde complète, réimportable dans un nouveau panneau.</li>
  </ul>
 
+
+ <h2 id="planification">Planification et calcul de charges (forfaits Électricien)</h2>
+ <p>L’onglet <strong>⚡ Planification et charges</strong> d’un panneau sert à concevoir ou vérifier un panneau pièce par pièce :</p>
+ <ol>
+  <li><strong>Choisir un modèle du catalogue</strong> (Siemens EQ, Square D QO et Homeline, Eaton BR, Cutler-Hammer CH, Leviton…) dans la fiche du panneau : marque, calibre principal, positions, circuits maximaux et famille de disjoncteurs se remplissent.</li>
+  <li><strong>Placer les disjoncteurs</strong> : touchez une position, choisissez un disjoncteur du catalogue (unipolaire, bipolaire, jumelé, DDFT, anti-arc) ; la référence indicative est proposée.</li>
+  <li><strong>Ajouter les charges</strong> du circuit à partir de la bibliothèque : bornes de recharge niveaux 1 et 2, thermopompes, plinthes, fournaise, chauffe-eau, thermopompe de piscine, spa, cuisinière, sécheuse… ou une charge personnalisée.</li>
+  <li><strong>Lire les résultats</strong> : courant du circuit, taux de charge du disjoncteur (une charge continue doit rester sous 80 % du calibre), disjoncteur et fil suggérés, phases L1/L2, capacité du panneau par rapport au principal, calcul de charge du logement selon la règle 8-200 (avec la superficie habitable) et suggestions (par exemple la borne la plus puissante qui entre encore sous 80 %).</li>
+  <li><strong>Imprimer</strong> le PDF « Bilan de charges et matériel » : synthèse, alertes, calcul 8-200, liste de charges par circuit et liste de disjoncteurs.</li>
+ </ol>
+ <h3>Bornes de recharge : repères</h3>
+ <ul>
+  <li><strong>Niveau 1</strong> : prise 120 V, 1,4 à 1,9 kW, environ 5 à 8 km d’autonomie par heure.</li>
+  <li><strong>Niveau 2</strong> : 208/240 V, 3,8 à 11,5 kW (7,2 kW le plus courant). Une borne est une charge continue : borne de 30 A → disjoncteur de 40 A ; 40 A → 50 A ; 48 A → 60 A.</li>
+  <li><strong>Niveau 3</strong> (rapide, courant continu) : 50 à 350 kW sur une alimentation triphasée 480 ou 600 V ; ne s’installe pas sur un panneau résidentiel.</li>
+ </ul>
+ <p class="notice">Les valeurs de la bibliothèque sont typiques : la plaque signalétique (MCA/MOP pour les thermopompes) a toujours préséance. Les calculs sont des outils d’aide inspirés du Code canadien de l’électricité et du Code de construction du Québec, chapitre V ; la conformité relève d’un maître électricien.</p>
  <h2 id="pro">Pour les électriciens</h2>
  <p>Dans « Mon compte », choisissez le profil <strong>Électricien / entrepreneur</strong> et remplissez le nom de l’entreprise, la licence RBQ, le téléphone et le courriel. Ils apparaissent dans l’en-tête « Préparé par » de chaque rapport. Indiquez aussi dans la fiche du panneau la <strong>date du relevé</strong> et la personne qui l’a effectué. Créez un site par client : le nom du client figure sur le rapport.</p>
 

@@ -1,5 +1,7 @@
 // Formulaires : site, panneau, fiche de circuit.
 import {h,field,select,dialog,toast,confirmDialog} from './dom.js';
+import {PANEL_MODELS,BREAKER_FAMILIES,PANEL_STATES,LOAD_LIBRARY,LOAD_CATEGORIES,WIRE_TABLE,WIRE_TYPES,modelById,modelLabel,breakerChoices,breakerRef,wireAmps} from '../catalog.js';
+import {circuitLoad,polesOf} from '../loadcalc.js';
 import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormats,designation,formatOf,reshape,validate,tagGroups,panelTitle,MAX_POSITIONS} from '../model.js';
 
 const input=(name,value,attrs={})=>h('input',{name,value:value??'',...attrs});
@@ -43,12 +45,15 @@ export function panelFields(panel={},siblings=[]){
    field('Type',select('kind',panelKinds,panel.kind||'Principal')),
    field('Bâtiment',input('building',d.building,{maxlength:80,placeholder:'Ex. Maison, Garage détaché'})),
    field('Emplacement précis',input('location',panel.location,{maxlength:140,placeholder:'Ex. Sous-sol, salle mécanique, mur nord'}),{full:true,hint:'Où trouver le panneau rapidement.'}))),
+  catalogFieldset(d),
   h('fieldset',{class:'form-section'},h('legend',{text:'Caractéristiques'}),h('div',{class:'fields'},
    field('Nombre de positions',select('positions',choices.map(n=>[n,n+' positions']),positions),{hint:'Emplacements numérotés du panneau.'}),
    field('Calibre principal (A)',input('mainAmps',d.mainAmps??'',{type:'number',min:15,max:1200,step:5,inputmode:'numeric',placeholder:'Ex. 200'})),
    field('Marque',input('brand',d.brand,{maxlength:60,placeholder:'Ex. Siemens, Square D, Eaton',list:'brands'})),
    field('Modèle',input('model',d.model,{maxlength:60,placeholder:'Ex. EQ, QO, BR'})),
    field('Tension',select('voltage',voltages,d.voltage||voltages[0])),
+   field('Superficie habitable (m²)',input('livingArea',d.livingArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 140'}),{hint:'Panneau principal d’un logement : sert au calcul de charge (règle 8-200).'}),
+   field('État',select('state',PANEL_STATES,d.state||'Existant'),{hint:'Planifié : panneau à construire ou à modifier.'}),
    h('datalist',{id:'brands'},['Siemens','Square D','Eaton','Cutler-Hammer','Schneider Electric','Federal Pioneer','Stab-Lok','Westinghouse','Commander','GE','Leviton'].map(b=>h('option',{value:b}))))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Alimentation'}),h('div',{class:'fields'},
    field('Alimenté par',fed),
@@ -59,9 +64,25 @@ export function panelFields(panel={},siblings=[]){
    field('Notes sur le panneau',area('notes',d.notes,{maxlength:2000,placeholder:'État, particularités, mise à la terre…'}),{full:true}))),
  ];
 }
+// Choix d'un modèle du catalogue : remplit marque, série, calibre, positions et famille de disjoncteurs.
+function catalogFieldset(d){
+ const groups=new Map();for(const m of PANEL_MODELS){groups.set(m.brand,[...(groups.get(m.brand)||[]),m]);}
+ const sel=h('select',{name:'modelId'},new Option('— Aucun (saisie libre) —',''),...[...groups].map(([b,ms])=>{const og=h('optgroup',{label:b});ms.forEach(m=>og.append(new Option(modelLabel(m),m.id)));return og;}));
+ sel.value=d.modelId||'';
+ const fam=select('breakerFamily',[['','— Selon le modèle —'],...Object.entries(BREAKER_FAMILIES).map(([k,f])=>[k,f.name])],d.breakerFamily||'');
+ const note=h('p',{class:'small muted full'});
+ const showNote=()=>{const m=modelById(sel.value);note.textContent=m?`${m.main?'Avec disjoncteur principal':'Sans disjoncteur principal (sous-panneau)'} · ${m.tandem?`jumelés permis, jusqu’à ${m.maxCircuits} circuits`:'jumelés non permis'}.${m.note?' '+m.note:''} Configuration typique : confirmez sur l’étiquette du panneau.`:'';};
+ sel.addEventListener('change',()=>{
+  const m=modelById(sel.value);const f=sel.closest('form');showNote();if(!m||!f)return;
+  f.elements.brand.value=m.brand;f.elements.model.value=m.series;f.elements.mainAmps.value=m.mainAmps;f.elements.breakerFamily.value=m.family;
+  const pos=f.elements.positions;if(![...pos.options].some(o=>o.value===String(m.positions)))pos.append(new Option(m.positions+' positions',m.positions));pos.value=String(m.positions);
+ });
+ showNote();
+ return h('fieldset',{class:'form-section'},h('legend',{text:'Modèle (catalogue)'}),h('div',{class:'fields'},field('Modèle de panneau',sel,{full:true,hint:'Choisir un modèle remplit les caractéristiques ci-dessous.'}),field('Famille de disjoncteurs',fam,{hint:'Sert aux références de la liste de matériel.'}),note));
+}
 export function panelPayload(form){
  const f=formData(form);
- return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes}},positions:Number(f.positions)};
+ return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,breakerFamily:f.breakerFamily,livingArea:f.livingArea===''?null:Number(f.livingArea),state:f.state}},positions:Number(f.positions)};
 }
 export function panelDialog({siblings=[],onSave}){
  const e=err();
@@ -85,8 +106,9 @@ export function panelDialog({siblings=[],onSave}){
 }
 
 // Fiche d'un circuit avec navigation précédent / suivant.
-export function circuitEditor({panel,id,order,onSave}){
+export function circuitEditor({panel,id,order,onSave,planning=false}){
  let current=id;
+ let plan=null;
  const e=err();
  const body=h('div');
  let d;
@@ -110,7 +132,8 @@ export function circuitEditor({panel,id,order,onSave}){
      field('Tags · appareils desservis',input('devices',(c.tags?.devices||[]).join(', '),{placeholder:'Routeur, Téléviseur'}),{full:true}),
      field('Exceptions et détails',area('exceptions',c.exceptions,{maxlength:2000,placeholder:'Ex. Prise près de la fenêtre non desservie'}),{full:true}),
      field('Notes',area('notes',c.notes,{maxlength:2000,placeholder:'Prises desservies, repères…'}),{full:true}),
-     c.originalLabel?h('p',{class:'small muted full',text:'Description originale du relevé : '+c.originalLabel}):null))),
+     c.originalLabel?h('p',{class:'small muted full',text:'Description originale du relevé : '+c.originalLabel}):null)),
+    (plan=planning?planningSection(c,panel,()=>{dirty=true;},body):null)?.node),
    e);
   d.el.querySelector('.dlg-head h2').textContent='Circuit '+designation(c);
   d.el.querySelector('.dlg-head .eyebrow').textContent=`Fiche ${idx+1} sur ${order.length} · ${panelTitle(panel)}`;
@@ -128,6 +151,12 @@ export function circuitEditor({panel,id,order,onSave}){
   if(Object.values(tags).some(a=>a.length)||c.tags)c.tags=tags;
   // Un circuit décrit passe automatiquement à « Identifié » s'il était « À confirmer » et que l'utilisateur n'a pas touché au statut.
   if(c.label&&c.status==='À confirmer'&&!statusTouched)c.status='Identifié';
+  if(plan){
+   const loads=plan.loads();if(loads.length)c.loads=loads;else delete c.loads;
+   const wire={gauge:f.get('wireGauge')||'',type:f.get('wireType')||'',length:f.get('wireLength')===''||f.get('wireLength')==null?null:Number(f.get('wireLength'))};
+   if(wire.gauge||wire.type||wire.length!=null){if(wire.length==null)delete wire.length;c.wire=wire;}else delete c.wire;
+   const ref=String(f.get('breakerRef')||'').trim();if(ref)c.breakerRef=ref;else delete c.breakerRef;
+  }
   const format=f.get('format');
   if(format&&format!==formatOf(c))next=reshape(next,current,format,panel.positions);
   return validate(next,{positions:panel.positions});
@@ -155,4 +184,89 @@ export function circuitEditor({panel,id,order,onSave}){
  const api={setPanel(p,nextOrder){panel=p;order=nextOrder;if(!panel.circuits.some(x=>x.id===current))current=order[0];}};
  render();
  return api;
+}
+
+// ---------- Planification : disjoncteur du catalogue, charges, conducteur, calcul en direct ----------
+const FORMAT_POLES={single:1,double:2,triple:3,tandem:1};
+function planningSection(c,panel,markDirty,root){
+ const fam=panel.details?.breakerFamily||modelById(panel.details?.modelId)?.family||'generic';
+ let loads=structuredClone(c.loads||[]);
+ const list=h('div',{class:'loads-list'});
+ const live=h('div',{class:'load-live'});
+ const form=()=>root.closest('form');
+ // Disjoncteur du catalogue : règle format, calibre, protection et référence.
+ const choices=breakerChoices(fam);
+ const pick=h('select',{'aria-label':'Disjoncteur du catalogue'},new Option('— Choisir dans le catalogue —',''),...choices.map(b=>new Option(b.label+(b.ref?' · '+b.ref:''),b.key)));
+ pick.addEventListener('change',()=>{
+  const b=choices.find(x=>x.key===pick.value);const f=form();if(!b||!f)return;
+  f.elements.format.value=b.tandem?'tandem':b.poles===3?'triple':b.poles===2?'double':'single';
+  f.elements.amps.value=String(b.amps);f.elements.protection.value=b.protection;f.elements.breakerRef.value=b.ref||'';
+  markDirty();refresh();
+ });
+ // Ajout d'une charge de la bibliothèque.
+ const groups=new Map();for(const l of LOAD_LIBRARY)groups.set(l.g,[...(groups.get(l.g)||[]),l]);
+ const add=h('select',{class:'add-load','aria-label':'Ajouter une charge'},new Option('+ Ajouter une charge…',''),...[...groups].map(([g,ls])=>{const og=h('optgroup',{label:g});ls.forEach(l=>og.append(new Option(`${l.name} — ${(l.w/1000).toLocaleString('fr-CA')} kW`,l.id)));return og;}),h('optgroup',{label:'Autre'},new Option('Charge personnalisée…','custom')));
+ add.addEventListener('change',()=>{
+  const id=add.value;add.value='';if(!id)return;
+  if(id==='custom')loads.push({id:'custom',name:'Charge personnalisée',w:1000,v:120,qty:1,cat:'basic',cont:false});
+  else{const l=LOAD_LIBRARY.find(x=>x.id===id);loads.push({id:l.id,name:l.name,w:l.w,v:l.v,qty:1,cat:l.cat,cont:l.cont});
+   const f=form();if(f&&!f.elements.label.value)f.elements.label.value=l.name.replace(/ —.*$/,'').slice(0,100);
+   if(l.note)live.dataset.note=l.note;}
+  markDirty();drawLoads();refresh();
+ });
+ function drawLoads(){
+  list.replaceChildren(...loads.map((l,i)=>{
+   const upd=(k,v)=>{l[k]=v;markDirty();refresh();};
+   const name=h('input',{value:l.name,maxlength:80,'aria-label':'Nom de la charge',oninput:e=>upd('name',e.target.value||'Charge')});
+   const w=h('input',{type:'number',min:0,max:200000,step:50,value:l.w,'aria-label':'Puissance (W)',oninput:e=>upd('w',Math.max(0,Number(e.target.value)||0))});
+   const v=select('',[[120,'120 V'],[208,'208 V'],[240,'240 V'],[347,'347 V'],[600,'600 V']],l.v);v.removeAttribute('name');v.onchange=e=>upd('v',Number(e.target.value));
+   const q=h('input',{type:'number',min:1,max:100,value:l.qty,'aria-label':'Quantité',oninput:e=>upd('qty',Math.min(100,Math.max(1,parseInt(e.target.value)||1)))});
+   const cat=select('',Object.entries(LOAD_CATEGORIES),l.cat);cat.removeAttribute('name');cat.onchange=e=>upd('cat',e.target.value);
+   const cont=h('label',{class:'check small'},h('input',{type:'checkbox',checked:l.cont,onchange:e=>upd('cont',e.target.checked)}),'Continue');
+   return h('div',{class:'load-row'},name,h('span',{class:'load-w'},w,' W'),v,h('span',{class:'load-q'},'× ',q),cat,cont,h('button',{type:'button',class:'sm ghost','aria-label':'Retirer',onclick:()=>{loads.splice(i,1);markDirty();drawLoads();refresh();}},'✕'));
+  }));
+  if(!loads.length)list.append(h('p',{class:'small muted',text:'Aucune charge. Ajoutez les appareils alimentés par ce circuit pour calculer sa charge.'}));
+ }
+ function draft(){
+  const f=form();const fmt=f?.elements.format.value||formatOf(c);const poles=FORMAT_POLES[fmt]||1;
+  const slots=poles===1?['1A','1B']:poles===2?['1A','1B','3A','3B']:['1A','1B','3A','3B','5A','5B'];
+  const amps=f?.elements.amps.value?Number(f.elements.amps.value):null;
+  return {slots,amps,loads,wire:{gauge:f?.elements.wireGauge?.value||''}};
+ }
+ function refresh(){
+  const r=circuitLoad(draft());
+  const note=live.dataset.note;
+  live.replaceChildren(...[
+   h('div',{class:'load-kpis'},
+    h('span',{},h('b',{text:(r.watts/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW'}),'charge'),
+    h('span',{},h('b',{text:r.demandAmps+' A'}),`à ${r.volts} V`),
+    h('span',{},h('b',{text:r.percent!=null?r.percent+' %':'—'}),'du disjoncteur'),
+    h('span',{},h('b',{text:r.minBreaker?r.minBreaker+' A':'—'}),'disjoncteur min.'),
+    h('span',{},h('b',{text:r.suggestedWire||(r.minBreaker?WIRE_TABLE.find(w=>w.amps>=r.minBreaker)?.gauge:'—')||'—'}),'fil suggéré')),
+   r.percent!=null&&h('div',{class:'progress'+(r.percent>100?' over':r.percent>80?' high':'')},h('i',{style:{width:Math.min(100,r.percent)+'%'}})),
+   ...r.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.level==='error'?'⛔ ':i.level==='warn'?'⚠ ':'ℹ ')+i.text})),
+   note&&h('p',{class:'small muted',text:'ℹ '+note}),
+   r.watts>0&&h('button',{type:'button',class:'sm',onclick:()=>{
+    const f=form();if(!f)return;const needs240=loads.some(l=>l.v>=208);
+    if(needs240&&FORMAT_POLES[f.elements.format.value]<2)f.elements.format.value='double';
+    const r2=circuitLoad(draft());if(r2.minBreaker){f.elements.amps.value=String(r2.minBreaker);}
+    const r3=circuitLoad(draft());if(r3.suggestedWire)f.elements.wireGauge.value=r3.suggestedWire;
+    const poles=FORMAT_POLES[f.elements.format.value];f.elements.breakerRef.value=breakerRef(fam,{poles,amps:Number(f.elements.amps.value),protection:f.elements.protection.value,tandem:f.elements.format.value==='tandem'});
+    markDirty();refresh();}},'Appliquer le disjoncteur et le fil suggérés')].flat().filter(x=>x!=null&&x!==false));
+ }
+ // Un seul écouteur par fiche : la section est recréée à chaque changement de circuit.
+ root._planRefresh=refresh;
+ if(!root._planListener){root._planListener=true;root.addEventListener('change',e=>{if(['amps','format','wireGauge','protection'].includes(e.target.name))root._planRefresh?.();});}
+ drawLoads();
+ const node=h('details',{class:'full plan-box',open:true},h('summary',{text:'⚡ Planification : disjoncteur, charges et conducteur'}),
+  h('div',{class:'fields'},
+   field('Disjoncteur du catalogue',pick,{hint:`Famille : ${BREAKER_FAMILIES[fam]?.name||'générique'}. Références indicatives à valider.`}),
+   field('Référence du disjoncteur',input('breakerRef',c.breakerRef||'',{maxlength:40,placeholder:'Ex. Q240'})),
+   h('div',{class:'full'},h('div',{class:'small',text:'Charges alimentées'}),list,add),
+   field('Calibre du fil',select('wireGauge',[['','—'],...WIRE_TABLE.map(w=>[w.gauge,`${w.gauge} (${w.amps} A)`])],c.wire?.gauge||'')),
+   field('Type de câble',select('wireType',[['','—'],...WIRE_TYPES.map(t=>[t,t])],c.wire?.type||'')),
+   field('Longueur (m)',input('wireLength',c.wire?.length??'',{type:'number',min:0,max:1000,step:1})),
+   h('div',{class:'full'},live)));
+ setTimeout(refresh,0);
+ return {node,loads:()=>loads.map(l=>({...(l.id?{id:l.id}:{}),name:String(l.name).slice(0,80),w:Number(l.w)||0,v:Number(l.v),qty:Number(l.qty)||1,cat:l.cat,cont:!!l.cont}))};
 }

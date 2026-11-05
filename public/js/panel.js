@@ -3,13 +3,17 @@ import {h,toast,confirmDialog,fmtRelative} from './dom.js';
 import {api,openDocument} from './api.js';
 import {designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
+import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
+import {EV_GUIDE,LOADS_SOURCES,modelLabel} from '../catalog.js';
 
 const statusClass=c=>c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
-const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
+const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
 
 export async function panelView({id,tab='panel',ctx}){
- const data=await api('/api/panels?id='+encodeURIComponent(id));
- let {panel,site,siblings}=data;
+ const [data,ent]=await Promise.all([api('/api/panels?id='+encodeURIComponent(id)),api('/api/billing').catch(()=>null)]);
+ let {panel,site,siblings,children=[]}=data;
+ // Planification : forfaits Électricien (et administrateurs).
+ const planning=!!(ent?.plan?.features?.planning||ctx.user?.isAdmin);
  let saving=Promise.resolve();
  const state={tab:tabNames[tab]?tab:'panel',q:'',status:'',tag:''};
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
@@ -64,7 +68,7 @@ export async function panelView({id,tab='panel',ctx}){
  }
  function openCircuit(cid){
   const order=sortCircuits(panel.circuits).map(c=>c.id);
-  const editor=circuitEditor({panel,id:cid,order,onSave:async circuits=>{
+  const editor=circuitEditor({panel,id:cid,order,planning,onSave:async circuits=>{
    const p=await persist({circuits});
    editor.setPanel(p,sortCircuits(p.circuits).map(c=>c.id));
    renderHead();renderBody();
@@ -94,11 +98,19 @@ export async function panelView({id,tab='panel',ctx}){
   const grid=h('div',{class:'breakers'});
   grid.style.gridTemplateRows=`repeat(${panel.positions},16px)`;
   const match=filtered(),filtering=!!(state.q||state.status||state.tag);
+  const showLoads=planning&&state.tab==='plan';
   for(const c of panel.circuits){
    const start=c.slots[0],n=slotPos(start),side=n%2===0?2:1;
    const linked=c.slots.length>2;
    const b=h('button',{type:'button',class:`breaker ${statusClass(c)}${side===2?' even':''}${linked?' linked':''}${filtering?(match(c)?' match':' dimmed'):''}`,'aria-label':`${designation(c)} : ${c.label||'à identifier'}, ${c.amps??'?'} A`,onclick:()=>openCircuit(c.id)},
     h('span',{class:'num',text:designation(c)}),h('span',{class:'lever',text:c.amps??'?'}),h('span',{class:'short',text:c.status==='Libre'?'Libre':c.label||'—'}),h('i',{class:'dot'}));
+   if(showLoads){
+    // Phase et taux de charge du circuit.
+    const r=circuitLoad(c);
+    const leg=r.volts===240?'L1+L2':legOf(n);
+    const tag=h('span',{class:'leg-tag',text:leg});tag.style[side===2?'left':'right']='3px';b.append(tag);
+    if(r.percent!=null){const bar=h('i',{class:r.percent>100?'over':r.percent>80?'high':''});bar.style.width=Math.min(100,r.percent)+'%';b.append(h('span',{class:'load-bar'},bar));}
+   }
    b.style.gridColumn=String(side);
    b.style.gridRow=`${slotOrder(start)+1} / span ${c.slots.length}`;
    grid.append(b);
@@ -126,7 +138,8 @@ export async function panelView({id,tab='panel',ctx}){
    const listBox=h('div',{class:'circuit-list'});
    body.replaceChildren(h('div',{class:'list-wide'},filters(()=>circuitList(listBox)),listBox,legend()));
    circuitList(listBox);
-  }else if(state.tab==='docs')renderDocs();
+  }else if(state.tab==='plan')renderPlan();
+  else if(state.tab==='docs')renderDocs();
   else renderInfo();
  }
 
@@ -137,6 +150,7 @@ export async function panelView({id,tab='panel',ctx}){
   const cards=[
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🗒'}),h('h3',{text:'Aide-mémoire de porte'}),h('p',{text:'Une page : tous les circuits en deux colonnes, comme sur le panneau. À fixer à l’intérieur de la porte.'}),h('div',{class:'opts'},f1),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'door',format:f1.value})},'Générer le PDF')),
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'📘'}),h('h3',{text:'Rapport complet'}),h('p',{text:'Informations du site et du panneau, répertoire, tableau détaillé avec notes et exceptions, préparé par et signature.'}),h('div',{class:'opts'},f2),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'report',format:f2.value})},'Générer le PDF')),
+   planning&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'⚡'}),h('h3',{text:'Bilan de charges et matériel'}),h('p',{text:'Liste de charges par circuit, phases L1/L2, capacité du panneau, calcul selon la règle 8-200, alertes et liste de disjoncteurs.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'Générer le PDF')),
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🏷'}),h('h3',{text:'Étiquettes autocollantes'}),h('p',{text:'Feuille Lettre Avery 5160 / 8160 (30 étiquettes 2⅝ × 1 po) : repère du panneau puis un circuit par étiquette. Imprimez à 100 %.'}),h('label',{class:'opts'},skip,'Ignorer les positions libres'),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'labels',skipFree:skip.checked})},'Générer les étiquettes')),
   ];
   if(ctx.features.zebra)cards.push(h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🖨'}),h('h3',{text:'Imprimante ZebraHD'}),h('p',{text:'Envoie les circuits à ZebraHD pour imprimer des étiquettes sur imprimante thermique.'}),h('button',{type:'button',onclick:zebra},'Envoyer à ZebraHD')));
@@ -170,6 +184,51 @@ export async function panelView({id,tab='panel',ctx}){
  async function remove(){
   if(!await confirmDialog(`Supprimer définitivement « ${panelTitle(panel)} » et ses ${panel.circuits.length} circuits ? Cette action est irréversible.`,{title:'Supprimer le panneau',confirm:'Supprimer',danger:true}))return;
   try{await api('/api/panels?id='+panel.id,{method:'DELETE'});toast('Panneau supprimé.');location.hash='#/sites/'+site.id;}catch(e){toast(e.message);}
+ }
+
+ // ---------- Onglet Planification ----------
+ function renderPlan(){
+  const rep=panelReport(panel,{children});
+  const statusText={ok:'Bonne marge',medium:'Marge correcte',high:'Au-delà de 80 %',over:'Surcharge',unknown:'À compléter'}[rep.status];
+  const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:1})+' kW';
+  const cabBox=h('div');cabBox.append(cabinet());
+  const gauge=h('div',{class:'card side-card'},h('h3',{text:'Capacité du panneau'}),
+   h('div',{class:'gauge '+rep.status},h('div',{class:'big',text:rep.percent!=null?rep.percent+' %':'—'}),h('div',{},h('b',{text:statusText}),h('div',{class:'small muted',text:rep.mainAmps?`${rep.designAmps} A sur un principal de ${rep.mainAmps} A (${rep.isDwelling?'calcul 8-200':'phase la plus chargée'})`:'Indiquez le calibre principal dans la fiche du panneau.'}))),
+   rep.percent!=null&&h('div',{class:'progress mt'+(rep.percent>100?' over':rep.percent>80?' high':'')},h('i',{style:{width:Math.min(100,rep.percent)+'%'}})),
+   h('p',{class:'small muted mt',text:`Charge branchée : ${kw(rep.connectedW)}${children.length?` (dont ${children.length} sous-panneau(x))`:''} · ${rep.free} position(s) libre(s)${rep.remainingAmps!=null?` · marge avant 80 % : ${rep.remainingAmps} A`:''}`}),
+   rep.model&&h('p',{class:'small muted',text:'Modèle : '+modelLabel(rep.model)}),
+   h('div',{class:'legs mt'},h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L1'}),h('b',{text:rep.balance.L1+' A'})),h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L2'}),h('b',{text:rep.balance.L2+' A'}))),
+   h('p',{class:'small muted',text:`Déséquilibre : ${rep.balance.imbalance} %`}));
+  const issues=h('div',{class:'card side-card'},h('h3',{text:`Alertes (${rep.issues.length})`}),rep.issues.length?rep.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.circuit?`Circuit ${i.circuit} : `:'')+i.text})):h('p',{class:'issue info',text:'Aucune alerte. Ajoutez les charges de chaque circuit pour un bilan complet.'}));
+  const sugg=h('div',{class:'card side-card'},h('h3',{text:'Suggestions'}),h('ul',{class:'small'},suggestions(rep).map(t=>h('li',{text:t}))));
+  if(!planning){
+   body.replaceChildren(h('div',{class:'card empty-state'},h('div',{class:'ico',text:'⚡'}),h('h2',{text:'Planification et calcul de charges'}),
+    h('p',{text:'Construisez le panneau pièce par pièce à partir du catalogue, ajoutez les charges de chaque circuit (bornes de recharge, thermopompes, chauffe-eau, piscine…), vérifiez la règle des 80 %, l’équilibre L1/L2 et la capacité du panneau, puis générez le bilan de charges et la liste de matériel.'}),
+    h('p',{class:'small muted',text:`Aperçu : charge branchée ${kw(rep.connectedW)}${rep.percent!=null?`, ${rep.percent} % du principal`:''}.`}),
+    h('a',{class:'btn primary lg',href:'#/abonnement'},'Inclus dans les forfaits Électricien — voir les forfaits')));
+   return;
+  }
+  const calc=rep.calc;
+  const calcCard=h('div',{class:'card side-card'},h('h3',{text:'Calcul de charge du logement (règle 8-200)'}),
+   panel.kind!=='Principal'?h('p',{class:'small muted',text:'S’applique au panneau principal d’un logement.'}):!panel.details?.livingArea?h('p',{class:'small muted'},'Indiquez la superficie habitable dans ',h('a',{href:'#',onclick:e=>{e.preventDefault();go('info');},text:'la fiche du panneau'}),' pour activer ce calcul.'):null,
+   h('div',{class:'table-wrap'},h('table',{class:'data'},h('tbody',{},calc.lines.map(l=>h('tr',{},h('td',{text:l.label}),h('td',{text:kw(l.w)}))),h('tr',{},h('td',{},h('b',{text:'Charge calculée'})),h('td',{},h('b',{text:`${kw(calc.totalW)} · ${calc.amps} A`})))))),
+   h('p',{class:'small muted mt',text:`Entrée minimale : ${calc.minService} A · recommandée selon le calcul : ${calc.recommended??'—'} A. Calcul simplifié inspiré du CCÉ : à valider par un maître électricien.`}));
+  const loadRows=rep.rows.filter(x=>x.r.watts||x.c.amps);
+  const table=h('div',{class:'card side-card'},h('h3',{text:'Liste de charges par circuit'}),
+   h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Pos.','Circuit','Charges','kW','A','Disj.','%','Fil'].map(t=>h('th',{text:t})))),
+    h('tbody',{},loadRows.length?loadRows.map(({c,r})=>h('tr',{class:'click',onclick:()=>openCircuit(c.id)},h('td',{text:designation(c)}),h('td',{text:c.label||'—'}),h('td',{class:'small',text:(c.loads||[]).map(l=>(l.qty>1?l.qty+' × ':'')+l.name).join(', ')||'—'}),h('td',{text:r.watts?(r.watts/1000).toLocaleString('fr-CA',{maximumFractionDigits:2}):'—'}),h('td',{text:r.watts?r.demandAmps:'—'}),h('td',{text:c.amps?c.amps+' A':'—'}),h('td',{class:r.percent>100?'st-unknown':'',text:r.percent!=null?r.percent+' %':'—'}),h('td',{class:'small',text:c.wire?.gauge||(r.suggestedWire?'≈ '+r.suggestedWire:'—')}))):h('tr',{},h('td',{colspan:8,class:'muted',text:'Touchez un disjoncteur et ajoutez ses charges dans la section « Planification » de la fiche.'}))))));
+  const mat=materials(panel);
+  const matCard=h('div',{class:'card side-card'},h('h3',{text:'Liste de matériel'}),h('p',{class:'small muted',text:'Famille : '+mat.family+' · références indicatives, à valider auprès du fabricant.'}),
+   mat.items.length?h('table',{class:'data'},h('thead',{},h('tr',{},['Qté','Disjoncteur','Référence'].map(t=>h('th',{text:t})))),h('tbody',{},mat.items.map(i=>h('tr',{},h('td',{text:i.qty}),h('td',{text:`${i.tandem?'Jumelé 2 × ':i.poles===3?'Tripolaire ':i.poles===2?'Bipolaire ':'Unipolaire '}${i.amps} A${i.protection!=='Standard'?' · '+i.protection:''}`}),h('td',{text:i.ref||'—'}))))):h('p',{class:'small muted',text:'Aucun disjoncteur avec calibre.'}));
+  const ev=h('details',{class:'card side-card'},h('summary',{},h('b',{text:'Guide des bornes de recharge (niveaux 1, 2 et 3)'})),
+   h('div',{class:'table-wrap mt'},h('table',{class:'data ev-guide'},h('thead',{},h('tr',{},['Niveau','Alimentation','Puissance','Disjoncteur','Recharge','Usage'].map(t=>h('th',{text:t})))),h('tbody',{},EV_GUIDE.map(g=>h('tr',{},[g.level,g.supply,g.power,g.breaker,g.range,g.use].map(t=>h('td',{text:t}))))))),
+   h('p',{class:'small muted',text:'Une borne est une charge continue (section 86) : disjoncteur ≥ 125 % du courant de la borne, circuit dédié. Un gestionnaire de charge (EVEMS) peut éviter d’augmenter l’entrée électrique.'}),
+   h('p',{class:'small muted',text:'Sources : '+LOADS_SOURCES.join(' · ')}));
+  body.replaceChildren(
+   h('div',{class:'page-actions'},h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'📄 PDF bilan de charges et matériel'),h('button',{type:'button',onclick:()=>go('info')},rep.model?'Changer de modèle':'Choisir un modèle du catalogue')),
+   h('p',{class:'small muted',text:'Touchez une position pour choisir un disjoncteur du catalogue et ajouter ses charges. Les barres sous chaque disjoncteur indiquent son taux de charge.'}),
+   h('div',{class:'workspace mt'},cabBox,h('div',{class:'stack'},gauge,issues,sugg)),
+   h('div',{class:'stack mt'},table,calcCard,matCard,ev));
  }
 
  renderHead();renderTabs();renderBody();

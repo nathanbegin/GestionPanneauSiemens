@@ -307,3 +307,65 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false}){
  });
  return d.pdf.save();
 }
+
+// Bilan de charges et liste de matériel d'un panneau (mode planification).
+export async function buildLoads({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version}){
+ const {panelReport,materials}=await import('../../public/loadcalc.js');
+ const {modelLabel,LOADS_SOURCES}=await import('../../public/catalog.js');
+ const rep=panelReport(panel,{children});
+ const mat=materials(panel);
+ const d=await Doc.create('letter','Bilan de charges — '+panelTitle(panel));
+ const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
+ d.page();
+ header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version,(panel.details?.state||'Existant').toUpperCase()]});
+ infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?modelLabel(rep.model):[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—']]);
+ preparedBlock(d,user,generatedAt);
+ // Synthèse.
+ sectionTitle(d,'Synthèse','Charge de calcul comparée au disjoncteur principal ; seuil recommandé : 80 %.');
+ const boxes=[['Capacité utilisée',rep.percent!=null?rep.percent+' %':'—'],['Charge de calcul',rep.designAmps+' A'],['Charge branchée',kw(rep.connectedW)],['Phase L1 / L2',`${rep.balance.L1} / ${rep.balance.L2} A`],['Marge avant 80 %',rep.remainingAmps!=null?rep.remainingAmps+' A':'—']];
+ const bw=(d.W-2*M-4*8)/5;
+ boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:C.soft,borderColor:C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:12,f:d.bold,color:i===0&&rep.percent>80?rgb(.64,.24,.2):C.ink,max:bw-14});});
+ d.y-=56;
+ if(rep.percent!=null){const w=d.W-2*M;d.rect(M,d.y-8,w,8,{color:rgb(.89,.91,.88)});d.rect(M,d.y-8,w*Math.min(1,rep.percent/100),8,{color:rep.percent>100?rgb(.64,.24,.2):rep.percent>80?C.amber:C.green});d.line(M+w*.8,d.y+2,M+w*.8,d.y-12,C.ink,1);d.text('80 %',M+w*.8-8,d.y-22,{size:6.5,color:C.muted});d.y-=34;}
+ // Alertes.
+ sectionTitle(d,`Alertes (${rep.issues.length})`);
+ if(!rep.issues.length){d.text('Aucune alerte.',M,d.y,{size:8.5,color:C.muted});d.y-=14;}
+ for(const i of rep.issues){const lines=d.wrap((i.circuit?`Circuit ${i.circuit} : `:'')+i.text,8.5,d.W-2*M-16);d.ensure(lines.length*11+4);d.rect(M,d.y-(lines.length-1)*11-3,3,(lines.length-1)*11+11,{color:i.level==='error'?rgb(.64,.24,.2):C.amber});lines.forEach((l,j)=>d.text(l,M+10,d.y-j*11,{size:8.5}));d.y-=lines.length*11+4;}
+ d.y-=6;
+ // Calcul 8-200.
+ if(panel.kind==='Principal'){
+  sectionTitle(d,'Calcul de charge du logement (règle 8-200, simplifié)');
+  for(const l of [...rep.calc.lines,{label:'Charge calculée',w:rep.calc.totalW,b:true}]){const lines=d.wrap(l.label,8.5,d.W-2*M-90);d.ensure(lines.length*11+4);lines.forEach((t,j)=>d.text(t,M,d.y-j*11,{size:8.5,f:l.b?d.bold:d.font}));const v=kw(l.w)+(l.b?` · ${rep.calc.amps} A`:'');d.text(v,d.W-M-d.width(v,8.5,d.bold),d.y,{size:8.5,f:d.bold});const base=d.y-(lines.length-1)*11;d.line(M,base-4,d.W-M,base-4);d.y=base-15;}
+  d.text(`Entrée minimale : ${rep.calc.minService} A · recommandée selon le calcul : ${rep.calc.recommended??'—'} A.`,M,d.y-4,{size:8,color:C.muted});d.y-=20;
+ }
+ // Liste de charges.
+ d.page();
+ sectionTitle(d,'Liste de charges par circuit','Charge de calcul, taux de charge du disjoncteur (charges continues limitées à 80 %) et conducteur.');
+ const cols=[['Pos.',44],['Circuit et charges',196],['kW',42],['A',38],['Disj.',40],['%',34],['Fil',58],['Ph.',30],['État',50]];
+ const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:C.white});x+=w;}d.y-=18;};
+ head();
+ const {legOf}=await import('../../public/loadcalc.js');
+ for(const {c,r} of rep.rows){
+  if(!r.watts&&c.amps==null)continue;
+  const sub=(c.loads||[]).map(l=>(l.qty>1?l.qty+' × ':'')+l.name+` (${kw(l.w*(l.qty||1))})`).join(', ');
+  const subLines=sub?d.wrap(sub,6.8,cols[1][1]-6).slice(0,4):[];
+  const h=14+subLines.length*8.5;d.ensure(h+2,head);
+  const err=r.issues.some(i=>i.level==='error'),warn=r.issues.some(i=>i.level==='warn');
+  const vals=[designation(c),c.label||'—',r.watts?(r.watts/1000).toLocaleString('fr-CA',{maximumFractionDigits:2}):'—',r.watts?String(r.demandAmps):'—',c.amps?c.amps+' A':'—',r.percent!=null?r.percent+' %':'—',c.wire?.gauge||(r.suggestedWire?'~ '+r.suggestedWire:'—'),r.volts===240?'L1+L2':legOf(parseInt(c.slots[0])),err?'À corriger':warn?'À surveiller':'OK'];
+  let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:7.6,f:i<2?d.bold:d.font,color:i===8?(err?rgb(.64,.24,.2):warn?C.amber:C.green):C.ink,max:cols[i][1]-5});x+=cols[i][1];});
+  subLines.forEach((l,j)=>d.text(l,M+49,d.y-19-j*8.5,{size:6.8,color:C.muted}));
+  d.y-=h;d.line(M,d.y,d.W-M,d.y);
+ }
+ // Matériel.
+ d.y-=16;
+ sectionTitle(d,'Liste de matériel — disjoncteurs','Famille : '+mat.family+'. Références indicatives, à valider auprès du fabricant et selon l’étiquette du panneau.');
+ if(!mat.items.length){d.text('Aucun disjoncteur avec calibre.',M,d.y,{size:8.5,color:C.muted});d.y-=14;}
+ for(const i of mat.items){d.ensure(14);d.text(String(i.qty)+' ×',M,d.y,{size:9,f:d.bold});d.text(`${i.tandem?'Jumelé 2 × ':i.poles===3?'Tripolaire ':i.poles===2?'Bipolaire ':'Unipolaire '}${i.amps} A${i.protection!=='Standard'?' · '+i.protection:''}`,M+34,d.y,{size:9});if(i.ref)d.text(i.ref,d.W-M-d.width(i.ref,9,d.bold),d.y,{size:9,f:d.bold,color:C.green});d.line(M,d.y-4,d.W-M,d.y-4);d.y-=16;}
+ d.y-=10;
+ d.ensure(60);
+ d.text('Hypothèses et sources',M,d.y,{size:9,f:d.bold});d.y-=12;
+ for(const t of ['Charges : valeurs saisies ou valeurs typiques de la bibliothèque. La plaque signalétique de chaque appareil a préséance.','Phases : les rangées alternent L1 / L2 (positions 1-2 sur L1, 3-4 sur L2, etc.).','Calcul simplifié inspiré du Code canadien de l’électricité (règles 8-104, 8-106, 8-200, section 86) et du Code de construction du Québec, chapitre V. Ne remplace pas l’analyse d’un maître électricien.',...LOADS_SOURCES.map(s=>'Source : '+s)])for(const l of d.wrap('• '+t,7.5,d.W-2*M)){d.ensure(10);d.text(l,M,d.y,{size:7.5,color:C.muted});d.y-=9.5;}
+ signature(d,user);
+ footers(d,'Mon Panneau · Bilan de charges indicatif — la conformité de l’installation relève d’un maître électricien.');
+ return d.pdf.save();
+}

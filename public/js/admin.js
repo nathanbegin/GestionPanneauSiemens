@@ -37,7 +37,7 @@ async function users(){
   const p=new URLSearchParams(new FormData(form));
   const {users}=await api('/api/admin?action=users&'+p);
   box.replaceChildren(h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Nom','Courriel','Forfait','Statut','Panneaux','Sites','Inscrit'].map(t=>h('th',{text:t})))),
-   h('tbody',{},users.map(u=>h('tr',{class:'click',onclick:()=>{location.hash='#/admin/abonne/'+u.id;}},h('td',{text:u.name}),h('td',{text:u.email}),h('td',{text:u.plan_id||'gratuit'}),h('td',{text:(STATUS[u.status]||'Gratuit')+(u.cancel_at_period_end?' (fin programmée)':'')}),h('td',{text:u.panels}),h('td',{text:u.sites}),h('td',{text:fmtDate(u.created_at)})))))),users.length===50&&h('p',{class:'small muted',text:'50 premiers résultats : précisez la recherche.'}));
+   h('tbody',{},users.map(u=>h('tr',{class:'click',onclick:()=>{location.hash='#/admin/abonne/'+u.id;}},h('td',{text:u.name}),h('td',{text:u.email}),h('td',{text:u.plan_id||'gratuit'}),h('td',{text:(STATUS[u.status]||'Gratuit')+(u.cancel_at_period_end?' (fin programmée)':'')}),h('td',{text:u.panels}),h('td',{text:u.sites}),h('td',{text:fmtDate(u.created_at)})))))),users.length===50?h('p',{class:'small muted',text:'50 premiers résultats : précisez la recherche.'}):'');
  };
  form.addEventListener('submit',e=>{e.preventDefault();load().catch(x=>toast(x.message));});
  await load();

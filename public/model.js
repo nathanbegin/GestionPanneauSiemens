@@ -1,7 +1,8 @@
 // Modèle partagé navigateur / serveur / mobile.
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
-export const APP_VERSION='2.1.0';
+import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,PANEL_MODELS,BREAKER_FAMILIES,PANEL_STATES} from './catalog.js';
+export const APP_VERSION='2.2.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -37,6 +38,19 @@ export function validate(data,{positions=LEGACY_POSITIONS}={}){
   if(c.exceptions!==undefined&&(typeof c.exceptions!=='string'||c.exceptions.length>2000))throw Error('Champ invalide : exceptions');
   if(c.protection!==undefined&&!protections.includes(c.protection))throw Error('Protection invalide.');
   if(c.tags!==undefined){if(!c.tags||typeof c.tags!=='object'||Array.isArray(c.tags))throw Error('Tags invalides.');for(const k of ['locations','functions','devices']){const a=c.tags[k];if(!Array.isArray(a)||a.length>30||a.some(t=>typeof t!=='string'||!t.trim()||t.length>80))throw Error('Tags invalides : '+k);}}
+  if(c.loads!==undefined){
+   if(!Array.isArray(c.loads)||c.loads.length>30)throw Error('Liste de charges invalide.');
+   for(const l of c.loads){
+    if(!l||typeof l!=='object'||typeof l.name!=='string'||!l.name.trim()||l.name.length>80)throw Error('Nom de charge invalide.');
+    if(l.id!==undefined&&(typeof l.id!=='string'||l.id.length>40))throw Error('Charge invalide.');
+    if(typeof l.w!=='number'||!isFinite(l.w)||l.w<0||l.w>200000)throw Error('Puissance invalide : '+l.name);
+    if(!VOLTAGES.includes(l.v))throw Error('Tension invalide : '+l.name);
+    if(!Number.isInteger(l.qty)||l.qty<1||l.qty>100)throw Error('Quantité invalide : '+l.name);
+    if(!LOAD_CATEGORIES[l.cat]||typeof l.cont!=='boolean')throw Error('Catégorie de charge invalide : '+l.name);
+   }
+  }
+  if(c.wire!==undefined){const w=c.wire;if(!w||typeof w!=='object'||(w.gauge&&!WIRE_TABLE.some(x=>x.gauge===w.gauge))||(w.type&&!WIRE_TYPES.includes(w.type))||(w.length!=null&&(typeof w.length!=='number'||w.length<0||w.length>1000)))throw Error('Conducteur invalide.');}
+  if(c.breakerRef!==undefined&&(typeof c.breakerRef!=='string'||c.breakerRef.length>40))throw Error('Référence de disjoncteur invalide.');
   for(const k of ['originalLabel','originalNotes','surveyDate'])if(c[k]!==undefined&&(typeof c[k]!=='string'||c[k].length>3000))throw Error('Historique invalide.');
   if(!usages.includes(c.usage)||!states.includes(c.status)||!(c.amps===null||ampsList.includes(c.amps)))throw Error('Caractéristiques invalides.');
  }
@@ -147,8 +161,12 @@ export function cleanPanelMeta(input={}){
  const voltage=d.voltage||voltages[0];if(!voltages.includes(voltage))throw Error('Tension invalide.');
  const surveyDate=str(d.surveyDate,10,'Date du relevé');if(surveyDate&&!/^\d{4}-\d{2}-\d{2}$/.test(surveyDate))throw Error('Date du relevé invalide.');
  const fedFrom=d.fedFrom==null||d.fedFrom===''?'':str(d.fedFrom,60,'Alimenté par');
+ const modelId=str(d.modelId,60,'Modèle du catalogue');if(modelId&&!PANEL_MODELS.some(m=>m.id===modelId))throw Error('Modèle du catalogue inconnu.');
+ const breakerFamily=str(d.breakerFamily,30,'Famille de disjoncteurs');if(breakerFamily&&!BREAKER_FAMILIES[breakerFamily])throw Error('Famille de disjoncteurs inconnue.');
+ const livingArea=d.livingArea===''||d.livingArea==null?null:Number(d.livingArea);if(livingArea!==null&&(!Number.isFinite(livingArea)||livingArea<0||livingArea>10000))throw Error('Superficie invalide.');
+ const state=d.state||'Existant';if(!PANEL_STATES.includes(state))throw Error('État du panneau invalide.');
  return {name,tag:str(input.tag,24,'Étiquette'),kind,location:str(input.location,140,'Emplacement'),
-  details:{building:str(d.building,80,'Bâtiment'),brand:str(d.brand,60,'Marque'),model:str(d.model,60,'Modèle'),mainAmps,voltage,fedFrom,fedFromCircuit:str(d.fedFromCircuit,40,'Circuit d’alimentation'),surveyDate,surveyedBy:str(d.surveyedBy,100,'Relevé par'),notes:str(d.notes,2000,'Notes')}};
+  details:{building:str(d.building,80,'Bâtiment'),brand:str(d.brand,60,'Marque'),model:str(d.model,60,'Modèle'),mainAmps,voltage,fedFrom,fedFromCircuit:str(d.fedFromCircuit,40,'Circuit d’alimentation'),surveyDate,surveyedBy:str(d.surveyedBy,100,'Relevé par'),notes:str(d.notes,2000,'Notes'),modelId,breakerFamily,livingArea,state}};
 }
 export function cleanSite(input={}){
  const name=str(input.name,100,'Nom du site');if(!name)throw Error('Donnez un nom au site.');

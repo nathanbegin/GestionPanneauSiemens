@@ -1,4 +1,4 @@
-# Mon Panneau — v2.1.0
+# Mon Panneau — v2.2.0
 
 Application grand public (et pro) pour faire la **nomenclature des panneaux électriques** : comptes utilisateurs, plusieurs sites (adresses), plusieurs panneaux par site, fiche de chaque disjoncteur, rapports PDF professionnels, étiquettes, et applications iOS / Android.
 
@@ -38,6 +38,15 @@ Compte ─┬─ Site (adresse, client, notes)
   - *ZebraHD* (si `PANELS_API_KEY` est défini) et *export JSON* (réimportable).
 - **Synchronisation** : enregistrement automatique, contrôle de révision (aucun écrasement silencieux entre deux appareils).
 - **PWA** installable (manifeste + service worker) et **applications natives** iOS/Android (Capacitor) dans `mobile/`.
+
+## Planification et calcul de charges (v2.2)
+
+Réservé aux forfaits dont la fonction « planification » est activée (Électricien Solo et Équipe) et aux administrateurs.
+
+- `public/catalog.js` : bibliothèque de charges typiques (bornes niveaux 1 et 2, thermopompes, plinthes, fournaises, chauffe-eau, piscine, spa, cuisinière, sécheuse…), guide des bornes niveaux 1/2/3, 22 modèles de panneaux courants (Siemens, Square D, Eaton, Cutler-Hammer, Leviton, Federal Pioneer), familles de disjoncteurs avec références **indicatives**, table des fils de cuivre.
+- `public/loadcalc.js` : charge par circuit, règle des 80 % pour les charges continues, disjoncteur et fil suggérés, phases L1/L2 (rangées alternées), capacité du panneau, calcul de charge d'un logement inspiré de la règle 8-200 (charge de base, chauffage 100 %/75 %, climatisation, cuisinière 6000 W + 40 %, 100 % pour piscine/spa/instantané/bornes, 25 % des autres charges), charges des sous-panneaux, suggestions et liste de matériel.
+- Interface : choix du modèle dans la fiche du panneau (superficie habitable, état Existant/Planifié/Installé/Vérifié), section « Planification » dans la fiche de circuit (disjoncteur du catalogue, charges, conducteur, calcul en direct), onglet « Planification et charges », PDF « Bilan de charges et matériel » (`kind=loads`).
+- ⚠ Toutes les valeurs du catalogue (modèles, références, charges) sont à valider par un maître électricien et selon les fiches des fabricants avant une utilisation professionnelle.
 
 ## Abonnements (v2.1)
 
