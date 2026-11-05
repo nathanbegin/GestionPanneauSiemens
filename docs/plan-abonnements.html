@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr-CA"><head><meta charset="utf-8"><title>Mon Panneau — Plan de la plateforme d’abonnements</title>
+<style>
+@page{size:Letter;margin:16mm 16mm 18mm}
+:root{--ink:#183c32;--muted:#5f6d65;--line:#d9e0d8;--soft:#eef2eb;--lime:#e3f7a9;--green:#226a51}
+*{box-sizing:border-box}
+body{font-family:Inter,"Helvetica Neue",Arial,sans-serif;color:var(--ink);font-size:10pt;line-height:1.45;margin:0}
+h1{font-size:28pt;line-height:1.05;margin:0 0 6mm;letter-spacing:-.02em;font-weight:600}
+h1 em,h2 em{font-family:Georgia,serif;font-weight:400;color:#4f7a5f}
+h2{font-size:15pt;margin:9mm 0 3mm;padding-top:2mm;border-top:2px solid var(--ink);break-after:avoid}
+h3{font-size:11pt;margin:5mm 0 2mm;break-after:avoid}
+p{margin:0 0 2.5mm}
+ul,ol{margin:0 0 3mm;padding-left:5mm}li{margin:1mm 0}
+.cover{height:240mm;display:flex;flex-direction:column;justify-content:space-between;break-after:page}
+.band{background:var(--ink);color:#fff;border-radius:6mm;padding:12mm}
+.band .eyebrow{color:var(--lime)}
+.band h1{color:#fff}
+.band h1 em{color:var(--lime)}
+.eyebrow{font-size:8pt;letter-spacing:.18em;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3mm}
+.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin-top:10mm}
+.meta div{border:1px solid #ffffff33;border-radius:3mm;padding:3mm}
+.meta b{display:block;color:var(--lime);font-size:8pt;letter-spacing:.1em;text-transform:uppercase}
+table{width:100%;border-collapse:collapse;margin:2mm 0 4mm;font-size:9pt;break-inside:avoid}
+th{background:var(--ink);color:#fff;text-align:left;padding:2mm 2.5mm;font-size:7.5pt;letter-spacing:.06em;text-transform:uppercase}
+td{padding:2mm 2.5mm;border-bottom:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#f7f9f5}
+.box{border:1px solid var(--line);background:var(--soft);border-radius:3mm;padding:4mm;margin:3mm 0;break-inside:avoid}
+.box.warn{background:#fbf5e8;border-color:#ead9b8}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+.tag{display:inline-block;font-size:7pt;font-weight:700;padding:.5mm 2mm;border-radius:9mm;background:#dcefe0;color:#245c3a;vertical-align:middle}
+.tag.todo{background:#f6ead3;color:#7d5a1f}
+.decisions li{list-style:none;margin-left:-5mm}
+.decisions li:before{content:'✓ ';color:var(--green);font-weight:700}
+.small{font-size:8.5pt;color:var(--muted)}
+.phase{display:grid;grid-template-columns:12mm 1fr;gap:3mm;margin:2.5mm 0;break-inside:avoid}
+.phase b.n{width:10mm;height:10mm;border-radius:50%;background:var(--ink);color:var(--lime);display:grid;place-items:center}
+</style></head><body>
+
+<section class="cover">
+ <div class="band">
+  <div class="eyebrow">Mon Panneau · Document de planification</div>
+  <h1>Plateforme d’abonnements<br><em>pour panneaux électriques</em></h1>
+  <p>Forfaits pour les propriétaires, les gestionnaires d’immeubles et les électriciens, catalogue de panneaux du marché québécois, mode planification et console d’administration.</p>
+  <div class="meta"><div><b>Version</b>2.1 — 5 novembre 2026</div><div><b>Paiement</b>Stripe (préparé, clés à ajouter)</div><div><b>Statut</b>Étapes 1 à 3 réalisées</div></div>
+ </div>
+ <div>
+  <h3>Décisions prises</h3>
+  <ul class="decisions">
+   <li>Les prix et limites proposés sont retenus comme point de départ.</li>
+   <li>Le forfait gratuit permet <b>5 panneaux</b> (et 2 sites).</li>
+   <li>Des <b>forfaits de panneaux sans abonnement</b> sont offerts aux utilisateurs occasionnels.</li>
+   <li>Le paiement est construit pour <b>Stripe</b>; les clés seront ajoutées plus tard. Sans clés, l’application fonctionne en forfait gratuit et la console permet d’attribuer des forfaits manuellement.</li>
+  </ul>
+  <p class="small">Tous les prix sont en dollars canadiens, taxes en sus, et modifiables en tout temps dans la console d’administration.</p>
+ </div>
+</section>
+
+<h2>1. Forfaits</h2>
+<table>
+ <tr><th>Forfait</th><th>Public</th><th>Mensuel</th><th>Annuel</th><th>Limite</th><th>Inclus</th></tr>
+ <tr><td><b>Gratuit</b></td><td>Pour essayer</td><td>0 $</td><td>0 $</td><td>5 panneaux actifs, 2 sites</td><td>Toutes les fonctions de base, PDF et étiquettes</td></tr>
+ <tr><td><b>Propriétaire</b></td><td>Maison, condo, chalet</td><td>3,99 $</td><td>29 $</td><td>10 panneaux actifs, 3 sites</td><td>Idem</td></tr>
+ <tr><td><b>Gestionnaire d’immeuble</b></td><td>Copropriétés, immeubles</td><td>24 $</td><td>240 $</td><td>150 panneaux actifs, sites illimités</td><td>3 utilisateurs, codes QR (à venir)</td></tr>
+ <tr><td><b>Électricien Solo</b></td><td>Maître électricien</td><td>34 $</td><td>340 $</td><td>25 nouveaux panneaux / mois</td><td>Planification avancée, rapports à l’image de l’entreprise</td></tr>
+ <tr><td><b>Électricien Équipe</b></td><td>Entreprise</td><td>89 $</td><td>890 $</td><td>120 nouveaux panneaux / mois</td><td>5 utilisateurs, planification, image de marque</td></tr>
+ <tr><td><b>Forfait de panneaux</b></td><td>Occasionnel</td><td colspan="2">29 $ pour 10 panneaux</td><td>Valables 12 mois</td><td>Utilisables avec n’importe quel forfait</td></tr>
+</table>
+<h3>Règles</h3>
+<ul>
+ <li><b>Deux façons de compter</b>, réglables par forfait : <i>panneaux actifs</i> (propriétaires, gestionnaires) ou <i>nouveaux panneaux par mois ou par année</i> (électriciens, qui livrent des panneaux à leurs clients). Un panneau supprimé ne libère pas le quota mensuel, pour éviter les abus.</li>
+ <li>Quand le forfait est épuisé, un <b>crédit prépayé</b> est utilisé automatiquement (le plus proche de l’expiration en premier).</li>
+ <li><b>Aucune donnée n’est jamais supprimée</b>. Au-delà de la limite, seule la création est bloquée; tout reste consultable, modifiable et imprimable.</li>
+ <li>Annulation en tout temps : l’accès demeure jusqu’à la fin de la période payée, puis retour au forfait gratuit.</li>
+ <li>Changement de forfait au prorata. Un changement de prix ne s’applique qu’aux nouveaux abonnés; les abonnés existants conservent leur prix.</li>
+ <li><b>Croissance</b> (à venir) : l’électricien pourra transférer un panneau terminé au compte gratuit du propriétaire, sans que ce panneau compte dans la limite du client.</li>
+</ul>
+
+<h2>2. Paiement : Stripe</h2>
+<div class="grid2">
+ <div>
+  <h3>Pourquoi Stripe</h3>
+  <ul><li>Abonnements mensuels et annuels, essais, coupons, prorata.</li><li><b>Stripe Tax</b> : TPS et TVQ calculées automatiquement.</li><li>Remboursements complets ou partiels par programmation.</li><li>Portail client : carte, factures, annulation.</li><li>Dollars canadiens, Apple Pay, Google Pay.</li><li>Frais indicatifs au Canada : environ 2,9 % + 0,30 $ par transaction, plus environ 0,5 % pour Stripe Tax (à vérifier sur stripe.com).</li></ul>
+ </div>
+ <div>
+  <h3>Alternatives écartées</h3>
+  <ul><li><b>Paddle</b> : gère les taxes à votre place (revendeur officiel), mais moins de contrôle et frais plus élevés.</li><li><b>Moneris, Square</b> : abonnements et API limités.</li></ul>
+  <h3>Applications mobiles</h3>
+  <p>Apple et Google exigent leur propre système de paiement (commission de 15 à 30 %) pour vendre un abonnement dans l’application. Les abonnements se vendent donc <b>sur le site web</b>; l’application les reconnaît sans bouton d’achat. Si un achat dans l’application devient nécessaire : RevenueCat.</p>
+ </div>
+</div>
+<h3>Ce qui est déjà en place <span class="tag">réalisé</span></h3>
+<ul>
+ <li>Intégration Stripe sans bibliothèque externe, version d’API figée (2024-06-20).</li>
+ <li>Paiement Stripe Checkout (abonnement ou forfait de panneaux), changement de forfait au prorata, portail client.</li>
+ <li>Produits et prix Stripe créés automatiquement quand un forfait est enregistré dans la console.</li>
+ <li>Réception des événements Stripe (webhook) avec signature vérifiée et protection contre les doublons : paiement terminé, abonnement créé, modifié ou supprimé, paiement échoué, remboursement.</li>
+</ul>
+<h3>Pour activer les paiements</h3>
+<ol>
+ <li>Créer le compte Stripe : entreprise, compte bancaire canadien. Activer Stripe Tax si applicable.</li>
+ <li>Dans Vercel : <code>STRIPE_SECRET_KEY</code> (clé de test d’abord), <code>ADMIN_EMAILS</code>, <code>STRIPE_TAX=1</code>.</li>
+ <li>Dans Stripe, ajouter le webhook <code>https://VOTRE-DOMAINE/api/stripe-webhook</code> et copier son secret dans <code>STRIPE_WEBHOOK_SECRET</code>.</li>
+ <li>Configurer le portail client (annulation, carte, factures) et les courriels de rappel avant renouvellement.</li>
+ <li>Dans la console, enregistrer chaque forfait payant pour créer les prix Stripe.</li>
+ <li>Tester avec la carte 4242 4242 4242 4242, puis passer aux clés de production.</li>
+ <li>Passer à <b>Vercel Pro</b> : le forfait Hobby interdit l’usage commercial.</li>
+</ol>
+
+<h2>3. Console d’administration <span class="tag">réalisé</span></h2>
+<table>
+ <tr><th>Module</th><th>Opérations</th></tr>
+ <tr><td><b>Tableau de bord</b></td><td>Revenu mensuel récurrent estimé, abonnés payants, comptes, nouveaux comptes et annulations sur 30 jours, panneaux prépayés vendus, état de Stripe (désactivé, test, production).</td></tr>
+ <tr><td><b>Abonnés</b></td><td>Recherche par nom ou courriel, filtres par forfait et statut.</td></tr>
+ <tr><td><b>Fiche abonné</b></td><td>Attribuer un forfait offert avec date de fin · changer le forfait Stripe avec ou sans prorata · limite personnalisée · offrir des panneaux · annuler à la fin de la période ou immédiatement · réactiver · <b>rembourser en totalité ou en partie</b> · reçus · historique.</td></tr>
+ <tr><td><b>Forfaits et prix</b></td><td>Créer et modifier : nom, public cible, description, prix mensuel et annuel, type de quota, limites de panneaux et de sites, utilisateurs, essai gratuit, fonctions incluses, actif, visible sur la page Tarifs. Forfaits de panneaux : quantité, prix, validité.</td></tr>
+ <tr><td><b>Journal</b></td><td>Chaque action de la console, avec la date, l’administrateur et le détail.</td></tr>
+</table>
+<p class="small">Accès réservé aux courriels de la variable <code>ADMIN_EMAILS</code>. À ajouter : authentification à deux facteurs pour les administrateurs.</p>
+
+<h2>4. Catalogue de panneaux (Québec et Canada) <span class="tag todo">à venir</span></h2>
+<p>Une bibliothèque de modèles gérée dans la console : l’électricien choisit un modèle et le panneau se dessine avec les bonnes positions.</p>
+<table>
+ <tr><th>Marque</th><th>Séries à couvrir</th></tr>
+ <tr><td>Siemens</td><td>EQ, PL / ES</td></tr>
+ <tr><td>Square D (Schneider Electric)</td><td>QO, Homeline</td></tr>
+ <tr><td>Eaton / Cutler-Hammer</td><td>BR, CH</td></tr>
+ <tr><td>Leviton</td><td>Centres de distribution résidentiels</td></tr>
+ <tr><td>Commander, Westinghouse, GE</td><td>Selon la demande</td></tr>
+ <tr><td>Federal Pioneer / Stab-Lok</td><td>Anciens panneaux seulement, avec avertissement</td></tr>
+</table>
+<p><b>Fiche d’un modèle :</b> marque, série, numéro de modèle · intensité nominale · disjoncteur principal ou panneau sans disjoncteur principal · nombre de positions et nombre maximal de circuits · positions acceptant les disjoncteurs jumelés · disjoncteurs compatibles par numéro (QO120, BR120, Q115…) avec leurs versions DDFT et anti-arc · tension, phases · possibilité d’un disjoncteur de raccordement pour génératrice.</p>
+<div class="box warn">Les données techniques doivent provenir des fiches des fabricants et être vérifiées avant la mise en ligne. Une première liste de modèles courants sera préparée pour validation.</div>
+
+<h2>5. Mode planification (électriciens) <span class="tag todo">à venir</span></h2>
+<ul>
+ <li><b>États du panneau</b> : Planifié → Installé → Vérifié, avec historique des versions (avant et après travaux).</li>
+ <li><b>Validation selon le modèle</b> : disjoncteur non compatible, jumelé interdit, nombre maximal de circuits dépassé.</li>
+ <li><b>Équilibrage des phases</b> L1 et L2 : charge par phase et écart.</li>
+ <li><b>Calcul de charge résidentielle</b> selon le Code de construction du Québec, chapitre V – Électricité (CSA C22.1), pour valider 100 A ou 200 A.</li>
+ <li><b>Par circuit</b> : calibre du fil, type de câble, longueur, charge prévue; alerte si le fil et le disjoncteur ne correspondent pas.</li>
+ <li><b>Rappels DDFT et anti-arc</b> selon la pièce desservie (indicatifs).</li>
+ <li><b>Liste de matériel</b> : disjoncteurs par numéro de modèle et quantités, pour les soumissions.</li>
+ <li><b>Rapport client</b> au nom de l’entreprise : logo, licence RBQ, signature, code QR à coller sur le panneau.</li>
+</ul>
+<p class="small">Ce sont des outils d’aide; l’électricien demeure responsable de la conformité de l’installation.</p>
+
+<h2>6. Architecture technique</h2>
+<ul>
+ <li><b>Qui fait foi</b> : Stripe pour la facturation, la base de données pour les droits d’accès. Les limites sont vérifiées côté serveur à chaque création de panneau ou de site.</li>
+ <li><b>Tables ajoutées</b> : forfaits, forfaits de panneaux, abonnements, crédits, historique des créations de panneaux, événements Stripe traités, journal d’administration.</li>
+ <li><b>Pages ajoutées</b> : page publique <i>Tarifs</i>, page <i>Mon abonnement</i> dans l’application (utilisation, crédits, forfaits, factures), console d’administration.</li>
+ <li><b>À venir</b> : organisations et membres (équipes, gestionnaires), rôles propriétaire, administrateur, technicien, lecture seule.</li>
+</ul>
+
+<h2>7. Étapes de réalisation</h2>
+<div class="phase"><b class="n">1</b><div><b>Forfaits et limites</b> <span class="tag">réalisé</span><br><span class="small">Forfait gratuit à 5 panneaux, quotas côté serveur, crédits prépayés.</span></div></div>
+<div class="phase"><b class="n">2</b><div><b>Paiement Stripe</b> <span class="tag">réalisé — clés à ajouter</span><br><span class="small">Paiement, portail client, webhook, taxes.</span></div></div>
+<div class="phase"><b class="n">3</b><div><b>Console d’administration</b> <span class="tag">réalisé</span><br><span class="small">Forfaits, abonnés, remboursements, journal. À ajouter : authentification à deux facteurs.</span></div></div>
+<div class="phase"><b class="n">4</b><div><b>Catalogue de panneaux</b> <span class="tag todo">à venir</span><br><span class="small">Modèles, disjoncteurs compatibles, validation.</span></div></div>
+<div class="phase"><b class="n">5</b><div><b>Mode planification</b> <span class="tag todo">à venir</span><br><span class="small">Phases, calcul de charge, liste de matériel, versions.</span></div></div>
+<div class="phase"><b class="n">6</b><div><b>Équipes et gestionnaires</b> <span class="tag todo">à venir</span><br><span class="small">Plusieurs utilisateurs par compte, codes QR, transfert au propriétaire.</span></div></div>
+<div class="phase"><b class="n">7</b><div><b>Publication mobile</b> <span class="tag todo">à venir</span><br><span class="small">App Store et Google Play.</span></div></div>
+
+<h2>8. À valider avant le lancement</h2>
+<div class="box warn">
+ <ul>
+  <li><b>Taxes</b> : TPS 5 % et TVQ 9,975 %; inscription obligatoire au-delà de 30 000 $ de revenus sur quatre trimestres consécutifs.</li>
+  <li><b>Loi sur la protection du consommateur</b> du Québec : contrats à renouvellement automatique, avis et annulation.</li>
+  <li><b>Loi 25</b> sur la protection des renseignements personnels : responsable désigné, politique de confidentialité, gestion des incidents.</li>
+  <li><b>Conditions d’utilisation</b> : un premier texte est en ligne, à faire réviser par un juriste.</li>
+  <li><b>Responsabilité</b> : les outils de planification ne remplacent pas le jugement d’un maître électricien.</li>
+ </ul>
+ <p class="small">Ce document n’est pas un avis juridique ou fiscal.</p>
+</div>
+</body></html>

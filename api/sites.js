@@ -2,6 +2,7 @@
 import {getSql} from './_lib/db.js';
 import {route,body,HttpError,isUuid,check} from './_lib/http.js';
 import {requireUser,newId} from './_lib/auth.js';
+import {assertCanCreateSite} from './_lib/plans.js';
 import {cleanSite} from '../public/model.js';
 import {siteOut,panelSummary} from './_lib/serialize.js';
 
@@ -21,6 +22,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   const site=check(()=>cleanSite(body(req)));
   const [{n}]=await sql`SELECT count(*)::int AS n FROM app_sites WHERE user_id=${user.id}`;
   if(n>=200)throw new HttpError(400,'Limite de 200 sites atteinte.');
+  await assertCanCreateSite(sql,user.id);
   const [row]=await sql`INSERT INTO app_sites(id,user_id,name,client,street,city,province,postal_code,notes) VALUES(${newId()},${user.id},${site.name},${site.client},${site.street},${site.city},${site.province},${site.postalCode},${site.notes}) RETURNING *`;
   return res.status(201).json({site:siteOut(row)});
  }

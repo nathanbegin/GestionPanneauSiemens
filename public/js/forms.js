@@ -5,6 +5,8 @@ import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormat
 const input=(name,value,attrs={})=>h('input',{name,value:value??'',...attrs});
 const area=(name,value,attrs={})=>{const t=h('textarea',{name,rows:3,...attrs});t.value=value??'';return t;};
 const err=()=>h('p',{class:'error',role:'alert'});
+// Affiche une erreur ; un dépassement de forfait propose de voir les forfaits.
+export function showError(el,x){el.replaceChildren(x.message);if(x.status===402)el.append(' ',h('a',{href:'#/abonnement',onclick:()=>el.closest('dialog')?.close(),text:'Voir les forfaits →'}));}
 
 export function siteFields(site={}){
  return h('div',{class:'fields'},
@@ -23,7 +25,7 @@ export function siteDialog(site,onSave){
  const d=dialog({title:site?'Modifier le site':'Nouveau site',eyebrow:site?site.name:'Étape 1 · une adresse',form:true,body:[siteFields(site||{}),e],actions:[{label:'Annuler',kind:'ghost'},{label:site?'Enregistrer':'Créer le site',kind:'primary',submit:true}]});
  d.form.addEventListener('submit',async ev=>{
   ev.preventDefault();const btn=ev.submitter;btn&&(btn.disabled=true);e.textContent='';
-  try{await onSave(formData(d.form));d.close();}catch(x){e.textContent=x.message;}finally{btn&&(btn.disabled=false);}
+  try{await onSave(formData(d.form));d.close();}catch(x){showError(e,x);}finally{btn&&(btn.disabled=false);}
  });
  d.form.elements.name.focus();
 }
@@ -77,7 +79,7 @@ export function panelDialog({siblings=[],onSave}){
   actions:[{label:'Annuler',kind:'ghost'},{label:'Créer le panneau',kind:'primary',submit:true}]});
  d.form.addEventListener('submit',async ev=>{
   ev.preventDefault();const btn=ev.submitter;btn&&(btn.disabled=true);e.textContent='';
-  try{const p=panelPayload(d.form);await onSave({...p.meta,positions:p.positions,...(imported?{circuits:imported}:{})});d.close();}catch(x){e.textContent=x.message;}finally{btn&&(btn.disabled=false);}
+  try{const p=panelPayload(d.form);await onSave({...p.meta,positions:p.positions,...(imported?{circuits:imported}:{})});d.close();}catch(x){showError(e,x);}finally{btn&&(btn.disabled=false);}
  });
  d.form.elements.name.focus();
 }

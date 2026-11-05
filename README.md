@@ -1,4 +1,4 @@
-# Mon Panneau — v2.0.0
+# Mon Panneau — v2.1.0
 
 Application grand public (et pro) pour faire la **nomenclature des panneaux électriques** : comptes utilisateurs, plusieurs sites (adresses), plusieurs panneaux par site, fiche de chaque disjoncteur, rapports PDF professionnels, étiquettes, et applications iOS / Android.
 
@@ -39,11 +39,40 @@ Compte ─┬─ Site (adresse, client, notes)
 - **Synchronisation** : enregistrement automatique, contrôle de révision (aucun écrasement silencieux entre deux appareils).
 - **PWA** installable (manifeste + service worker) et **applications natives** iOS/Android (Capacitor) dans `mobile/`.
 
+## Abonnements (v2.1)
+
+| Forfait | Prix (CAD, taxes en sus) | Limite | Quota |
+| --- | --- | --- | --- |
+| Gratuit | 0 $ | 5 panneaux, 2 sites | actifs |
+| Propriétaire | 3,99 $/mois · 29 $/an | 10 panneaux, 3 sites | actifs |
+| Gestionnaire d'immeuble | 24 $/mois · 240 $/an | 150 panneaux, 3 utilisateurs | actifs |
+| Électricien Solo | 34 $/mois · 340 $/an | 25 panneaux | nouveaux / mois |
+| Électricien Équipe | 89 $/mois · 890 $/an | 120 panneaux, 5 utilisateurs | nouveaux / mois |
+| Forfait de panneaux | 29 $ | 10 panneaux valables 12 mois | crédits |
+
+Ces valeurs sont insérées au premier démarrage, puis **se modifient dans la console** (`/app#/admin`, réservée aux courriels de `ADMIN_EMAILS`).
+
+- **Limites appliquées côté serveur** à la création d'un panneau ou d'un site (HTTP 402). Quand le forfait est épuisé, un crédit prépayé est utilisé. Aucune donnée n'est jamais supprimée ni bloquée en lecture.
+- **Console** : tableau de bord (revenu mensuel récurrent estimé, abonnés, annulations), recherche d'abonnés, fiche abonné (attribuer un forfait offert avec date de fin, changer le forfait Stripe avec ou sans prorata, limite personnalisée, offrir des panneaux, annuler à la fin de la période ou immédiatement, réactiver, **rembourser en totalité ou en partie**), édition des forfaits et des forfaits de panneaux, journal de toutes les actions.
+- **Stripe sans SDK** (`api/_lib/stripe.js`, version d'API figée `2024-06-20`) : Checkout (abonnement ou paiement unique), changement de forfait au prorata, portail client (carte, factures, annulation), produits et prix créés automatiquement à l'enregistrement d'un forfait. Un prix modifié crée un nouveau prix Stripe : les abonnés existants conservent l'ancien.
+- **Webhook** `POST /api/stripe-webhook` : signature vérifiée, idempotent. Événements : `checkout.session.completed`, `customer.subscription.created|updated|deleted`, `invoice.payment_failed`, `charge.refunded`.
+- **Mobile** : pas d'achat dans l'application (règles Apple/Google). Les boutons ouvrent la page web.
+
+### Activer Stripe (le moment venu)
+1. Créer le compte Stripe (entreprise, compte bancaire canadien), puis activer **Stripe Tax** (inscriptions TPS/TVQ) si applicable.
+2. Dans Vercel : `STRIPE_SECRET_KEY` (commencer par `sk_test_…`), `ADMIN_EMAILS`, et `STRIPE_TAX=1` si Stripe Tax est activé.
+3. Dans Stripe → Développeurs → Webhooks : ajouter `https://VOTRE-DOMAINE/api/stripe-webhook` avec les 6 événements ci-dessus, puis copier le secret dans `STRIPE_WEBHOOK_SECRET`.
+4. Stripe → Paramètres → Portail client : autoriser l'annulation, la mise à jour de la carte et l'historique des factures. Activer les courriels de rappel avant renouvellement.
+5. Dans la console, ouvrir et enregistrer chaque forfait payant : les produits et prix Stripe sont créés automatiquement.
+6. Tester avec la carte `4242 4242 4242 4242`, puis passer aux clés `sk_live_…` (et recréer le webhook en mode production).
+
+> Vercel Hobby interdit l'usage commercial et limite à 12 fonctions (l'application en compte 12) : passer au forfait **Vercel Pro** avant d'encaisser des paiements.
+
 ## Architecture
 
 - `public/` : site statique + application (JavaScript natif en modules, sans étape de compilation). `public/model.js` est partagé par le navigateur, le serveur et le mobile.
-- `api/` : fonctions Vercel (Node 22). `auth`, `account`, `sites`, `panels`, `report`, `etiquettes` (+ routes v1 `panel`, `panel-live`, `panels-manager`). Le code commun est dans `api/_lib/` (non exposé).
-- Base PostgreSQL (Neon) : tables `app_users`, `app_sessions`, `app_resets`, `app_rate`, `app_sites`, `app_panels`, créées automatiquement. Les tables v1 (`panel_state`, `panels_extra`…) ne sont pas modifiées.
+- `api/` : fonctions Vercel (Node 22). `auth`, `account`, `sites`, `panels`, `report`, `etiquettes`, `billing`, `stripe-webhook`, `admin` (+ routes v1 `panel`, `panel-live`, `panels-manager`). Le code commun est dans `api/_lib/` (non exposé).
+- Base PostgreSQL (Neon) : tables `app_users`, `app_sessions`, `app_resets`, `app_rate`, `app_sites`, `app_panels`, `app_plans`, `app_packs`, `app_subscriptions`, `app_credits`, `app_panel_events`, `app_stripe_events`, `app_admin_audit`, créées automatiquement. Les tables v1 (`panel_state`, `panels_extra`…) ne sont pas modifiées.
 - Sécurité : mots de passe scrypt, jetons de session aléatoires (empreinte SHA-256 en base), témoin `HttpOnly; Secure; SameSite=Lax` sur le web, jeton Bearer sur mobile, en-tête `X-MP-Client` obligatoire pour les écritures (anti-CSRF), limitation des tentatives, liens PDF signés HMAC valables 10 min, CSP stricte, chaque requête filtrée par `user_id`.
 
 ## Déploiement Vercel

@@ -2,6 +2,7 @@
 import {getSql} from './_lib/db.js';
 import {route,body,HttpError,isUuid,check} from './_lib/http.js';
 import {requireUser,newId} from './_lib/auth.js';
+import {consumePanelQuota} from './_lib/plans.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
 
@@ -44,7 +45,9 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
    positions=Math.max(positions,highestPosition(circuits));if(positions%2)positions++;
    circuits=check(()=>resize(circuits,positions));
   }else circuits=blank(positions);
-  const [row]=await sql`INSERT INTO app_panels(id,user_id,site_id,name,tag,kind,location,positions,details,circuits) VALUES(${newId()},${user.id},${site.id},${meta.name},${meta.tag},${meta.kind},${meta.location},${positions},${JSON.stringify(meta.details)}::jsonb,${JSON.stringify(circuits)}::jsonb) RETURNING *`;
+  const panelId=newId();
+  await consumePanelQuota(sql,user.id,panelId);
+  const [row]=await sql`INSERT INTO app_panels(id,user_id,site_id,name,tag,kind,location,positions,details,circuits) VALUES(${panelId},${user.id},${site.id},${meta.name},${meta.tag},${meta.kind},${meta.location},${positions},${JSON.stringify(meta.details)}::jsonb,${JSON.stringify(circuits)}::jsonb) RETURNING *`;
   await sql`UPDATE app_sites SET updated_at=now() WHERE id=${site.id}`;
   return res.status(201).json({panel:panelOut(row)});
  }

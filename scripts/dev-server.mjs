@@ -32,6 +32,7 @@ http.createServer(async(req,res)=>{
  const chunks=[];for await(const c of req)chunks.push(c);
  const raw=Buffer.concat(chunks).toString('utf8');
  req.query=Object.fromEntries(url.searchParams);
+ req.rawBody=raw;
  req.body=raw&&String(req.headers['content-type']).includes('json')?(()=>{try{return JSON.parse(raw);}catch{return raw;}})():raw;
  res.status=c=>{res.statusCode=c;return res;};
  res.json=o=>{if(!res.getHeader('Content-Type'))res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(o));return res;};

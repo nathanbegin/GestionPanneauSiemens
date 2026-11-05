@@ -66,3 +66,6 @@ export const fmtRelative=v=>{
  if(s<60)return 'à l’instant';if(s<3600)return `il y a ${Math.floor(s/60)} min`;if(s<86400)return `il y a ${Math.floor(s/3600)} h`;
  return fmtDate(v);
 };
+export const money=cents=>cents==null?'—':new Intl.NumberFormat('fr-CA',{style:'currency',currency:'CAD',minimumFractionDigits:cents%100?2:0}).format(cents/100);
+export const quotaLabel=p=>p.panelLimit==null?'Panneaux illimités':p.quotaType==='active'?`${p.panelLimit} panneaux`:p.quotaType==='monthly'?`${p.panelLimit} nouveaux panneaux / mois`:`${p.panelLimit} nouveaux panneaux / an`;
+export const planFeatures=p=>[quotaLabel(p),p.siteLimit==null?'Sites illimités':`${p.siteLimit} site${p.siteLimit>1?'s':''}`,p.seats>1?`${p.seats} utilisateurs (bientôt)`:null,'Rapports PDF et étiquettes',p.features?.planning?'Planification avancée (bientôt)':null,p.features?.branding?'Rapports à votre image (entreprise, RBQ)':null,p.features?.qr?'Codes QR pour les panneaux (bientôt)':null].filter(Boolean);

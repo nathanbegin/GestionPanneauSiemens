@@ -4,6 +4,8 @@ import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
 import {siteDialog,panelDialog,siteFields,formData} from './forms.js';
 import {panelView} from './panel.js';
+import {billingView} from './billing.js';
+import {adminView} from './admin.js';
 
 const view=document.getElementById('view'),topbar=document.getElementById('topbar');
 const state={user:null,features:{}};
@@ -21,6 +23,8 @@ function crumbs(items){
    h('div',{class:'who'},h('b',{text:state.user.name}),state.user.email),
    h('a',{href:'#/sites',role:'menuitem'},'🏠 Mes sites'),
    h('a',{href:'#/compte',role:'menuitem'},'👤 Mon compte'),
+   h('a',{href:'#/abonnement',role:'menuitem'},'⭐ Mon abonnement'),
+   state.user.isAdmin&&h('a',{href:'#/admin',role:'menuitem'},'🛠 Administration'),
    h('a',{href:webUrl('/fonctionnement'),role:'menuitem',target:NATIVE?'_blank':null},'❓ Fonctionnement'),
    h('hr'),
    h('button',{type:'button',role:'menuitem',onclick:logout},'↩ Se déconnecter'));
@@ -91,16 +95,18 @@ function resetView(token){
 // ---------- Sites ----------
 async function sitesView(){
  crumbs([['Mes sites']]);
- const {sites}=await api('/api/sites');
+ const [{sites},usage]=await Promise.all([api('/api/sites'),api('/api/billing').catch(()=>null)]);
+ const chip=usage&&h('a',{class:'usage-chip',href:'#/abonnement'},h('b',{text:usage.plan.name}),usage.limit==null?`${usage.used} panneaux`:`${usage.used} / ${usage.limit} panneaux${usage.plan.quotaType==='monthly'?' ce mois-ci':''}`,usage.credits?` · +${usage.credits} prépayés`:'',usage.canCreatePanel?'':' · Augmenter →');
  const create=()=>siteDialog(null,async f=>{const {site}=await api('/api/sites',{method:'POST',body:f});toast('Site créé. Ajoutez maintenant un panneau.');location.hash='#/sites/'+site.id;});
  const first=state.user.name.split(' ')[0];
  if(!sites.length)return h('div',{class:'container'},h('div',{class:'card empty-state'},
   h('div',{class:'ico',text:'🏠'}),h('h2',{text:`Bienvenue, ${first} !`}),h('p',{text:'Commencez par ajouter un site : l’adresse d’une maison, d’un chalet ou d’un client. Vous y ajouterez ensuite ses panneaux électriques.'}),
   h('div',{class:'onboard'},h('div',{},h('b',{text:'1. Un site'}),h('span',{text:'Une adresse (maison, chalet, client).'})),h('div',{},h('b',{text:'2. Ses panneaux'}),h('span',{text:'Principal, sous-panneau du garage…'})),h('div',{},h('b',{text:'3. Les circuits'}),h('span',{text:'Touchez chaque disjoncteur et décrivez-le.'}))),
   h('button',{type:'button',class:'primary lg',onclick:create},'+ Ajouter mon premier site'),
+  h('p',{class:'small muted mt'},'Forfait gratuit : 5 panneaux. ',h('a',{href:'#/abonnement',text:'Voir les forfaits'}),'.'),
   h('p',{class:'small muted mt'},'Vous utilisiez l’ancienne version avec une clé d’accès ? ',h('a',{href:'#/compte',text:'Importez vos panneaux'}),'.')));
  return h('div',{class:'container'},
-  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`Bonjour ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
+  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`Bonjour ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
   h('div',{class:'cards'},...sites.map(s=>h('a',{class:'card site-card',href:'#/sites/'+s.id},
    h('div',{},h('h2',{text:s.name}),h('div',{class:'addr',text:siteAddress(s)||'Adresse à préciser'}),s.client&&h('div',{class:'addr',text:'Client : '+s.client})),
    h('div',{class:'chips'},s.panels.length?s.panels.map(p=>h('span',{class:'badge '+(p.progress===100?'ok':''),text:`${p.tag||p.name} · ${p.progress} %`})):h('span',{class:'badge warn',text:'Aucun panneau'})),
@@ -189,7 +195,7 @@ function accountView(){
 // ---------- Routeur ----------
 async function route(){
  const token=++renderToken;
- const [,name='',id='',sub='']=(location.hash||'#/').replace(/^#/,'').split('/');
+ const [,name='',id='',sub='',extra='']=(location.hash||'#/').replace(/^#/,'').split('/');
  if(!state.user&&!publicRoutes.includes(name)){
   if(name&&name!=='sites')sessionStorage.setItem('mp_after_login',location.hash);
   location.replace('#/connexion');return;
@@ -205,6 +211,8 @@ async function route(){
   else if(name==='sites'&&id)node=await siteView(id);
   else if(name==='panneaux'&&id)node=await panelView({id,tab:sub,ctx});
   else if(name==='compte')node=accountView();
+  else if(name==='abonnement')node=await billingView({ctx,sub:id,a:sub,b:extra});
+  else if(name==='admin'&&state.user.isAdmin)node=await adminView({ctx,tab:id||'tableau',id:sub});
   else if(name===''||name==='sites')node=await sitesView();
   else{location.replace('#/sites');return;}
   if(token!==renderToken)return;

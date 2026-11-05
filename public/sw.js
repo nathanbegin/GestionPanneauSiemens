@@ -1,6 +1,6 @@
 // Service worker : réseau d'abord, copie en cache pour l'ouverture hors ligne de l'interface.
-const CACHE='mon-panneau-v2.0.0';
-const SHELL=['/app','/app.html','/config.js','/assets/mp.css','/model.js','/js/app.js','/js/api.js','/js/dom.js','/js/forms.js','/js/panel.js','/assets/icon.svg'];
+const CACHE='mon-panneau-v2.1.0';
+const SHELL=['/app','/app.html','/config.js','/assets/mp.css','/model.js','/js/app.js','/js/api.js','/js/dom.js','/js/forms.js','/js/panel.js','/js/billing.js','/js/admin.js','/js/pricing.js','/assets/icon.svg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).catch(()=>{}));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{

@@ -312,3 +312,43 @@ dialog::backdrop{background:#152b2870;backdrop-filter:blur(3px)}
 }
 @media (max-width:1100px) and (min-width:721px){.site-nav a:not(.btn){padding:8px 8px}}
 .save-state:empty{display:none}
+/* ---------- Tarifs et abonnements ---------- */
+.billing-toggle{display:inline-flex;background:var(--soft);border-radius:99px;padding:4px;gap:4px;margin-bottom:24px}
+.billing-toggle button{border:0;border-radius:99px;background:none;min-height:36px;padding:6px 16px}
+.billing-toggle button[aria-pressed=true]{background:#fff;box-shadow:0 1px 3px #183c3220;font-weight:600}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;align-items:stretch}
+.plan{padding:22px;display:flex;flex-direction:column;gap:10px;position:relative}
+.plan.highlight{border:2px solid var(--ink)}
+.plan .ribbon{position:absolute;top:-11px;left:20px;background:var(--ink);color:var(--lime);font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;letter-spacing:.05em}
+.plan h3{margin:0;font-size:18px}
+.plan .aud{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.plan .price{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.plan .price small{font-size:14px;color:var(--muted);font-weight:400}
+.plan .save{font-size:12px;color:#2f7048;font-weight:600;min-height:18px}
+.plan ul{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:6px;font-size:14px;flex:1}
+.plan li:before{content:'✓ ';color:var(--green);font-weight:700}
+.plan p{color:var(--muted);font-size:14px;margin:0}
+.plan.current{background:#eef5ef}
+.usage{padding:22px;display:grid;gap:14px}
+.usage .big{font-size:28px;font-weight:600}
+.usage-chip{display:inline-flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);text-decoration:none;background:#fff;border:1px solid var(--line);padding:6px 12px;border-radius:99px}
+.usage-chip b{color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat{padding:16px}
+.stat b{display:block;font-size:26px;font-weight:600}
+.stat span{font-size:13px;color:var(--muted)}
+table.data{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+table.data th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#f0f3ee;padding:10px 12px;font-weight:700}
+table.data td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:top}
+table.data tr.click{cursor:pointer}
+table.data tr.click:hover td{background:#f5f8f3}
+.table-wrap{overflow-x:auto}
+.admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.admin-grid .card{padding:18px}
+.admin-grid h3{font-size:16px;margin-bottom:12px}
+.inline-form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.inline-form label.f{flex:1;min-width:120px}
+.mode{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#f6ead3;color:#7d5a1f}
+.mode.live{background:#dcefe0;color:#245c3a}
+.tabs a[aria-selected=true]{background:#fff;box-shadow:0 1px 3px #183c3218;font-weight:600}.tabs a{white-space:nowrap}
+.plan ul{align-content:start}
