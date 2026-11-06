@@ -8,6 +8,10 @@ import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
 import {panelArt,isEmptySlot} from './panelart.js';
 import {loadLibrary,breakerPalette,validStarts,compatibility} from './library.js';
 import {placeBreaker} from '../model.js';
+import {assignDialog} from './assign.js';
+import {linkedChild} from './feeds.js';
+import {breakerUnits} from '../units.js';
+import {panelDialog} from './forms.js';
 
 const statusClass=c=>c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
 const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
@@ -73,7 +77,7 @@ export async function panelView({id,tab='panel',ctx}){
  }
  function openCircuit(cid){
   const order=sortCircuits(panel.circuits).map(c=>c.id);
-  const editor=circuitEditor({panel,id:cid,order,planning,lib,onSave:async circuits=>{
+  const editor=circuitEditor({panel,id:cid,order,planning,lib,feeds:{siblings,createSubpanel,onChange:()=>{renderBody();}},onSave:async circuits=>{
    const p=await persist({circuits});
    editor.setPanel(p,sortCircuits(p.circuits).map(c=>c.id));
    renderHead();renderBody();
@@ -94,7 +98,7 @@ export async function panelView({id,tab='panel',ctx}){
    const meta=h('span',{class:'meta'},c.amps?c.amps+' A':'— A',h('small',{class:'st-'+statusClass(c),text:c.status}));
    return h('button',{type:'button',class:'circuit-card card '+statusClass(c),onclick:()=>openCircuit(c.id)},
     h('span',{class:'pos',text:designation(c)}),
-    h('span',{class:'txt'},h('strong',{text:c.status==='Libre'?'Libre':c.label||'À identifier — touchez pour décrire'}),h('small',{text:[c.room,c.usage!=='Autre'?c.usage:'',c.protection].filter(Boolean).join(' · ')||'—'}),c.exceptions&&h('span',{class:'ex',text:'⚠ '+c.exceptions})),
+    h('span',{class:'txt'},h('strong',{text:c.status==='Libre'?'Libre':c.label||'À identifier — touchez pour décrire'}),h('small',{text:[c.room,c.usage!=='Autre'?c.usage:'',c.protection,c.breakerRef].filter(Boolean).join(' · ')||'—'}),c.exceptions&&h('span',{class:'ex',text:'⚠ '+c.exceptions}),(()=>{const ch=linkedChild(panel,c,siblings);return ch?h('span',{class:'feeds-tag',text:'⚡ Alimente '+panelTitle(ch)}):c.usage==='Sous-panneau'?h('span',{class:'feeds-tag todo',text:'⚡ Sous-panneau à lier'}):null;})()),
     meta);
   }):[h('p',{class:'empty-state muted',text:'Aucun circuit ne correspond à la recherche.'})]));
  }
@@ -191,6 +195,17 @@ export async function panelView({id,tab='panel',ctx}){
   try{await api('/api/panels?id='+panel.id,{method:'DELETE'});toast('Panneau supprimé.');location.hash='#/sites/'+site.id;}catch(e){toast(e.message);}
  }
 
+ // Création d'un sous-panneau pré-relié à un circuit de ce panneau (sans quitter la page).
+ function createSubpanel(initial){
+  return new Promise(resolve=>{
+   panelDialog({siblings,library:planning,initial,title:'Nouveau sous-panneau',eyebrow:`Alimenté par ${panelTitle(panel)} · circuit ${initial.details?.fedFromCircuit||''}`,
+    onSave:async f=>{const {panel:p}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});resolve({id:p.id,name:p.name,tag:p.tag,kind:p.kind,fedFrom:p.details?.fedFrom||'',fedFromCircuit:p.details?.fedFromCircuit||''});}});
+  });
+ }
+ function openAssign(){
+  if(!lib)return toast('Bibliothèque de produits indisponible (forfaits Électricien).');
+  assignDialog({getPanel:()=>panel,lib,siblings,createSubpanel,save:async circuits=>{const p=await persist({circuits});renderHead();return p;},onClose:()=>{renderHead();renderBody();}});
+ }
  // ---------- Onglet Planification ----------
  function renderPlan(){
   const rep=panelReport(panel,{children});
@@ -245,7 +260,9 @@ export async function panelView({id,tab='panel',ctx}){
    h('p',{class:'small muted',text:'Une borne est une charge continue (section 86) : disjoncteur ≥ 125 % du courant de la borne, circuit dédié. Un gestionnaire de charge (EVEMS) peut éviter d’augmenter l’entrée électrique.'}),
    h('p',{class:'small muted',text:'Sources : '+LOADS_SOURCES.join(' · ')}));
   body.replaceChildren(
-   h('div',{class:'page-actions'},h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'📄 PDF bilan de charges et matériel'),h('button',{type:'button',onclick:()=>go('info')},rep.model?'Changer de modèle':'Choisir un modèle du catalogue')),
+   h('div',{class:'page-actions'},(()=>{const us=breakerUnits(panel.circuits).filter(u=>u.kind!=='other');const done=us.filter(u=>u.ref).length;
+     return h('button',{type:'button',class:'primary',onclick:openAssign},`🔧 Attribuer les modèles (${done}/${us.length})`);})(),
+    h('button',{type:'button',onclick:()=>doc({kind:'loads'})},'📄 PDF bilan de charges et matériel'),h('button',{type:'button',onclick:()=>go('info')},rep.model?'Changer de modèle':'Choisir un modèle du catalogue')),
    h('p',{class:'small muted',text:'Choisissez un disjoncteur dans la bibliothèque, puis touchez une position en surbrillance pour le placer. Touchez un disjoncteur installé pour décrire ses charges.'}),
    h('div',{class:'workspace mt plan-workspace'},cabBox,h('div',{class:'stack'},palette,gauge,issues,sugg)),
    h('div',{class:'stack mt'},table,calcCard,matCard,ev));

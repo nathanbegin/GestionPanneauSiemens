@@ -39,6 +39,13 @@ Compte ─┬─ Site (adresse, client, notes)
 - **Synchronisation** : enregistrement automatique, contrôle de révision (aucun écrasement silencieux entre deux appareils).
 - **PWA** installable (manifeste + service worker) et **applications natives** iOS/Android (Capacitor) dans `mobile/`.
 
+## Attribution des modèles et liaison des sous-panneaux (v2.4)
+
+- **Attribuer les modèles** (onglet Planification, abonnés) : les fiches sont regroupées en disjoncteurs physiques (`public/units.js` : unipolaire, bipolaire, tripolaire, jumelé, quad, y compris les bipolaires sur demi-emplacements « 1B / 3A »). Modèles proposés selon le format, les calibres et la protection, neutre enfichable en premier si le panneau en a une barre.
+  - *Un à un* : un clic sur le modèle l'attribue et passe au suivant ; Passer, Précédent, Retirer le modèle.
+  - *Par groupe identique* : groupes par format, calibres et protection ; sélection (tout, sans modèle seulement) et attribution en lot.
+- **Sous-panneaux** : un circuit dont l'usage est « Sous-panneau » propose de le lier à un panneau du site, de créer le sous-panneau tout de suite (pré-rempli et relié), ou de le relier plus tard depuis la fiche du sous-panneau (le champ « Circuit d'alimentation » propose les circuits du panneau source). La liaison est vérifiée côté serveur (même site, aucune boucle).
+
 ## Bibliothèque de produits et concepteur visuel (v2.3)
 
 - Données fournies par l'administrateur (`api/_data/catalogue.js`, issues des catalogues canadiens Schneider/Square D, Siemens, Eaton et Leviton) : 332 panneaux, 680 disjoncteurs, 7 familles (QO, HomeLine, Siemens, BR, CH, Leviton, CBM), anciennes marques, génératrices, parasurtenseurs, sources.

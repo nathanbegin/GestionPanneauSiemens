@@ -3,6 +3,8 @@ import {h,field,select,dialog,toast,confirmDialog} from './dom.js';
 import {FAMILIES,PANEL_STATES,LOAD_LIBRARY,LOAD_CATEGORIES,WIRE_TABLE,WIRE_TYPES,familyOf,wireAmps} from '../catalog.js';
 import {modelPicker} from './library.js';
 import {brandBadge} from './panelart.js';
+import {subpanelLink} from './feeds.js';
+import {api} from './api.js';
 import {circuitLoad,polesOf} from '../loadcalc.js';
 import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormats,designation,formatOf,reshape,validate,tagGroups,panelTitle,MAX_POSITIONS} from '../model.js';
 
@@ -59,7 +61,7 @@ export function panelFields(panel={},siblings=[],{library=false}={}){
    h('datalist',{id:'brands'},['Siemens','Square D','Eaton','Cutler-Hammer','Schneider Electric','Federal Pioneer','Stab-Lok','Westinghouse','Commander','GE','Leviton'].map(b=>h('option',{value:b}))))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Alimentation'}),h('div',{class:'fields'},
    field('Alimenté par',fed),
-   field('Circuit d’alimentation',input('fedFromCircuit',d.fedFromCircuit,{maxlength:40,placeholder:'Ex. 14/16'}),{hint:'Position du disjoncteur dans le panneau source.'}))),
+   field('Circuit d’alimentation',fedCircuitInput(fed,d.fedFromCircuit),{hint:'Position du disjoncteur dans le panneau source (les circuits « Sous-panneau » sont proposés en premier).'}))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Relevé'}),h('div',{class:'fields'},
    field('Date du relevé',input('surveyDate',d.surveyDate,{type:'date'})),
    field('Relevé effectué par',input('surveyedBy',d.surveyedBy,{maxlength:100,placeholder:'Nom de la personne'})),
@@ -91,11 +93,27 @@ function catalogFieldset(d,library){
   h('div',{class:'fields'},h('div',{class:'full model-pick'},summary,h('div',{class:'page-actions'},choose,d.modelId&&clear)),
    field('Famille de produits',fam,{hint:'Détermine le dessin du panneau et les disjoncteurs proposés.'})));
 }
+// Champ « Circuit d'alimentation » : propose les circuits du panneau source choisi.
+function fedCircuitInput(fedSelect,value){
+ const listId='fedc-'+Math.random().toString(36).slice(2,8);
+ const dl=h('datalist',{id:listId});
+ const inp=input('fedFromCircuit',value,{maxlength:40,placeholder:'Ex. 14/16',list:listId,autocomplete:'off'});
+ const load=async()=>{
+  dl.replaceChildren();if(!fedSelect.value)return;
+  try{const {panel:src}=await api('/api/panels?id='+encodeURIComponent(fedSelect.value));
+   const cs=[...src.circuits].filter(c=>c.label||c.amps).sort((a,b)=>(b.usage==='Sous-panneau')-(a.usage==='Sous-panneau'));
+   dl.replaceChildren(...cs.map(c=>h('option',{value:designation(c),label:`${c.usage==='Sous-panneau'?'⚡ ':''}${c.label||'—'}${c.amps?' · '+c.amps+' A':''}`})));}
+  catch{}
+ };
+ fedSelect.addEventListener('change',()=>{inp.value='';load();});
+ load();
+ return h('span',{class:'fed-circuit'},inp,dl);
+}
 export function panelPayload(form){
  const f=formData(form);
  return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),state:f.state}},positions:Number(f.positions)};
 }
-export function panelDialog({siblings=[],onSave,library=false}){
+export function panelDialog({siblings=[],onSave,library=false,initial={},title='Nouveau panneau',eyebrow='Étape 2 · un panneau dans ce site'}){
  const e=err();
  const fileInput=h('input',{type:'file',accept:'application/json,.json',class:'sr-only',id:'importJson'});
  let imported=null;
@@ -106,7 +124,7 @@ export function panelDialog({siblings=[],onSave,library=false}){
    if(data.panel&&!d.form.elements.name.value)d.form.elements.name.value=String(data.panel).slice(0,100);}
   catch(x){imported=null;importNote.textContent='⚠ '+x.message;}
  });
- const d=dialog({title:'Nouveau panneau',eyebrow:'Étape 2 · un panneau dans ce site',form:true,wide:true,body:[...panelFields({},siblings,{library}),
+ const d=dialog({title,eyebrow,form:true,wide:true,body:[...panelFields(initial,siblings,{library}),
   h('div',{class:'notice info'},'Vous avez une sauvegarde JSON (ancienne version ou export) ? ',h('label',{for:'importJson',class:'btn sm',text:'Importer un fichier'}),fileInput,importNote),e],
   actions:[{label:'Annuler',kind:'ghost'},{label:'Créer le panneau',kind:'primary',submit:true}]});
  d.form.addEventListener('submit',async ev=>{
@@ -117,7 +135,7 @@ export function panelDialog({siblings=[],onSave,library=false}){
 }
 
 // Fiche d'un circuit avec navigation précédent / suivant.
-export function circuitEditor({panel,id,order,onSave,planning=false,lib=null}){
+export function circuitEditor({panel,id,order,onSave,planning=false,lib=null,feeds=null}){
  let current=id;
  let plan=null;
  const e=err();
@@ -132,6 +150,7 @@ export function circuitEditor({panel,id,order,onSave,planning=false,lib=null}){
     field('Désignation — ce que le circuit alimente',input('label',c.label,{maxlength:100,placeholder:'Ex. Prises du salon',autocomplete:'off'}),{full:true}),
     field('Pièce / zone',input('room',c.room,{maxlength:80,placeholder:'Ex. Cuisine, Sous-sol',list:'rooms'})),
     field('Type d’usage',select('usage',usageOrder,c.usage)),
+    feeds&&h('div',{class:'full feed-slot'}),
     field('Calibre',select('amps',[['','À confirmer'],...ampsList.map(a=>[a,a+' A'])],c.amps??'')),
     field('Protection',select('protection',protections,c.protection||'Standard'),{hint:'DDFT : différentiel (salle de bain, extérieur). Anti-arc : chambres, aires habitables.'}),
     field('Statut',select('status',states,c.status)),
@@ -146,6 +165,12 @@ export function circuitEditor({panel,id,order,onSave,planning=false,lib=null}){
      c.originalLabel?h('p',{class:'small muted full',text:'Description originale du relevé : '+c.originalLabel}):null)),
     (plan=planning?planningSection(c,panel,()=>{dirty=true;},body,lib):null)?.node),
    e);
+  // Circuit qui alimente un sous-panneau : liaison avec un panneau du site.
+  const slot=body.querySelector('.feed-slot');
+  if(slot){
+   const drawFeed=()=>{const usage=body.querySelector('[name=usage]').value;slot.replaceChildren(usage==='Sous-panneau'?subpanelLink({panel,circuit:c,siblings:feeds.siblings,createSubpanel:feeds.createSubpanel,onChange:feeds.onChange}):'');};
+   body.querySelector('[name=usage]').addEventListener('change',drawFeed);drawFeed();
+  }
   d.el.querySelector('.dlg-head h2').textContent='Circuit '+designation(c);
   d.el.querySelector('.dlg-head .eyebrow').textContent=`Fiche ${idx+1} sur ${order.length} · ${panelTitle(panel)}`;
   prevBtn.disabled=idx<=0;nextBtn.disabled=idx>=order.length-1;

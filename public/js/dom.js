@@ -32,7 +32,8 @@ export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide
  const close=()=>{if(el.open)el.close();};
  for(const a of actions){
   const b=h('button',{type:a.submit?'submit':'button',class:a.kind||'',text:a.label});
-  if(a.onClick)b.addEventListener('click',async e=>{if(a.submit)return;e.preventDefault();const r=await a.onClick(close,b);if(r!==false&&!a.keep)close();});
+  // Tout bouton sans « submit » ferme la boîte, après son action éventuelle (sauf si elle renvoie false).
+  if(!a.submit)b.addEventListener('click',async e=>{e.preventDefault();const r=a.onClick?await a.onClick(close,b):undefined;if(r!==false&&!a.keep)close();});
   (a.left?foot:right).append(b);
  }
  foot.append(right);

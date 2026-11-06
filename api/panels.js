@@ -32,8 +32,9 @@ async function checkFedFrom(sql,meta,siteId,selfId){
  const f=meta.details.fedFrom;
  if(!f)return;
  if(!isUuid(f)||f===selfId)throw new HttpError(400,'Panneau d’alimentation invalide.');
- const [p]=await sql`SELECT id FROM app_panels WHERE id=${f} AND site_id=${siteId}`;
- if(!p)throw new HttpError(400,'Le panneau d’alimentation doit appartenir au même site.');
+ const sitePanels=await sql`SELECT id,details FROM app_panels WHERE site_id=${siteId}`;
+ if(!sitePanels.some(p=>p.id===f))throw new HttpError(400,'Le panneau d’alimentation doit appartenir au même site.');
+ if(selfId){const parentOf=new Map(sitePanels.map(p=>[p.id,p.details?.fedFrom||'']));for(let cur=f,i=0;cur&&i<60;cur=parentOf.get(cur),i++)if(cur===selfId)throw new HttpError(400,'Liaison impossible : elle créerait une boucle d’alimentation.');}
 }
 
 export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
@@ -80,7 +81,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  if(req.method==='GET'){
   const [site]=await sql`SELECT * FROM app_sites WHERE id=${row.site_id}`;
   const all=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${row.site_id} ORDER BY created_at`;
-  const siblings=all.map(({id,name,tag,kind})=>({id,name,tag,kind}));
+  const siblings=all.map(({id,name,tag,kind,details})=>({id,name,tag,kind,fedFrom:details?.fedFrom||'',fedFromCircuit:details?.fedFromCircuit||''}));
   // Sous-panneaux alimentés directement ou indirectement par ce panneau (pour le bilan de charge).
   const children=[],queue=[row.id],seen=new Set([row.id]);
   while(queue.length){const parent=queue.shift();for(const p of all)if(p.details?.fedFrom===parent&&!seen.has(p.id)){seen.add(p.id);queue.push(p.id);children.push({id:p.id,name:p.name,tag:p.tag,kind:p.kind,circuits:p.circuits});}}
@@ -94,6 +95,21 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  }
  // PUT : mise à jour optimiste avec numéro de révision.
  const data=body(req);
+ // Liaison d'alimentation seule (depuis la fiche du circuit qui alimente ce panneau) : met à jour
+ // uniquement « Alimenté par » et « Circuit d'alimentation », sans toucher au reste de la fiche.
+ if(data.feed!==undefined){
+  const fedFrom=String(data.feed?.fedFrom||'');const fedFromCircuit=String(data.feed?.fedFromCircuit||'').trim().slice(0,40);
+  if(fedFrom){
+   if(!isUuid(fedFrom)||fedFrom===id)throw new HttpError(400,'Panneau d’alimentation invalide.');
+   const sitePanels=await sql`SELECT id,details FROM app_panels WHERE site_id=${row.site_id}`;
+   if(!sitePanels.some(p=>p.id===fedFrom))throw new HttpError(400,'Le panneau d’alimentation doit appartenir au même site.');
+   // Pas de boucle : le panneau source ne peut pas être alimenté (directement ou non) par celui-ci.
+   const parentOf=new Map(sitePanels.map(p=>[p.id,p.details?.fedFrom||'']));
+   for(let cur=fedFrom,i=0;cur&&i<60;cur=parentOf.get(cur),i++)if(cur===id)throw new HttpError(400,'Liaison impossible : elle créerait une boucle d’alimentation.');
+  }
+  const [u]=await sql`UPDATE app_panels SET details=details||${JSON.stringify({fedFrom,fedFromCircuit:fedFrom?fedFromCircuit:''})}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND user_id=${user.id} RETURNING *`;
+  return res.status(200).json({panel:panelOut(u)});
+ }
  if(!Number.isInteger(data.revision))throw new HttpError(400,'Révision manquante.');
  let {name,tag,kind,location,details,positions,circuits}=row;
  if(data.meta){const m=check(()=>cleanPanelMeta(data.meta));await checkFedFrom(sql,m,row.site_id,id);await applyModel(sql,user,m,row.details);({name,tag,kind,location,details}=m);}

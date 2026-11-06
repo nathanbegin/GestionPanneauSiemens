@@ -436,3 +436,19 @@ dialog.picker{width:min(1100px,calc(100vw - 24px))}
 .model-summary{display:flex;align-items:center;gap:10px;min-width:0}
 @media (max-width:720px){.palette .palette-filters{grid-template-columns:1fr 1fr}.model-grid{grid-template-columns:1fr 1fr}.model-thumb .panel-art{max-width:110px}}
 .brand-badge img.parent{height:12px;opacity:.85;padding-left:6px;border-left:1px solid var(--line)}.brand-badge.xs img.parent{height:9px}
+/* ---------- Attribution des modèles et sous-panneaux ---------- */
+.assign{margin-top:12px}
+.assign-unit{display:flex;align-items:center;gap:12px;padding:14px}
+.assign-unit .pi-text{flex:1}
+.group{padding:0;overflow:hidden}
+.group-head{display:flex;align-items:center;gap:12px;width:100%;justify-content:flex-start;text-align:left;border:0;border-radius:0;background:#fff;padding:12px 14px;font-weight:400}
+.group-head .pi-text{flex:1}
+.group.open .group-head{background:#eef5ef}
+.group-body{padding:12px 14px;border-top:1px solid var(--line)}
+.group-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px;margin:10px 0;max-height:220px;overflow:auto}
+.feed-box{background:#f4f8fc;border:1px solid #cddcee;border-radius:10px;padding:10px 12px}
+.feed-box .inline-form select{flex:1;min-width:180px;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff}
+.feed-linked{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.feeds-tag{display:inline-block;margin-top:3px;font-size:12px;font-weight:600;color:#245c8a}
+.feeds-tag.todo{color:#8a6a1f}
+.fed-circuit{display:block}
