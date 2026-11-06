@@ -435,3 +435,4 @@ dialog.picker{width:min(1100px,calc(100vw - 24px))}
 .model-pick{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}
 .model-summary{display:flex;align-items:center;gap:10px;min-width:0}
 @media (max-width:720px){.palette .palette-filters{grid-template-columns:1fr 1fr}.model-grid{grid-template-columns:1fr 1fr}.model-thumb .panel-art{max-width:110px}}
+.brand-badge img.parent{height:12px;opacity:.85;padding-left:6px;border-left:1px solid var(--line)}.brand-badge.xs img.parent{height:9px}

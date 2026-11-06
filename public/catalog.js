@@ -97,11 +97,11 @@ export const wireAmps=g=>WIRE_TABLE.find(w=>w.gauge===g)?.amps??null;
 // et des disjoncteurs est réservée aux abonnés et servie par l'API).
 // pitch = largeur d'un espace en pouces (3/4" ou 1"), utilisée pour le dessin réaliste.
 export const FAMILIES={
- QO:{brand:'Square D',maker:'Schneider Electric',name:'Square D QO',pitch:.75,accent:'#3a8f4e',body:'#161616',handle:'#2c2c2c',ink:'#f3f3f3',mark:'QO'},
- HOM:{brand:'Square D',maker:'Schneider Electric',name:'Square D HomeLine',pitch:1,accent:'#3a8f4e',body:'#1a1a1a',handle:'#303030',ink:'#f3f3f3',mark:'HOM'},
+ QO:{brand:'Square D',maker:'Schneider Electric',parent:'Schneider Electric',name:'Square D QO',pitch:.75,accent:'#3a8f4e',body:'#161616',handle:'#2c2c2c',ink:'#f3f3f3',mark:'QO'},
+ HOM:{brand:'Square D',maker:'Schneider Electric',parent:'Schneider Electric',name:'Square D HomeLine',pitch:1,accent:'#3a8f4e',body:'#1a1a1a',handle:'#303030',ink:'#f3f3f3',mark:'HOM'},
  SIE:{brand:'Siemens',maker:'Siemens Canada',name:'Siemens EQ / Q',pitch:1,accent:'#0b8a8f',body:'#24282b',handle:'#3a4045',ink:'#f1f4f5',mark:'Q'},
  BR:{brand:'Eaton',maker:'Eaton Canada',name:'Eaton BR',pitch:1,accent:'#1f5fa8',body:'#141414',handle:'#262626',ink:'#f3f3f3',mark:'BR'},
- CH:{brand:'Eaton',maker:'Eaton Canada',name:'Cutler-Hammer CH',pitch:.75,accent:'#1f5fa8',body:'#a8784b',handle:'#7b5232',ink:'#fff8ee',mark:'CH'},
+ CH:{brand:'Cutler-Hammer',maker:'Eaton Canada',parent:'Eaton',name:'Cutler-Hammer CH',pitch:.75,accent:'#1f5fa8',body:'#a8784b',handle:'#7b5232',ink:'#fff8ee',mark:'CH'},
  LEV:{brand:'Leviton',maker:'Leviton Canada',name:'Leviton LP / LR / LS',pitch:1,accent:'#2d63a6',body:'#d7dbdd',handle:'#596066',ink:'#22282c',mark:'LB'},
  CBM:{brand:'Eaton',maker:'Eaton Canada',name:'Eaton CBM / CBL (boulonné)',pitch:1,accent:'#1f5fa8',body:'#171717',handle:'#2a2a2a',ink:'#f3f3f3',mark:'BA'},
  generic:{brand:'',maker:'',name:'Générique / autre marque',pitch:1,accent:'#6b7a72',body:'#262b28',handle:'#3a403c',ink:'#eef2ec',mark:''},

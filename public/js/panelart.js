@@ -17,22 +17,35 @@ const fit=(text,px,size)=>{const max=Math.max(0,Math.floor(px/(size*.55)));retur
 const slug=b=>String(b||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 
 // Plaque de marque : logo officiel si le fichier existe (assets/brands/<marque>.svg), sinon nom de marque.
-// Le fichier n'est demandé qu'une fois par marque et par session.
+// Logo de la société mère en plus (ex. Schneider Electric pour Square D, Eaton pour Cutler-Hammer).
+// Chaque fichier n'est demandé qu'une fois par session.
 const logoState=new Map();
-function probeLogo(brand){
- if(logoState.has(brand))return;
- logoState.set(brand,'pending');
+function probeLogo(name){
+ const key=slug(name);
+ if(!key||logoState.has(key))return;
+ logoState.set(key,'pending');
  const img=new Image();
- img.onload=()=>{logoState.set(brand,'ok');document.querySelectorAll(`.brand-badge[data-brand="${slug(brand)}"]`).forEach(addLogo);};
- img.onerror=()=>logoState.set(brand,'missing');
- img.src=`assets/brands/${slug(brand)}.svg`;
+ img.onload=()=>{logoState.set(key,'ok');document.querySelectorAll(`.brand-badge[data-logos~="${key}"]`).forEach(fillBadge);};
+ img.onerror=()=>logoState.set(key,'missing');
+ img.src=`assets/brands/${key}.svg`;
 }
-function addLogo(box){if(box.querySelector('img'))return;box.replaceChildren(h('img',{src:`assets/brands/${box.dataset.brand}.svg`,alt:box.title}));}
+const logoOk=name=>logoState.get(slug(name))==='ok';
+function fillBadge(box){
+ const [brand,parent]=[box.dataset.brand,box.dataset.parent];
+ const kids=[];
+ if(brand&&logoState.get(brand)==='ok')kids.push(h('img',{src:`assets/brands/${brand}.svg`,alt:box.dataset.brandName}));
+ else kids.push(h('span',{class:'brand-text',text:box.dataset.brandName||'Panneau'}));
+ if(parent&&logoState.get(parent)==='ok')kids.push(h('img',{class:'parent',src:`assets/brands/${parent}.svg`,alt:box.dataset.parentName}));
+ box.replaceChildren(...kids);
+}
 export function brandBadge(familyId,{size='md'}={}){
  const f=familyOf(familyId);
- const box=h('span',{class:'brand-badge '+size,title:f.brand||f.name,dataset:{brand:slug(f.brand)}},h('span',{class:'brand-text',text:f.brand||'Panneau'}));
+ const brand=slug(f.brand),parent=f.parent&&slug(f.parent)!==brand?slug(f.parent):'';
+ const box=h('span',{class:'brand-badge '+size,title:[f.brand,f.parent&&f.parent!==f.brand?f.parent:''].filter(Boolean).join(' · ')||f.name,
+  dataset:{brand,parent,brandName:f.brand||'',parentName:f.parent||'',logos:[brand,parent].filter(Boolean).join(' ')}});
  box.style.setProperty('--accent',f.accent);
- if(f.brand){probeLogo(f.brand);if(logoState.get(f.brand)==='ok')addLogo(box);}
+ if(f.brand)probeLogo(f.brand);if(parent)probeLogo(f.parent);
+ fillBadge(box);
  return box;
 }
 
@@ -65,7 +78,9 @@ export function panelArt(opts){
  for(const [cx,cy] of [[34,34],[W-34,34],[34,H-34],[W-34,H-34]])svg.append(s('g',{},s('circle',{cx,cy,r:6,fill:'#c9cdc7',stroke:'#8e948c'}),s('line',{x1:cx-3.5,y1:cy+2,x2:cx+3.5,y2:cy-2,stroke:'#7d847b','stroke-width':1.2})));
  // Étiquette du fabricant (texte ; le logo officiel s'affiche au-dessus du dessin).
  svg.append(s('rect',{x:W/2-120,y:34,width:240,height:34,rx:4,fill:'#f7f8f5',stroke:'#c3c8c1'}));
- svg.append(s('text',{x:W/2,y:50,'text-anchor':'middle','font-size':12,'font-weight':800,fill:fam.accent,'letter-spacing':1.5},(fam.brand||'PANNEAU').toUpperCase()));
+ // Logo officiel s'il est installé (assets/brands), sinon nom de la marque.
+ if(fam.brand&&logoOk(fam.brand))svg.append(s('image',{href:`assets/brands/${slug(fam.brand)}.svg`,x:W/2-60,y:38,width:120,height:15,preserveAspectRatio:'xMidYMid meet'}));
+ else svg.append(s('text',{x:W/2,y:50,'text-anchor':'middle','font-size':12,'font-weight':800,fill:fam.accent,'letter-spacing':1.5},(fam.brand||'PANNEAU').toUpperCase()));
  svg.append(s('text',{x:W/2,y:62,'text-anchor':'middle','font-size':8,fill:'#5d665f','letter-spacing':.8},fit(`${det.modelId||fam.name}${det.maxCircuits?` · ${panel.positions}/${det.maxCircuits}`:` · ${panel.positions} pos.`}`,230,8)));
  // Principal ou cosses.
  if(det.mainAmps&&isMain){
