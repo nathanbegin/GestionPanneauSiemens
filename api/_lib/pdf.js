@@ -127,6 +127,11 @@ function directory(d,panel,{rowH=18,compact=false}={}){
  const circuits=sortCircuits(panel.circuits);
  const rows=Math.ceil(panel.positions/2);
  const gap=10,colW=(d.W-2*M-gap)/2;
+ // Une seule taille de police : elle doit tenir dans un demi-emplacement (disjoncteur jumelé) s'il y en a.
+ const hasHalf=circuits.some(c=>c.slots.length%2===1);
+ const fs=Math.min(compact?7.6:8.2,hasHalf?rowH/2-1.6:rowH-6);
+ const posW=Math.max(28,...circuits.map(c=>d.width(designation(c),fs,d.bold)))+10;
+ const ampsW=Math.max(...circuits.map(c=>d.width(c.amps?c.amps+' A':'— A',fs,d.bold)));
  // Découpe en blocs de lignes si le répertoire dépasse la page.
  let row=0;
  while(row<rows){
@@ -144,19 +149,13 @@ function directory(d,panel,{rowH=18,compact=false}={}){
    const y=top-(b-row)*rowH,h=(b-a)*rowH;
    d.rect(x,y+.8,colW,h-1.6,{color:c.status==='Libre'?C.soft:C.white,borderColor:C.line,borderWidth:.6});
    d.rect(x,y+.8,3,h-1.6,{color:statusColor(c)});
-   const small=h<rowH*.9,fs=small?6.5:compact?7.8:8.6;
-   const pos=designation(c);
-   const posW=Math.max(30,d.width(pos,fs,d.bold)+8);
-   d.text(pos,x+7,y+h/2-fs/2.8,{size:fs,f:d.bold,color:C.green,max:posW});
+   // Mise en page uniforme : même police, colonnes fixes (position, désignation, calibre) pour toutes les cases.
+   const by=y+h/2-fs*.35;
+   d.text(designation(c),x+8,by,{size:fs,f:d.bold,color:C.green,max:posW-4});
    const amps=c.amps?c.amps+' A':'— A';
-   d.text(amps,x+colW-6-d.width(amps,fs,d.bold),y+h/2-fs/2.8,{size:fs,f:d.bold});
-   const labelW=colW-posW-d.width(amps,fs,d.bold)-22;
+   d.text(amps,x+colW-7-d.width(amps,fs,d.bold),by,{size:fs,f:d.bold});
    const label=c.status==='Libre'?'LIBRE':c.label||'À identifier';
-   const room=c.room&&c.status!=='Libre'?c.room:'';
-   if(h>=rowH*1.8&&room){
-    d.text(label,x+7+posW,y+h/2+1.5,{size:fs,f:c.label?d.font:d.font,color:c.label?C.ink:C.muted,max:labelW});
-    d.text(room,x+7+posW,y+h/2-fs,{size:fs-1.5,color:C.muted,max:labelW});
-   }else d.text(room&&!small?`${label} — ${room}`:label,x+7+posW,y+h/2-fs/2.8,{size:fs,color:c.label||c.status==='Libre'?C.ink:C.muted,max:labelW});
+   d.text(label,x+8+posW,by,{size:fs,color:c.label||c.status==='Libre'?C.ink:C.muted,max:colW-posW-ampsW-22});
   }
   d.y=top-(end-row)*rowH-10;
   row=end;
@@ -178,15 +177,20 @@ function detailTable(d,panel){
  let zebra=false;
  for(const c of sortCircuits(panel.circuits)){
   const extra=[c.exceptions&&'Exceptions : '+c.exceptions,c.notes&&'Notes : '+c.notes,...tagGroups.map(k=>(c.tags?.[k]||[]).length?({locations:'Emplacements',functions:'Fonctions',devices:'Appareils'}[k]+' : '+c.tags[k].join(', ')):'').filter(Boolean),formatOf(c)!=='single'?'Format : '+breakerFormats[formatOf(c)]:''].filter(Boolean);
-  const extraLines=extra.flatMap(e=>d.wrap(e,7,d.W-2*M-54)).slice(0,8);
-  const h=15+extraLines.length*9;
+  const extraLines=extra.flatMap(e=>d.wrap(e,7,d.W-2*M-cols[0][1]-10)).slice(0,8);
+  // Désignation complète sur deux lignes au besoin (les autres colonnes restent sur la première ligne).
+  const desig=d.wrap(c.status==='Libre'?'Libre':c.label||'À identifier',7.8,cols[1][1]-6,d.bold);
+  const desigLines=desig.length>2?[desig[0],d.fit(desig.slice(1).join(' '),7.8,cols[1][1]-6,d.bold)]:desig;
+  const dh=(desigLines.length-1)*9.5;
+  const h=15+dh+extraLines.length*9;
   if(d.ensure(h+2,head))zebra=false;
   if(zebra)d.rect(M,d.y-h,d.W-2*M,h,{color:C.soft});
   zebra=!zebra;
   const vals=[designation(c),c.status==='Libre'?'Libre':c.label||'À identifier',c.room,c.usage,c.amps?c.amps+' A':'—',c.protection||'—',c.status];
   let x=M+5;
-  vals.forEach((v,i)=>{d.text(v||'—',x,d.y-10,{size:7.8,f:i<2?d.bold:d.font,color:i===6?statusColor(c):C.ink,max:cols[i][1]-6});x+=cols[i][1];});
-  extraLines.forEach((l,i)=>d.text(l,M+49,d.y-20-i*9,{size:7,color:C.muted}));
+  vals.forEach((v,i)=>{if(i===1)desigLines.forEach((l,j)=>d.text(l,x,d.y-10-j*9.5,{size:7.8,f:d.bold}));else d.text(v||'—',x,d.y-10,{size:7.8,f:i<2?d.bold:d.font,color:i===6?statusColor(c):C.ink,max:cols[i][1]-6});x+=cols[i][1];});
+  // Notes alignées sur le début de la désignation.
+  extraLines.forEach((l,i)=>d.text(l,M+5+cols[0][1],d.y-20-dh-i*9,{size:7,color:C.muted}));
   d.y-=h;
   d.line(M,d.y,d.W-M,d.y);
  }
