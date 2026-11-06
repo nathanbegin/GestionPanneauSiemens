@@ -4,7 +4,10 @@ import {api,openDocument} from './api.js';
 import {designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
-import {EV_GUIDE,LOADS_SOURCES,modelLabel} from '../catalog.js';
+import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
+import {panelArt,isEmptySlot} from './panelart.js';
+import {loadLibrary,breakerPalette,validStarts,compatibility} from './library.js';
+import {placeBreaker} from '../model.js';
 
 const statusClass=c=>c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
 const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
@@ -14,8 +17,10 @@ export async function panelView({id,tab='panel',ctx}){
  let {panel,site,siblings,children=[]}=data;
  // Planification : forfaits Électricien (et administrateurs).
  const planning=!!(ent?.plan?.features?.planning||ctx.user?.isAdmin);
+ // Bibliothèque de produits (abonnés seulement).
+ const lib=planning?await loadLibrary().catch(()=>null):null;
  let saving=Promise.resolve();
- const state={tab:tabNames[tab]?tab:'panel',q:'',status:'',tag:''};
+ const state={tab:tabNames[tab]?tab:'panel',q:'',status:'',tag:'',place:null};
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
 
  const root=h('div',{class:'container'});
@@ -68,7 +73,7 @@ export async function panelView({id,tab='panel',ctx}){
  }
  function openCircuit(cid){
   const order=sortCircuits(panel.circuits).map(c=>c.id);
-  const editor=circuitEditor({panel,id:cid,order,planning,onSave:async circuits=>{
+  const editor=circuitEditor({panel,id:cid,order,planning,lib,onSave:async circuits=>{
    const p=await persist({circuits});
    editor.setPanel(p,sortCircuits(p.circuits).map(c=>c.id));
    renderHead();renderBody();
@@ -170,7 +175,7 @@ export async function panelView({id,tab='panel',ctx}){
  }
  function renderInfo(){
   const e=h('p',{class:'error',role:'alert'});
-  const form=h('form',{class:'card form-card',novalidate:true},...panelFields(panel,siblings),e,
+  const form=h('form',{class:'card form-card',novalidate:true},...panelFields(panel,siblings,{library:planning}),e,
    h('div',{class:'form-actions'},h('button',{type:'button',class:'danger',onclick:remove},'Supprimer ce panneau'),h('button',{type:'submit',class:'primary'},'Enregistrer la fiche')));
   form.addEventListener('submit',async ev=>{
    ev.preventDefault();e.textContent='';
@@ -191,12 +196,27 @@ export async function panelView({id,tab='panel',ctx}){
   const rep=panelReport(panel,{children});
   const statusText={ok:'Bonne marge',medium:'Marge correcte',high:'Au-delà de 80 %',over:'Surcharge',unknown:'À compléter'}[rep.status];
   const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:1})+' kW';
-  const cabBox=h('div');cabBox.append(cabinet());
+  // Panneau réaliste + placement depuis la palette.
+  const free=c=>isEmptySlot(c)||(c.status==='Libre'&&!c.label&&!c.notes);
+  const targets=state.place?validStarts(panel,state.place,free):null;
+  const art=panelArt({panel,breakersByCat:lib?.byCat||new Map(),highlight:targets,
+   onCircuit:id=>{if(state.place)return toast('Touchez une position en surbrillance pour placer le disjoncteur, ou terminez le placement.');openCircuit(id);},
+   onPosition:async pos=>{
+    try{const circuits=placeBreaker(panel.circuits,pos,{...state.place,cat:state.place.cat},panel.positions);await persist({circuits});toast(`${state.place.cat} placé en position ${pos}.`);renderHead();renderBody();}
+    catch(e){toast(e.message,7000);}
+   }});
+  const banner=state.place&&h('div',{class:'place-banner'},h('span',{},'Placement : ',h('b',{text:state.place.cat}),` · ${state.place.label} — ${targets.size?'touchez une position en surbrillance.':'aucun espace libre suffisant.'}`),h('button',{type:'button',class:'sm',onclick:()=>{state.place=null;renderBody();}},'Terminer'));
+  const cabBox=h('div',{class:'stack'},banner,art);
+  const palette=lib?breakerPalette({lib,det:panel.details||{},selected:state.place?.cat,onSelect:(b,issues)=>{
+   if(!b){toast(issues.map(i=>i.text).join(' ')||'Ce produit ne peut pas être placé.',7000);return;}
+   const warn=issues.filter(i=>i.level==='warn');if(warn.length)toast(warn.map(i=>i.text).join(' '),7000);
+   state.place=state.place?.cat===b.cat?null:b;renderBody();
+  }}):h('div',{class:'card side-card'},h('h3',{text:'Bibliothèque de produits'}),h('p',{class:'small muted',text:'Bibliothèque indisponible pour le moment.'}));
   const gauge=h('div',{class:'card side-card'},h('h3',{text:'Capacité du panneau'}),
    h('div',{class:'gauge '+rep.status},h('div',{class:'big',text:rep.percent!=null?rep.percent+' %':'—'}),h('div',{},h('b',{text:statusText}),h('div',{class:'small muted',text:rep.mainAmps?`${rep.designAmps} A sur un principal de ${rep.mainAmps} A (${rep.isDwelling?'calcul 8-200':'phase la plus chargée'})`:'Indiquez le calibre principal dans la fiche du panneau.'}))),
    rep.percent!=null&&h('div',{class:'progress mt'+(rep.percent>100?' over':rep.percent>80?' high':'')},h('i',{style:{width:Math.min(100,rep.percent)+'%'}})),
    h('p',{class:'small muted mt',text:`Charge branchée : ${kw(rep.connectedW)}${children.length?` (dont ${children.length} sous-panneau(x))`:''} · ${rep.free} position(s) libre(s)${rep.remainingAmps!=null?` · marge avant 80 % : ${rep.remainingAmps} A`:''}`}),
-   rep.model&&h('p',{class:'small muted',text:'Modèle : '+modelLabel(rep.model)}),
+   rep.model&&h('p',{class:'small muted',text:`Modèle : ${rep.model.id} — ${rep.model.label}`}),
    h('div',{class:'legs mt'},h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L1'}),h('b',{text:rep.balance.L1+' A'})),h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L2'}),h('b',{text:rep.balance.L2+' A'}))),
    h('p',{class:'small muted',text:`Déséquilibre : ${rep.balance.imbalance} %`}));
   const issues=h('div',{class:'card side-card'},h('h3',{text:`Alertes (${rep.issues.length})`}),rep.issues.length?rep.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.circuit?`Circuit ${i.circuit} : `:'')+i.text})):h('p',{class:'issue info',text:'Aucune alerte. Ajoutez les charges de chaque circuit pour un bilan complet.'}));
@@ -218,7 +238,7 @@ export async function panelView({id,tab='panel',ctx}){
    h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Pos.','Circuit','Charges','kW','A','Disj.','%','Fil'].map(t=>h('th',{text:t})))),
     h('tbody',{},loadRows.length?loadRows.map(({c,r})=>h('tr',{class:'click',onclick:()=>openCircuit(c.id)},h('td',{text:designation(c)}),h('td',{text:c.label||'—'}),h('td',{class:'small',text:(c.loads||[]).map(l=>(l.qty>1?l.qty+' × ':'')+l.name).join(', ')||'—'}),h('td',{text:r.watts?(r.watts/1000).toLocaleString('fr-CA',{maximumFractionDigits:2}):'—'}),h('td',{text:r.watts?r.demandAmps:'—'}),h('td',{text:c.amps?c.amps+' A':'—'}),h('td',{class:r.percent>100?'st-unknown':'',text:r.percent!=null?r.percent+' %':'—'}),h('td',{class:'small',text:c.wire?.gauge||(r.suggestedWire?'≈ '+r.suggestedWire:'—')}))):h('tr',{},h('td',{colspan:8,class:'muted',text:'Touchez un disjoncteur et ajoutez ses charges dans la section « Planification » de la fiche.'}))))));
   const mat=materials(panel);
-  const matCard=h('div',{class:'card side-card'},h('h3',{text:'Liste de matériel'}),h('p',{class:'small muted',text:'Famille : '+mat.family+' · références indicatives, à valider auprès du fabricant.'}),
+  const matCard=h('div',{class:'card side-card'},h('h3',{text:'Liste de matériel'}),h('p',{class:'small muted',text:'Famille : '+mat.family+' · numéros de catalogue de la bibliothèque (vérifiez la disponibilité auprès du distributeur).'}),
    mat.items.length?h('table',{class:'data'},h('thead',{},h('tr',{},['Qté','Disjoncteur','Référence'].map(t=>h('th',{text:t})))),h('tbody',{},mat.items.map(i=>h('tr',{},h('td',{text:i.qty}),h('td',{text:`${i.tandem?'Jumelé 2 × ':i.poles===3?'Tripolaire ':i.poles===2?'Bipolaire ':'Unipolaire '}${i.amps} A${i.protection!=='Standard'?' · '+i.protection:''}`}),h('td',{text:i.ref||'—'}))))):h('p',{class:'small muted',text:'Aucun disjoncteur avec calibre.'}));
   const ev=h('details',{class:'card side-card'},h('summary',{},h('b',{text:'Guide des bornes de recharge (niveaux 1, 2 et 3)'})),
    h('div',{class:'table-wrap mt'},h('table',{class:'data ev-guide'},h('thead',{},h('tr',{},['Niveau','Alimentation','Puissance','Disjoncteur','Recharge','Usage'].map(t=>h('th',{text:t})))),h('tbody',{},EV_GUIDE.map(g=>h('tr',{},[g.level,g.supply,g.power,g.breaker,g.range,g.use].map(t=>h('td',{text:t}))))))),
@@ -226,8 +246,8 @@ export async function panelView({id,tab='panel',ctx}){
    h('p',{class:'small muted',text:'Sources : '+LOADS_SOURCES.join(' · ')}));
   body.replaceChildren(
    h('div',{class:'page-actions'},h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'📄 PDF bilan de charges et matériel'),h('button',{type:'button',onclick:()=>go('info')},rep.model?'Changer de modèle':'Choisir un modèle du catalogue')),
-   h('p',{class:'small muted',text:'Touchez une position pour choisir un disjoncteur du catalogue et ajouter ses charges. Les barres sous chaque disjoncteur indiquent son taux de charge.'}),
-   h('div',{class:'workspace mt'},cabBox,h('div',{class:'stack'},gauge,issues,sugg)),
+   h('p',{class:'small muted',text:'Choisissez un disjoncteur dans la bibliothèque, puis touchez une position en surbrillance pour le placer. Touchez un disjoncteur installé pour décrire ses charges.'}),
+   h('div',{class:'workspace mt plan-workspace'},cabBox,h('div',{class:'stack'},palette,gauge,issues,sugg)),
    h('div',{class:'stack mt'},table,calcCard,matCard,ev));
  }
 

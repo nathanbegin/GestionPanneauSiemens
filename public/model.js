@@ -1,13 +1,13 @@
 // Modèle partagé navigateur / serveur / mobile.
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
-import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,PANEL_MODELS,BREAKER_FAMILIES,PANEL_STATES} from './catalog.js';
-export const APP_VERSION='2.2.0';
+import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES} from './catalog.js';
+export const APP_VERSION='2.3.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
-export const ampsList=[10,15,20,25,30,35,40,45,50,60,70,80,90,100,125,150,175,200];
-export const protections=['Standard','DDFT','Anti-arc','DDFT + anti-arc'];
+export const ampsList=[10,15,20,25,30,35,40,45,50,60,70,80,90,100,110,125,150,175,200,225];
+export const protections=['Standard','DDFT','Anti-arc','DDFT + anti-arc','Protection équipement'];
 export const panelKinds=['Principal','Sous-panneau','Distribution','Temporaire / chantier','Autre'];
 export const voltages=['120/240 V monophasé','120/208 V triphasé','347/600 V triphasé','Autre'];
 export const breakerFormats={single:'Unipolaire · 1 position',double:'Bipolaire · 2 positions (n et n+2)',triple:'Tripolaire · 3 positions',tandem:'Jumelé · 2 demi-positions A / B'};
@@ -123,6 +123,33 @@ function mergeHalves(list){
  }
  return out;
 }
+// Une case peut recevoir un disjoncteur si elle n'a aucune description saisie (une case « Libre » vide compte comme libre).
+const replaceable=c=>!(c.label||c.room||c.notes||c.exceptions||(c.loads&&c.loads.length)||(c.tags&&Object.values(c.tags).some(a=>a.length)));
+const blankAt=(id,slots,extra={})=>({...emptyCircuit(id,slots),...extra});
+// Place un disjoncteur de la bibliothèque à la position p.
+// b : {kind:'single'|'double'|'triple'|'tandem'|'quad', amps:[...], protection, cat}
+export function placeBreaker(circuits,p,b,positions){
+ const span={single:1,double:2,triple:3,tandem:1,quad:2}[b.kind];
+ if(!span)throw Error('Ce produit ne se place pas directement dans un espace (principal, accessoire ou format non pris en charge).');
+ if(!Number.isInteger(p)||p<1||p+(span-1)*2>positions)throw Error(`Pas assez d’espaces à partir de la position ${p} (${span} espace${span>1?'s':''} requis dans la même colonne).`);
+ const pos=Array.from({length:span},(_,k)=>p+k*2);
+ const target=pos.flatMap(n=>[`${n}A`,`${n}B`]);
+ const ids=new Set(circuits.map(c=>c.id));
+ const out=[];
+ for(const c of circuits){
+  if(!c.slots.some(s=>target.includes(s))){out.push(c);continue;}
+  if(!replaceable(c))throw Error(`La position ${designation(c)} est déjà utilisée par « ${c.label||c.status} ». Videz cette fiche ou choisissez un espace libre.`);
+  ids.delete(c.id);
+  for(const s of c.slots)if(!target.includes(s)){const nid=freeId(ids,'c'+s);ids.add(nid);out.push(emptyCircuit(nid,[s]));}
+ }
+ const a=b.amps||[];
+ const extra=(amps)=>({amps:amps??null,...(b.protection&&b.protection!=='Standard'?{protection:b.protection}:{}),...(b.cat?{breakerRef:b.cat}:{})});
+ const add=(base,slots,amps)=>{const nid=freeId(ids,base);ids.add(nid);out.push(blankAt(nid,slots,extra(amps)));};
+ if(b.kind==='tandem'){add(`${p}A`,[`${p}A`],a[0]);add(`${p}B`,[`${p}B`],a[1]??a[0]);}
+ else if(b.kind==='quad'){add(`${p}A`,[`${p}A`],a[0]);add(`${p}B`,[`${p}B`,`${p+2}A`],a[1]??a[0]);add(`${p+2}B`,[`${p+2}B`],a[2]??a[0]);}
+ else add(String(p),target,a[0]);
+ return validate(mergeHalves(sortCircuits(out)),{positions});
+}
 // Ajuste le nombre de positions d'un panneau.
 export function resize(circuits,positions){
  if(!Number.isInteger(positions)||positions<MIN_POSITIONS||positions>MAX_POSITIONS||positions%2)throw Error(`Choisissez un nombre pair de positions entre ${MIN_POSITIONS} et ${MAX_POSITIONS}.`);
@@ -161,12 +188,16 @@ export function cleanPanelMeta(input={}){
  const voltage=d.voltage||voltages[0];if(!voltages.includes(voltage))throw Error('Tension invalide.');
  const surveyDate=str(d.surveyDate,10,'Date du relevé');if(surveyDate&&!/^\d{4}-\d{2}-\d{2}$/.test(surveyDate))throw Error('Date du relevé invalide.');
  const fedFrom=d.fedFrom==null||d.fedFrom===''?'':str(d.fedFrom,60,'Alimenté par');
- const modelId=str(d.modelId,60,'Modèle du catalogue');if(modelId&&!PANEL_MODELS.some(m=>m.id===modelId))throw Error('Modèle du catalogue inconnu.');
- const breakerFamily=str(d.breakerFamily,30,'Famille de disjoncteurs');if(breakerFamily&&!BREAKER_FAMILIES[breakerFamily])throw Error('Famille de disjoncteurs inconnue.');
+ // Modèle choisi dans la bibliothèque : le serveur vérifie le numéro et réécrit l'instantané.
+ const modelId=str(d.modelId,40,'Modèle du catalogue');if(modelId&&!/^[A-Za-z0-9][A-Za-z0-9.\-\/]{1,39}$/.test(modelId))throw Error('Numéro de modèle invalide.');
+ const family=str(d.family||d.breakerFamily,12,'Famille');if(family&&!FAMILY_IDS.includes(family))throw Error('Famille de produits inconnue.');
+ const maxCircuits=d.maxCircuits==null||d.maxCircuits===''?null:Number(d.maxCircuits);if(maxCircuits!==null&&(!Number.isInteger(maxCircuits)||maxCircuits<1||maxCircuits>200))throw Error('Nombre de circuits maximal invalide.');
+ const modelInfo=str(d.modelInfo,160,'Description du modèle');
+ const pon=d.pon===true?true:d.pon===false?false:null;
  const livingArea=d.livingArea===''||d.livingArea==null?null:Number(d.livingArea);if(livingArea!==null&&(!Number.isFinite(livingArea)||livingArea<0||livingArea>10000))throw Error('Superficie invalide.');
  const state=d.state||'Existant';if(!PANEL_STATES.includes(state))throw Error('État du panneau invalide.');
  return {name,tag:str(input.tag,24,'Étiquette'),kind,location:str(input.location,140,'Emplacement'),
-  details:{building:str(d.building,80,'Bâtiment'),brand:str(d.brand,60,'Marque'),model:str(d.model,60,'Modèle'),mainAmps,voltage,fedFrom,fedFromCircuit:str(d.fedFromCircuit,40,'Circuit d’alimentation'),surveyDate,surveyedBy:str(d.surveyedBy,100,'Relevé par'),notes:str(d.notes,2000,'Notes'),modelId,breakerFamily,livingArea,state}};
+  details:{building:str(d.building,80,'Bâtiment'),brand:str(d.brand,60,'Marque'),model:str(d.model,60,'Modèle'),mainAmps,voltage,fedFrom,fedFromCircuit:str(d.fedFromCircuit,40,'Circuit d’alimentation'),surveyDate,surveyedBy:str(d.surveyedBy,100,'Relevé par'),notes:str(d.notes,2000,'Notes'),modelId,family,maxCircuits,tandem:d.tandem===false?false:maxCircuits==null?true:!!d.tandem,pon,modelInfo,livingArea,state}};
 }
 export function cleanSite(input={}){
  const name=str(input.name,100,'Nom du site');if(!name)throw Error('Donnez un nom au site.');

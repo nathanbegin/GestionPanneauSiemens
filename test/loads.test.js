@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {blank,reshape,validate,cleanPanelMeta} from '../public/model.js';
 import {circuitLoad,phaseBalance,dwellingCalc,panelReport,suggestions,materials,legOf,wireFor,nextBreaker} from '../public/loadcalc.js';
-import {loadById,breakerRef,breakerChoices,PANEL_MODELS,BREAKER_FAMILIES} from '../public/catalog.js';
+import {loadById,FAMILIES} from '../public/catalog.js';
 
 const L=(id,qty=1)=>{const l=loadById(id);return {id,name:l.name,w:l.w,v:l.v,qty,cat:l.cat,cont:l.cont};};
 
@@ -24,21 +24,17 @@ test('calcul 8-200 : maison de 150 m² avec cuisinière, sécheuse, chauffe-eau,
  assert.equal(r.totalW,6000+13000+6000+7200+2525);assert.equal(r.amps,144.7);assert.equal(r.recommended,150);
 });
 test('rapport, suggestions et matériel',()=>{
- let d=reshape(blank(24),'1','double',24);d.find(x=>x.id==='1').loads=[L('ev-l2-30')];d.find(x=>x.id==='1').amps=40;d.find(x=>x.id==='1').label='Borne';
- const panel={kind:'Principal',positions:24,details:{mainAmps:100,livingArea:100,modelId:'siemens-eq-100-24',breakerFamily:'siemens-q'},circuits:d};
- const rep=panelReport(panel);assert.ok(rep.percent>0);assert.equal(rep.model.id,'siemens-eq-100-24');
+ let d=reshape(blank(24),'1','double',24);d.find(x=>x.id==='1').loads=[L('ev-l2-30')];d.find(x=>x.id==='1').amps=40;d.find(x=>x.id==='1').label='Borne';d.find(x=>x.id==='1').breakerRef='Q240';
+ const panel={kind:'Principal',positions:24,details:{mainAmps:100,livingArea:100,modelId:'EQL24125D',family:'SIE',maxCircuits:48,tandem:true,modelInfo:'Siemens EQL'},circuits:d};
+ const rep=panelReport(panel);assert.ok(rep.percent>0);assert.equal(rep.model.id,'EQL24125D');
  assert.ok(suggestions(rep).length>2);
  const m=materials(panel);assert.equal(m.items[0].ref,'Q240');
 });
-test('catalogue cohérent',()=>{
- for(const m of PANEL_MODELS){assert.ok(BREAKER_FAMILIES[m.family],m.id);assert.ok(m.positions%2===0);}
- assert.equal(breakerRef('squared-qo',{poles:1,amps:20}),'QO120');assert.equal(breakerRef('squared-qo',{poles:1,amps:15,tandem:true}),'QOT1515');assert.equal(breakerRef('eaton-br',{poles:1,amps:15,protection:'Anti-arc'}),'');
- assert.ok(breakerChoices('siemens-q').some(c=>c.tandem));assert.ok(!breakerChoices('leviton-lb').some(c=>c.tandem));
-});
+test('familles publiques',()=>{for(const id of ['QO','HOM','SIE','BR','CH','LEV','CBM'])assert.ok(FAMILIES[id].pitch);});
 test('validation des charges, fils et métadonnées',()=>{
  const d=blank(4);d[0].loads=[L('ev-l2-32')];d[0].wire={gauge:'8 AWG',type:'NMD90 (Loomex)',length:12};d[0].breakerRef='Q240';validate(d,{positions:4});
  d[0].loads=[{name:'x',w:-1,v:240,qty:1,cat:'ev',cont:true}];assert.throws(()=>validate(d,{positions:4}));
  d[0].loads=[];d[0].wire={gauge:'9 AWG'};assert.throws(()=>validate(d,{positions:4}));
- const m=cleanPanelMeta({name:'P',details:{modelId:'squared-qo-200-40',breakerFamily:'squared-qo',livingArea:'140',state:'Planifié'}});assert.equal(m.details.livingArea,140);
- assert.throws(()=>cleanPanelMeta({name:'P',details:{modelId:'inconnu'}}));
+ const m=cleanPanelMeta({name:'P',details:{modelId:'CQO140M200PC',family:'QO',livingArea:'140',state:'Planifié'}});assert.equal(m.details.livingArea,140);assert.equal(m.details.family,'QO');
+ assert.throws(()=>cleanPanelMeta({name:'P',details:{modelId:'mauvais modèle !'}}));assert.throws(()=>cleanPanelMeta({name:'P',details:{family:'XYZ'}}));
 });

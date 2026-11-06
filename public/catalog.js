@@ -93,66 +93,21 @@ export const WIRE_TABLE=[
 export const WIRE_TYPES=['NMD90 (Loomex)','AC90 (BX)','TECK90','Conduit + T90','Aluminium (artère)','Autre'];
 export const wireAmps=g=>WIRE_TABLE.find(w=>w.gauge===g)?.amps??null;
 
-// Familles de disjoncteurs. Les références sont INDICATIVES (motif usuel du fabricant) : à valider.
-// {a} = calibre ; p1/p2 = unipolaire/bipolaire ; t = jumelé ; af = anti-arc ; gf = DDFT ; df = anti-arc + DDFT.
-export const BREAKER_FAMILIES={
- 'siemens-q':{brand:'Siemens',name:'Siemens type QP / Q',p1:'Q1{a}',p2:'Q2{a}',p3:null,t:'Q{a}{a}',af:'QA1{a}AFC',gf:null,df:null},
- 'squared-qo':{brand:'Square D',name:'Square D QO',p1:'QO1{a}',p2:'QO2{a}',p3:'QO3{a}',t:'QOT{a}{a}',af:'QO1{a}CAFI',gf:'QO1{a}GFI',df:'QO1{a}DF'},
- 'squared-hom':{brand:'Square D',name:'Square D Homeline',p1:'HOM1{a}',p2:'HOM2{a}',p3:null,t:'HOMT{a}{a}',af:'HOM1{a}CAFI',gf:'HOM1{a}GFI',df:'HOM1{a}DF'},
- 'eaton-br':{brand:'Eaton',name:'Eaton type BR',p1:'BR1{a}',p2:'BR2{a}',p3:null,t:'BD{a}{a}',af:null,gf:null,df:null},
- 'eaton-ch':{brand:'Eaton / Cutler-Hammer',name:'Cutler-Hammer type CH',p1:'CH1{a}',p2:'CH2{a}',p3:'CH3{a}',t:'CHT{a}{a}',af:null,gf:null,df:null},
- 'leviton-lb':{brand:'Leviton',name:'Leviton LB',p1:'LB1{a}',p2:'LB2{a}',p3:null,t:null,af:'LB1{a}-AF',gf:null,df:'LB1{a}-DF'},
- 'generic':{brand:'',name:'Générique / autre marque',p1:null,p2:null,p3:null,t:null,af:null,gf:null,df:null},
+// Familles de produits (métadonnées publiques seulement : la bibliothèque complète des panneaux
+// et des disjoncteurs est réservée aux abonnés et servie par l'API).
+// pitch = largeur d'un espace en pouces (3/4" ou 1"), utilisée pour le dessin réaliste.
+export const FAMILIES={
+ QO:{brand:'Square D',maker:'Schneider Electric',name:'Square D QO',pitch:.75,accent:'#3a8f4e',body:'#161616',handle:'#2c2c2c',ink:'#f3f3f3',mark:'QO'},
+ HOM:{brand:'Square D',maker:'Schneider Electric',name:'Square D HomeLine',pitch:1,accent:'#3a8f4e',body:'#1a1a1a',handle:'#303030',ink:'#f3f3f3',mark:'HOM'},
+ SIE:{brand:'Siemens',maker:'Siemens Canada',name:'Siemens EQ / Q',pitch:1,accent:'#0b8a8f',body:'#24282b',handle:'#3a4045',ink:'#f1f4f5',mark:'Q'},
+ BR:{brand:'Eaton',maker:'Eaton Canada',name:'Eaton BR',pitch:1,accent:'#1f5fa8',body:'#141414',handle:'#262626',ink:'#f3f3f3',mark:'BR'},
+ CH:{brand:'Eaton',maker:'Eaton Canada',name:'Cutler-Hammer CH',pitch:.75,accent:'#1f5fa8',body:'#a8784b',handle:'#7b5232',ink:'#fff8ee',mark:'CH'},
+ LEV:{brand:'Leviton',maker:'Leviton Canada',name:'Leviton LP / LR / LS',pitch:1,accent:'#2d63a6',body:'#d7dbdd',handle:'#596066',ink:'#22282c',mark:'LB'},
+ CBM:{brand:'Eaton',maker:'Eaton Canada',name:'Eaton CBM / CBL (boulonné)',pitch:1,accent:'#1f5fa8',body:'#171717',handle:'#2a2a2a',ink:'#f3f3f3',mark:'BA'},
+ generic:{brand:'',maker:'',name:'Générique / autre marque',pitch:1,accent:'#6b7a72',body:'#262b28',handle:'#3a403c',ink:'#eef2ec',mark:''},
 };
-export function breakerRef(familyId,{poles=1,amps,protection='Standard',tandem=false}){
- const f=BREAKER_FAMILIES[familyId];if(!f||!amps)return '';
- let pattern=tandem?f.t:poles===3?f.p3:poles===2?f.p2:protection==='Anti-arc'?f.af:protection==='DDFT'?f.gf:protection==='DDFT + anti-arc'?f.df:f.p1;
- if(poles===1&&!tandem&&protection!=='Standard'&&!pattern)return '';
- return pattern?pattern.replaceAll('{a}',String(amps)):'';
-}
-// Disjoncteurs proposés dans le constructeur pour une famille.
-export function breakerChoices(familyId){
- const f=BREAKER_FAMILIES[familyId]||BREAKER_FAMILIES.generic;
- const out=[];
- for(const a of [15,20,30])out.push({key:`1-${a}`,poles:1,amps:a,protection:'Standard',tandem:false});
- if(f.af||familyId==='generic')for(const a of [15,20])out.push({key:`1-${a}-af`,poles:1,amps:a,protection:'Anti-arc',tandem:false});
- if(f.gf||familyId==='generic')for(const a of [15,20])out.push({key:`1-${a}-gf`,poles:1,amps:a,protection:'DDFT',tandem:false});
- if(f.df||familyId==='generic')for(const a of [15,20])out.push({key:`1-${a}-df`,poles:1,amps:a,protection:'DDFT + anti-arc',tandem:false});
- if(f.t||familyId==='generic')out.push({key:'t-15',poles:1,amps:15,protection:'Standard',tandem:true},{key:'t-20',poles:1,amps:20,protection:'Standard',tandem:true});
- for(const a of [15,20,25,30,40,50,60,70,80,100])out.push({key:`2-${a}`,poles:2,amps:a,protection:'Standard',tandem:false});
- if(f.p3)for(const a of [20,30,40,60])out.push({key:`3-${a}`,poles:3,amps:a,protection:'Standard',tandem:false});
- return out.map(c=>({...c,ref:breakerRef(familyId,c),label:`${c.tandem?'Jumelé 2 × ':c.poles===3?'Tripolaire ':c.poles===2?'Bipolaire ':'Unipolaire '}${c.amps} A${c.protection!=='Standard'?' · '+c.protection:''}`}));
-}
-
-// Modèles de panneaux courants (configurations typiques). Vérifiez toujours l'étiquette du panneau :
-// nombre de positions, circuits maximaux, positions acceptant des disjoncteurs jumelés.
-const M=(id,brand,series,family,mainAmps,positions,{main=true,tandem=true,maxCircuits,note}={})=>({id,brand,series,family,mainAmps,positions,main,tandem,maxCircuits:maxCircuits??(tandem?positions*2:positions),note:note||''});
-export const PANEL_MODELS=[
- M('siemens-eq-100-24','Siemens','EQ','siemens-q',100,24),
- M('siemens-eq-125-30','Siemens','EQ','siemens-q',125,30),
- M('siemens-eq-200-32','Siemens','EQ','siemens-q',200,32),
- M('siemens-eq-200-40','Siemens','EQ','siemens-q',200,40),
- M('siemens-eq-200-42','Siemens','EQ','siemens-q',200,42),
- M('siemens-eq-ml-100-24','Siemens','EQ (sous-panneau, sans principal)','siemens-q',100,24,{main:false}),
- M('siemens-eq-ml-60-12','Siemens','EQ (sous-panneau, sans principal)','siemens-q',60,12,{main:false}),
- M('squared-qo-100-24','Square D','QO','squared-qo',100,24),
- M('squared-qo-200-40','Square D','QO','squared-qo',200,40),
- M('squared-qo-200-42','Square D','QO','squared-qo',200,42),
- M('squared-qo-ml-100-24','Square D','QO (sous-panneau, sans principal)','squared-qo',100,24,{main:false}),
- M('squared-hom-100-24','Square D','Homeline','squared-hom',100,24),
- M('squared-hom-200-40','Square D','Homeline','squared-hom',200,40),
- M('squared-hom-ml-60-12','Square D','Homeline (sous-panneau, sans principal)','squared-hom',60,12,{main:false}),
- M('eaton-br-100-24','Eaton','BR','eaton-br',100,24),
- M('eaton-br-200-40','Eaton','BR','eaton-br',200,40),
- M('eaton-br-ml-100-24','Eaton','BR (sous-panneau, sans principal)','eaton-br',100,24,{main:false}),
- M('eaton-ch-125-24','Eaton / Cutler-Hammer','CH','eaton-ch',125,24),
- M('eaton-ch-200-42','Eaton / Cutler-Hammer','CH','eaton-ch',200,42),
- M('leviton-200-40','Leviton','Centre de distribution résidentiel','leviton-lb',200,40,{tandem:false}),
- M('leviton-ml-100-24','Leviton','Centre de distribution (sous-panneau)','leviton-lb',100,24,{main:false,tandem:false}),
- M('federal-stablok-100-24','Federal Pioneer','Stab-Lok (ancien)','generic',100,24,{note:'Panneau ancien : faites évaluer son remplacement par un maître électricien.'}),
-];
-export const modelById=id=>PANEL_MODELS.find(m=>m.id===id);
-export const modelLabel=m=>`${m.brand} ${m.series} — ${m.mainAmps} A · ${m.positions} positions${m.tandem?` (jusqu’à ${m.maxCircuits} circuits)`:''}`;
+export const FAMILY_IDS=Object.keys(FAMILIES);
+export const familyOf=id=>FAMILIES[id]||FAMILIES.generic;
 
 export const PANEL_STATES=['Existant','Planifié','Installé','Vérifié'];
 export const LOADS_SOURCES=[

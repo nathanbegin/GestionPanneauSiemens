@@ -124,7 +124,9 @@ function tree(panels){
 async function siteView(id){
  const {site,panels}=await api('/api/sites?id='+encodeURIComponent(id));
  crumbs([['Mes sites','#/sites'],[site.name]]);
- const addPanel=()=>panelDialog({siblings:panels,onSave:async f=>{const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});toast('Panneau créé. Touchez un disjoncteur pour commencer.');location.hash='#/panneaux/'+panel.id;}});
+ const ent=await api('/api/billing').catch(()=>null);
+ const library=!!(ent?.plan?.features?.planning||state.user.isAdmin);
+ const addPanel=()=>panelDialog({siblings:panels,library,onSave:async f=>{const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});toast('Panneau créé. Touchez un disjoncteur pour commencer.');location.hash='#/panneaux/'+panel.id;}});
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
  const remove=async()=>{if(!await confirmDialog(`Supprimer « ${site.name} », ses ${panels.length} panneau(x) et tous leurs circuits ? Cette action est irréversible.`,{title:'Supprimer le site',confirm:'Supprimer définitivement',danger:true}))return;await api('/api/sites?id='+site.id,{method:'DELETE'});toast('Site supprimé.');location.hash='#/sites';};
  const report=async()=>{try{toast('Génération du rapport du site…');await openDocument({site:site.id,kind:'report'});}catch(e){toast(e.message);}};

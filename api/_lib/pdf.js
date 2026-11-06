@@ -315,14 +315,14 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false}){
 // Bilan de charges et liste de matériel d'un panneau (mode planification).
 export async function buildLoads({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version}){
  const {panelReport,materials}=await import('../../public/loadcalc.js');
- const {modelLabel,LOADS_SOURCES}=await import('../../public/catalog.js');
+ const {LOADS_SOURCES}=await import('../../public/catalog.js');
  const rep=panelReport(panel,{children});
  const mat=materials(panel);
  const d=await Doc.create('letter','Bilan de charges — '+panelTitle(panel));
  const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
  d.page();
  header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version,(panel.details?.state||'Existant').toUpperCase()]});
- infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?modelLabel(rep.model):[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—']]);
+ infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?rep.model.id+' — '+rep.model.label:[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—']]);
  preparedBlock(d,user,generatedAt);
  // Synthèse.
  sectionTitle(d,'Synthèse','Charge de calcul comparée au disjoncteur principal ; seuil recommandé : 80 %.');
@@ -362,7 +362,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  }
  // Matériel.
  d.y-=16;
- sectionTitle(d,'Liste de matériel — disjoncteurs','Famille : '+mat.family+'. Références indicatives, à valider auprès du fabricant et selon l’étiquette du panneau.');
+ sectionTitle(d,'Liste de matériel — disjoncteurs','Famille : '+mat.family+'. Numéros de catalogue de la bibliothèque de produits ; vérifiez la compatibilité sur l’étiquette du panneau.');
  if(!mat.items.length){d.text('Aucun disjoncteur avec calibre.',M,d.y,{size:8.5,color:C.muted});d.y-=14;}
  for(const i of mat.items){d.ensure(14);d.text(String(i.qty)+' ×',M,d.y,{size:9,f:d.bold});d.text(`${i.tandem?'Jumelé 2 × ':i.poles===3?'Tripolaire ':i.poles===2?'Bipolaire ':'Unipolaire '}${i.amps} A${i.protection!=='Standard'?' · '+i.protection:''}`,M+34,d.y,{size:9});if(i.ref)d.text(i.ref,d.W-M-d.width(i.ref,9,d.bold),d.y,{size:9,f:d.bold,color:C.green});d.line(M,d.y-4,d.W-M,d.y-4);d.y-=16;}
  d.y-=10;

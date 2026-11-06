@@ -1,5 +1,5 @@
 // Client de l'API. Web : témoin de session HttpOnly. Mobile (Capacitor) : jeton Bearer.
-const cfg=window.MP_CONFIG||{};
+const cfg=(typeof window!=='undefined'&&window.MP_CONFIG)||{};
 export const API_BASE=(cfg.apiBase||'').replace(/\/$/,'');
 export const NATIVE=!!cfg.native;
 const TOKEN_KEY='mp_token';

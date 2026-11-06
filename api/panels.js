@@ -2,7 +2,9 @@
 import {getSql} from './_lib/db.js';
 import {route,body,HttpError,isUuid,check} from './_lib/http.js';
 import {requireUser,newId} from './_lib/auth.js';
-import {consumePanelQuota} from './_lib/plans.js';
+import {consumePanelQuota,entitlement} from './_lib/plans.js';
+import {library,findPanel,panelSnapshot} from './_lib/library.js';
+import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
 
@@ -10,6 +12,21 @@ function checkPositions(v){
  const n=Number(v);
  if(!Number.isInteger(n)||n<MIN_POSITIONS||n>MAX_POSITIONS||n%2)throw new HttpError(400,`Choisissez un nombre pair de positions entre ${MIN_POSITIONS} et ${MAX_POSITIONS}.`);
  return n;
+}
+// Bibliothèque de produits réservée aux forfaits avec la fonction « planification » (et aux administrateurs).
+async function hasLibrary(sql,user){
+ if(adminEmails().includes(user.email))return true;
+ const e=await entitlement(sql,user.id);return !!e.plan.features?.planning;
+}
+// Vérifie le modèle choisi et remplace l'instantané par les données officielles de la bibliothèque.
+async function applyModel(sql,user,meta,previous){
+ const id=meta.details.modelId;
+ if(!id){Object.assign(meta.details,{family:meta.details.family||'',maxCircuits:null,tandem:true,pon:null,modelInfo:''});return;}
+ if(previous?.modelId===id){Object.assign(meta.details,{family:previous.family,maxCircuits:previous.maxCircuits??null,tandem:previous.tandem!==false,pon:previous.pon??null,modelInfo:previous.modelInfo||''});return;}
+ if(!await hasLibrary(sql,user))throw new HttpError(402,'La bibliothèque de produits est incluse dans les forfaits Électricien.',{quota:true});
+ const p=findPanel(id);
+ if(!p||!p.designable)throw new HttpError(400,'Modèle introuvable dans la bibliothèque.');
+ Object.assign(meta.details,panelSnapshot(p));
 }
 async function checkFedFrom(sql,meta,siteId,selfId){
  const f=meta.details.fedFrom;
@@ -22,6 +39,11 @@ async function checkFedFrom(sql,meta,siteId,selfId){
 export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  const sql=await getSql();
  const user=await requireUser(req,sql);
+ if(req.method==='GET'&&req.query?.catalog){
+  if(!await hasLibrary(sql,user))throw new HttpError(402,'La bibliothèque de produits est incluse dans les forfaits Électricien.',{quota:true});
+  res.setHeader('Cache-Control','private, max-age=3600');
+  return res.status(200).json(library());
+ }
  const id=req.query?.id?String(req.query.id):'';
  if(id&&!isUuid(id))throw new HttpError(404,'Panneau introuvable.');
  if(req.method==='POST'){
@@ -33,6 +55,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   if(n>=50)throw new HttpError(400,'Limite de 50 panneaux par site atteinte.');
   const meta=check(()=>cleanPanelMeta(data));
   await checkFedFrom(sql,meta,site.id,null);
+  await applyModel(sql,user,meta,null);
   let positions=checkPositions(data.positions??32),circuits;
   if(data.copyFrom){
    if(!isUuid(data.copyFrom))throw new HttpError(400,'Panneau source invalide.');
@@ -73,7 +96,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  const data=body(req);
  if(!Number.isInteger(data.revision))throw new HttpError(400,'Révision manquante.');
  let {name,tag,kind,location,details,positions,circuits}=row;
- if(data.meta){const m=check(()=>cleanPanelMeta(data.meta));await checkFedFrom(sql,m,row.site_id,id);({name,tag,kind,location,details}=m);}
+ if(data.meta){const m=check(()=>cleanPanelMeta(data.meta));await checkFedFrom(sql,m,row.site_id,id);await applyModel(sql,user,m,row.details);({name,tag,kind,location,details}=m);}
  if(data.circuits!==undefined)circuits=check(()=>validate(normalize(data.circuits,{positions}),{positions}));
  if(data.positions!==undefined&&data.positions!==positions){positions=checkPositions(data.positions);circuits=check(()=>resize(circuits,positions));}
  const [u]=await sql`UPDATE app_panels SET name=${name},tag=${tag},kind=${kind},location=${location},details=${JSON.stringify(details)}::jsonb,positions=${positions},circuits=${JSON.stringify(circuits)}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND user_id=${user.id} AND revision=${data.revision} RETURNING *`;

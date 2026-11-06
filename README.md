@@ -39,6 +39,15 @@ Compte ─┬─ Site (adresse, client, notes)
 - **Synchronisation** : enregistrement automatique, contrôle de révision (aucun écrasement silencieux entre deux appareils).
 - **PWA** installable (manifeste + service worker) et **applications natives** iOS/Android (Capacitor) dans `mobile/`.
 
+## Bibliothèque de produits et concepteur visuel (v2.3)
+
+- Données fournies par l'administrateur (`api/_data/catalogue.js`, issues des catalogues canadiens Schneider/Square D, Siemens, Eaton et Leviton) : 332 panneaux, 680 disjoncteurs, 7 familles (QO, HomeLine, Siemens, BR, CH, Leviton, CBM), anciennes marques, génératrices, parasurtenseurs, sources.
+- **Réservée aux abonnés** (fonction « planification » ou administrateur) : servie seulement par `GET /api/panels?catalog=1` (402 sinon). Le choix d'un modèle est vérifié et réécrit côté serveur (circuits maximaux, jumelés, neutre enfichable).
+- Sélecteur visuel de modèle (filtres marque, type, ampérage, numéro, générations précédentes) avec miniature réelle du panneau.
+- Rendu SVG réaliste : boîtier, plaque frontale, principal ou cosses, barres omnibus, couleurs et pas (3/4" ou 1") par famille, boutons TEST (anti-arc, DDFT, double fonction, protection d'équipement), queues de cochon, témoin des disjoncteurs intelligents, jumelés et quads.
+- Palette de disjoncteurs filtrée par famille, format, protection et calibre ; placement par clic sur les positions libres valides, contrôle de compatibilité (famille, PoN, jumelés).
+- Logos : déposer les logos officiels autorisés dans `public/assets/brands/` (voir `LISEZMOI.md`) ; sinon le nom de la marque s'affiche.
+
 ## Planification et calcul de charges (v2.2)
 
 Réservé aux forfaits dont la fonction « planification » est activée (Électricien Solo et Équipe) et aux administrateurs.

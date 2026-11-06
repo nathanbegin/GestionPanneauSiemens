@@ -1,7 +1,9 @@
 // Calculs de charge : circuits, phases L1/L2, capacité du panneau, calcul d'un logement (règle 8-200),
 // dimensionnement et suggestions. Outils d'aide : la conformité relève d'un maître électricien.
 import {slotPos,designation,sortCircuits} from './model.js';
-import {CONTINUOUS_FACTOR,STANDARD_BREAKERS,SERVICE_SIZES,WIRE_TABLE,wireAmps,LOAD_LIBRARY,BREAKER_FAMILIES,breakerRef,modelById} from './catalog.js';
+import {CONTINUOUS_FACTOR,STANDARD_BREAKERS,SERVICE_SIZES,WIRE_TABLE,wireAmps,LOAD_LIBRARY,familyOf} from './catalog.js';
+// Modèle de la bibliothèque, d'après l'instantané enregistré dans la fiche du panneau.
+export const panelModel=det=>det?.modelId?{id:det.modelId,family:det.family,maxCircuits:det.maxCircuits??null,tandem:det.tandem!==false,pon:det.pon??null,label:det.modelInfo||det.modelId}:null;
 
 export const polesOf=c=>c.slots.length===1?1:new Set(c.slots.map(slotPos)).size;
 // Phases : les rangées alternent L1 / L2 (positions 1-2 = L1, 3-4 = L2, 5-6 = L1…).
@@ -84,7 +86,7 @@ export function dwellingCalc(circuits,{livingArea=0,children=[]}={}){
 // Bilan complet d'un panneau.
 export function panelReport(panel,{children=[]}={}){
  const det=panel.details||{};
- const model=modelById(det.modelId);
+ const model=panelModel(det);
  const circuits=sortCircuits(panel.circuits);
  const rows=circuits.map(c=>({c,r:circuitLoad(c)}));
  const connectedW=rows.reduce((s,x)=>s+x.r.watts,0)+children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c).watts,0),0);
@@ -92,7 +94,7 @@ export function panelReport(panel,{children=[]}={}){
  // Sous-panneaux : charge répartie sur les deux phases.
  const childAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c).watts,0),0)/240;
  balance.L1=round(balance.L1+childAmps);balance.L2=round(balance.L2+childAmps);
- const mainAmps=Number(det.mainAmps)||model?.mainAmps||null;
+ const mainAmps=Number(det.mainAmps)||null;
  const calc=dwellingCalc(circuits,{livingArea:det.livingArea,children});
  const isDwelling=panel.kind==='Principal'&&Number(det.livingArea)>0;
  const designAmps=isDwelling?calc.amps:Math.max(balance.L1,balance.L2);
@@ -100,7 +102,7 @@ export function panelReport(panel,{children=[]}={}){
  const issues=[];
  for(const {c,r} of rows)for(const i of r.issues)if(i.level!=='info')issues.push({...i,circuit:designation(c)});
  const used=circuits.filter(c=>c.status!=='Libre'&&(c.label||c.loads?.length||c.amps)).length;
- if(model&&used>model.maxCircuits)issues.push({level:'error',text:`${used} circuits pour un maximum de ${model.maxCircuits} sur ce modèle.`});
+ if(model?.maxCircuits&&used>model.maxCircuits)issues.push({level:'error',text:`${used} circuits pour un maximum de ${model.maxCircuits} sur ce modèle.`});
  if(model&&!model.tandem&&circuits.some(c=>c.slots.length===1))issues.push({level:'error',text:'Ce modèle n’accepte pas de disjoncteurs jumelés.'});
  if(percent!=null&&percent>100)issues.push({level:'error',text:`Charge de calcul (${designAmps} A) supérieure au principal de ${mainAmps} A.`});
  else if(percent!=null&&percent>80)issues.push({level:'warn',text:`Charge de calcul à ${percent} % du principal : au-delà de 80 %, prévoyez une marge (gestionnaire de charge, augmentation de l’entrée).`});
@@ -126,7 +128,7 @@ export function suggestions(report){
 
 // Liste de matériel : disjoncteurs regroupés par type, avec référence indicative.
 export function materials(panel){
- const fam=panel.details?.breakerFamily||modelById(panel.details?.modelId)?.family||'generic';
+ const fam=panel.details?.family||panel.details?.breakerFamily||'generic';
  const groups=new Map();
  const seenTandem=new Set();
  for(const c of panel.circuits){
@@ -134,9 +136,9 @@ export function materials(panel){
   const tandem=c.slots.length===1;
   if(tandem){const p=slotPos(c.slots[0]);if(seenTandem.has(p))continue;seenTandem.add(p);}
   const poles=tandem?1:polesOf(c),protection=c.protection||'Standard';
-  const key=[poles,c.amps,protection,tandem].join('|');
-  const g=groups.get(key)||{poles,amps:c.amps,protection,tandem,qty:0,ref:c.breakerRef||breakerRef(fam,{poles,amps:c.amps,protection,tandem})};
+  const key=[poles,c.amps,protection,tandem,c.breakerRef||''].join('|');
+  const g=groups.get(key)||{poles,amps:c.amps,protection,tandem,qty:0,ref:c.breakerRef||''};
   g.qty++;groups.set(key,g);
  }
- return {family:BREAKER_FAMILIES[fam]?.name||fam,items:[...groups.values()].sort((a,b)=>a.poles-b.poles||a.amps-b.amps)};
+ return {family:familyOf(fam).name,items:[...groups.values()].sort((a,b)=>a.poles-b.poles||a.amps-b.amps)};
 }
