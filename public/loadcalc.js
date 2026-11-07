@@ -1,7 +1,7 @@
 // Calculs de charge : circuits, phases L1/L2, capacité du panneau, calcul d'un logement (règle 8-200),
 // dimensionnement et suggestions. Outils d'aide : la conformité relève d'un maître électricien.
 import {slotPos,designation,sortCircuits} from './model.js';
-import {CONTINUOUS_FACTOR,STANDARD_BREAKERS,SERVICE_SIZES,WIRE_TABLE,wireAmps,LOAD_LIBRARY,familyOf} from './catalog.js';
+import {CONTINUOUS_FACTOR,STANDARD_BREAKERS,SERVICE_SIZES,WIRE_TABLE,wireAmps,LOAD_LIBRARY,familyOf,serviceCheck} from './catalog.js';
 // Modèle de la bibliothèque, d'après l'instantané enregistré dans la fiche du panneau.
 export const panelModel=det=>det?.modelId?{id:det.modelId,family:det.family,maxCircuits:det.maxCircuits??null,tandem:det.tandem!==false,pon:det.pon??null,label:det.modelInfo||det.modelId}:null;
 
@@ -135,9 +135,11 @@ export function panelReport(panel,{children=[]}={}){
  if(model&&!model.tandem&&circuits.some(c=>c.slots.length===1))issues.push({level:'error',text:'Ce modèle n’accepte pas de disjoncteurs jumelés.'});
  if(percent!=null&&percent>100)issues.push({level:'error',text:`Charge de calcul (${designAmps} A) supérieure au principal de ${mainAmps} A.`});
  else if(percent!=null&&percent>80)issues.push({level:'warn',text:`Charge de calcul à ${percent} % du principal : au-delà de 80 %, prévoyez une marge (gestionnaire de charge, augmentation de l’entrée).`});
+ const service=det.fedFrom?null:serviceCheck(det);
+ if(service?.status==='warn')issues.push({level:'warn',text:service.text});
  if(balance.imbalance>30&&Math.max(balance.L1,balance.L2)>20)issues.push({level:'warn',text:`Déséquilibre de ${balance.imbalance} % entre L1 et L2 : déplacez des circuits 120 V.`});
  const free=circuits.filter(c=>c.status==='Libre'||(!c.label&&!c.loads?.length&&c.amps==null)).length;
- return {model,mainAmps,rows,connectedW,balance,calc,isDwelling,designAmps,percent,status:percent==null?'unknown':percent>100?'over':percent>80?'high':percent>70?'medium':'ok',issues,free,remainingAmps:mainAmps?round(mainAmps*CONTINUOUS_FACTOR-designAmps):null};
+ return {model,mainAmps,service,rows,connectedW,balance,calc,isDwelling,designAmps,percent,status:percent==null?'unknown':percent>100?'over':percent>80?'high':percent>70?'medium':'ok',issues,free,remainingAmps:mainAmps?round(mainAmps*CONTINUOUS_FACTOR-designAmps):null};
 }
 
 // Suggestions : quelle borne ou quel appareil peut encore être ajouté ?

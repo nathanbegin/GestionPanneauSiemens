@@ -1,6 +1,6 @@
 // Formulaires : site, panneau, fiche de circuit.
 import {h,field,select,dialog,toast,confirmDialog} from './dom.js';
-import {FAMILIES,PANEL_STATES,LOAD_LIBRARY,LOAD_CATEGORIES,WIRE_TABLE,WIRE_TYPES,familyOf,wireAmps} from '../catalog.js';
+import {FAMILIES,PANEL_STATES,LOAD_LIBRARY,LOAD_CATEGORIES,WIRE_TABLE,WIRE_TYPES,familyOf,wireAmps,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,serviceCheck} from '../catalog.js';
 import {modelPicker} from './library.js';
 import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
@@ -63,11 +63,37 @@ export function panelFields(panel={},siblings=[],{library=false}={}){
   h('fieldset',{class:'form-section'},h('legend',{text:'Alimentation'}),h('div',{class:'fields'},
    field('Alimenté par',fed),
    field('Circuit d’alimentation',fedCircuitInput(fed,d.fedFromCircuit),{hint:'Position du disjoncteur dans le panneau source (les circuits « Sous-panneau » sont proposés en premier).'}))),
+  serviceFieldset(d,fed),
   h('fieldset',{class:'form-section'},h('legend',{text:'Relevé'}),h('div',{class:'fields'},
    field('Date du relevé',input('surveyDate',d.surveyDate,{type:'date'})),
    field('Relevé effectué par',input('surveyedBy',d.surveyedBy,{maxlength:100,placeholder:'Nom de la personne'})),
    field('Notes sur le panneau',area('notes',d.notes,{maxlength:2000,placeholder:'État, particularités, mise à la terre…'}),{full:true}))),
  ];
+}
+// Entrée électrique : conducteurs entre le point de raccordement d'Hydro-Québec (tête de mât)
+// et le disjoncteur principal. Affiché seulement pour un panneau alimenté par le réseau.
+function serviceFieldset(d,fed){
+ const gauge=select('serviceGauge',[['','— Non précisé —'],...SERVICE_CONDUCTORS.map(w=>[w.gauge,w.gauge])],d.serviceGauge||'');
+ const mat=select('serviceMaterial',SERVICE_MATERIALS,d.serviceMaterial||'Cuivre');
+ const route=select('serviceRoute',[['','— Non précisé —'],...SERVICE_ROUTES],d.serviceRoute||'');
+ const check=h('p',{class:'small full service-check'});
+ const box=h('fieldset',{class:'form-section'},h('legend',{text:'Entrée électrique (Hydro-Québec → panneau)'}),
+  h('p',{class:'small muted',text:'Conducteurs qui partent du point de raccordement d’Hydro-Québec (en haut du mât ou sur la façade), passent par l’embase du compteur et arrivent au disjoncteur principal. Ils appartiennent au propriétaire ; le branchement aérien jusqu’au mât appartient à Hydro-Québec.'}),
+  h('div',{class:'fields'},
+   field('Calibre des conducteurs d’entrée',gauge,{hint:'Inscrit sur la gaine du fil (ex. 3/0 AWG, 4/0 AWG).'}),
+   field('Matériau',mat),
+   field('Type d’entrée',route),
+   field('Notes sur l’entrée',input('serviceNotes',d.serviceNotes,{maxlength:300,placeholder:'Ex. mât de 2 po, embase 200 A, conduit PVC'})),
+   check));
+ const refresh=()=>{
+  box.hidden=!!fed.value;
+  const f=box.closest('form');
+  const r=serviceCheck({serviceGauge:gauge.value,serviceMaterial:mat.value,mainAmps:f?.elements.mainAmps?.value});
+  check.textContent=r?.text||'';check.className='small full service-check '+(r?.status==='warn'?'warn':'muted');
+ };
+ for(const el of [gauge,mat,fed])el.addEventListener('change',refresh);
+ queueMicrotask(()=>{refresh();box.closest('form')?.elements.mainAmps?.addEventListener('input',refresh);});
+ return box;
 }
 // Modèle de la bibliothèque (abonnés) : remplit marque, gamme, calibre, positions et famille.
 function catalogFieldset(d,library){
@@ -112,7 +138,7 @@ function fedCircuitInput(fedSelect,value){
 }
 export function panelPayload(form){
  const f=formData(form);
- return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),basementArea:f.basementArea===''||f.basementArea==null?null:Number(f.basementArea),state:f.state}},positions:Number(f.positions)};
+ return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),basementArea:f.basementArea===''||f.basementArea==null?null:Number(f.basementArea),state:f.state,...(f.fedFrom?{}:{serviceGauge:f.serviceGauge,serviceMaterial:f.serviceMaterial,serviceRoute:f.serviceRoute,serviceNotes:f.serviceNotes})}},positions:Number(f.positions)};
 }
 export function panelDialog({siblings=[],onSave,library=false,initial={},title='Nouveau panneau',eyebrow='Étape 2 · un panneau dans ce site'}){
  const e=err();

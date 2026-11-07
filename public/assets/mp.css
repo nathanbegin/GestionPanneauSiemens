@@ -470,3 +470,4 @@ dialog.picker{width:min(1100px,calc(100vw - 24px))}
 .calc-step ul{margin:4px 0 0;padding-left:18px;font-size:13px}
 @media (max-width:720px){.g-cols{grid-template-columns:1fr}}
 .doc .cta-band p{color:#c8d6cf}
+.service-check{margin:0}.service-check.warn{color:#7d5a1f;background:#fbf5e8;padding:6px 8px;border-radius:6px}

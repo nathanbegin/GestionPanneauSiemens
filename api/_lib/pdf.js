@@ -1,7 +1,7 @@
 // Génération des PDF : rapport complet, aide-mémoire de porte et étiquettes (feuille Avery 5160).
 import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
 import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,tagGroups,formatOf,breakerFormats} from '../../public/model.js';
-import {FAMILIES} from '../../public/catalog.js';
+import {FAMILIES,serviceCheck} from '../../public/catalog.js';
 import LOGOS from '../_data/logos.js';
 
 // ---------- Logos et modèle du panneau ----------
@@ -262,6 +262,11 @@ function signature(d,user){
  d.y=y-24;
 }
 
+// Ligne « Entrée électrique » (panneau alimenté par le réseau seulement).
+function serviceLine(det){
+ if(det.fedFrom||!(det.serviceGauge||det.serviceRoute||det.serviceNotes))return '';
+ return [det.serviceGauge&&det.serviceGauge+' '+(det.serviceMaterial||'Cuivre').toLowerCase(),det.serviceRoute,det.serviceNotes].filter(Boolean).join(' · ');
+}
 function panelInfoRows(panel,site,fedFromLabel){
  const det=panel.details||{};
  const s=stats(panel.circuits);
@@ -270,6 +275,7 @@ function panelInfoRows(panel,site,fedFromLabel){
   ['Bâtiment',det.building],['Emplacement du panneau',panel.location],
   ['Type de panneau',panel.kind],['Alimenté par',fedFromLabel?(fedFromLabel+(det.fedFromCircuit?' — circuit '+det.fedFromCircuit:'')):'Réseau / entrée électrique'],
   ['Marque et modèle',[[det.brand,det.model].filter(Boolean).join(' '),det.modelId].filter(Boolean).join(' · ')],['Principal et tension',[det.mainAmps?det.mainAmps+' A':'',det.voltage].filter(Boolean).join(' · ')],
+  ...(serviceLine(det)?[['Conducteurs d’entrée',serviceLine(det)]]:[]),
   ['Positions',`${panel.positions} positions · ${s.total} circuits/groupes`],['Avancement',`${s.identified} identifié(s) · ${s.free} libre(s) · ${s.toConfirm} à confirmer (${s.progress} %)`],
   ['Relevé effectué',[surveyDate(det.surveyDate),det.surveyedBy&&'par '+det.surveyedBy].filter(Boolean).join(' ')],
  ];
@@ -379,7 +385,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
  d.page();
  await header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version,(panel.details?.state||'Existant').toUpperCase()],logos:panelLogos(panel.details),model:panelModelLine(panel)});
- infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?rep.model.id+' — '+rep.model.label:[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—']]);
+ infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?rep.model.id+' — '+rep.model.label:[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—'],...(serviceLine(panel.details||{})?[['Conducteurs d’entrée',serviceLine(panel.details)]]:[])]);
  preparedBlock(d,user,generatedAt);
  // Synthèse.
  sectionTitle(d,'Synthèse','Charge de calcul comparée au disjoncteur principal ; seuil recommandé : 80 %.');
@@ -443,7 +449,7 @@ export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],ge
  d.page();
  await header(d,{overline:'NOTE DE CALCUL — CHARGE DU LOGEMENT',title:panelTitle(panel),subtitle:[site.name,siteAddress(site)].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:panelLogos(det),model:panelModelLine(panel)});
  infoGrid(d,[['Site',site.name+(site.client?' — '+site.client:'')],['Adresse',siteAddress(site)],['Panneau',`${panelTitle(panel)} (${panel.kind})`],['Disjoncteur principal installé',det.mainAmps?det.mainAmps+' A':'—'],
-  ['Superficie hors sol',det.livingArea?det.livingArea+' m²':'—'],['Superficie du sous-sol',det.basementArea?det.basementArea+' m² (compte à 75 %)':'—'],['Superficie habitable retenue',calc.area?calc.area+' m²':'—'],['Sous-panneaux inclus',children.length?children.map(c=>c.tag||c.name).join(', '):'Aucun']]);
+  ['Superficie hors sol',det.livingArea?det.livingArea+' m²':'—'],['Superficie du sous-sol',det.basementArea?det.basementArea+' m² (compte à 75 %)':'—'],['Superficie habitable retenue',calc.area?calc.area+' m²':'—'],['Sous-panneaux inclus',children.length?children.map(c=>c.tag||c.name).join(', '):'Aucun'],['Conducteurs d’entrée',serviceLine(det)||'Non précisés']]);
  preparedBlock(d,user,generatedAt);
  // Synthèse.
  sectionTitle(d,'Résultat');
@@ -453,7 +459,11 @@ export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],ge
  boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:C.soft,borderColor:C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:11.5,f:d.bold,color:i===4&&pct>100?rgb(.64,.24,.2):C.ink,max:bw-14});});
  d.y-=54;
  const verdict=!calc.area?'Superficie manquante : le calcul est incomplet.':!det.mainAmps?'Indiquez le calibre du disjoncteur principal pour comparer.':calc.amps<=det.mainAmps&&det.mainAmps>=calc.minService?`Le principal de ${det.mainAmps} A est suffisant pour la charge calculée (${pct} % utilisé).${pct>80?' Marge réduite : prévoyez les ajouts futurs.':''}`:`Le principal de ${det.mainAmps} A est insuffisant : une entrée d’au moins ${calc.recommended} A est requise selon ce calcul.`;
- para(verdict,{f:d.bold,size:9});d.y-=6;
+ para(verdict,{f:d.bold,size:9});
+ const svc=det.fedFrom?null:serviceCheck(det);
+ if(svc?.text)para(svc.text,{size:8.6,color:svc.status==='warn'?rgb(.64,.24,.2):C.ink});
+ if(calc.recommended&&!det.fedFrom){const need=calc.recommended;para(`Rappel : les conducteurs d’entrée (du mât au panneau) et l’embase du compteur doivent convenir à l’entrée choisie (${need} A ou plus). Leur calibre se choisit avec le tableau 39 du Code pour un logement unifamilial, et les exigences d’Hydro-Québec (norme E.21-10) s’appliquent au mât et au branchement.`,{size:8,color:C.muted});}
+ d.y-=6;
  // Méthode.
  sectionTitle(d,'Méthode');
  para(G.GUIDE_INTRO.what);para(G.GUIDE_INTRO.why);para(G.GUIDE_INTRO.scope,{color:C.muted,size:8});d.y-=6;

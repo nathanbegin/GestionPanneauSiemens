@@ -48,3 +48,15 @@ test('note de calcul : sous-sol à 75 %, étapes, exclusions',()=>{
  assert.ok(r.warnings.some(w=>/Chauffe-plat/.test(w)));
  assert.equal(r.items.find(i=>i.name==='Réfrigérateur').where,'P-1 · 3');
 });
+
+import {serviceCheck,serviceAmpacity} from '../public/catalog.js';
+test('conducteurs d’entrée : vérification et validation',()=>{
+ assert.equal(serviceAmpacity('3/0 AWG','Cuivre'),200);
+ assert.equal(serviceAmpacity('4/0 AWG','Aluminium'),180);
+ assert.equal(serviceCheck({serviceGauge:'3/0 AWG',serviceMaterial:'Cuivre',mainAmps:200}).status,'ok');
+ assert.equal(serviceCheck({serviceGauge:'2 AWG',serviceMaterial:'Aluminium',mainAmps:200}).status,'warn');
+ assert.equal(serviceCheck({}),null);
+ const m=cleanPanelMeta({name:'P',details:{mainAmps:200,serviceGauge:'4/0 AWG',serviceMaterial:'Aluminium',serviceRoute:'Aérienne — mât'}});
+ assert.equal(m.details.serviceGauge,'4/0 AWG');assert.equal(m.details.serviceRoute,'Aérienne — mât');
+ assert.throws(()=>cleanPanelMeta({name:'P',details:{serviceGauge:'99 AWG'}}));
+});

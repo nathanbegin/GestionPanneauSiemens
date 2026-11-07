@@ -93,6 +93,33 @@ export const WIRE_TABLE=[
 export const WIRE_TYPES=['NMD90 (Loomex)','AC90 (BX)','TECK90','Conduit + T90','Aluminium (artère)','Autre'];
 export const wireAmps=g=>WIRE_TABLE.find(w=>w.gauge===g)?.amps??null;
 
+// Conducteurs d'entrée électrique (du point de raccordement d'Hydro-Québec, en tête de mât,
+// jusqu'au disjoncteur principal, en passant par l'embase du compteur).
+// Courant admissible indicatif, colonne 75 °C, au plus 3 conducteurs en conduit
+// (Code canadien de l'électricité, tableaux 2 (cuivre) et 4 (aluminium)).
+// Le tableau 39 permet parfois un calibre plus petit pour l'entrée d'un logement unifamilial.
+export const SERVICE_CONDUCTORS=[
+ {gauge:'6 AWG',cu:65,al:50},{gauge:'4 AWG',cu:85,al:65},{gauge:'3 AWG',cu:100,al:75},{gauge:'2 AWG',cu:115,al:90},
+ {gauge:'1 AWG',cu:130,al:100},{gauge:'1/0 AWG',cu:150,al:120},{gauge:'2/0 AWG',cu:175,al:135},{gauge:'3/0 AWG',cu:200,al:155},
+ {gauge:'4/0 AWG',cu:230,al:180},{gauge:'250 kcmil',cu:255,al:205},{gauge:'300 kcmil',cu:285,al:230},{gauge:'350 kcmil',cu:310,al:250},
+ {gauge:'400 kcmil',cu:335,al:270},{gauge:'500 kcmil',cu:380,al:310},{gauge:'600 kcmil',cu:420,al:340},
+];
+export const SERVICE_MATERIALS=['Cuivre','Aluminium'];
+export const SERVICE_ROUTES=['Aérienne — mât','Aérienne — sur façade','Souterraine'];
+export const serviceAmpacity=(gauge,material)=>{const r=SERVICE_CONDUCTORS.find(w=>w.gauge===gauge);return r?(material==='Aluminium'?r.al:r.cu):null;};
+// Vérification indicative : conducteurs d'entrée comparés au disjoncteur principal.
+export function serviceCheck(det={}){
+ if(!det.serviceGauge)return null;
+ const material=det.serviceMaterial||'Cuivre';
+ const ampacity=serviceAmpacity(det.serviceGauge,material);
+ const main=Number(det.mainAmps)||null;
+ const label=`${det.serviceGauge} ${material.toLowerCase()}`;
+ if(!ampacity)return {label,ampacity:null,status:'unknown',text:''};
+ if(!main)return {label,ampacity,status:'unknown',text:`Conducteurs d’entrée ${label} : environ ${ampacity} A admissibles (colonne 75 °C).`};
+ if(ampacity>=main)return {label,ampacity,status:'ok',text:`Conducteurs d’entrée ${label} (≈ ${ampacity} A) compatibles avec le principal de ${main} A.`};
+ return {label,ampacity,status:'warn',text:`Conducteurs d’entrée ${label} : environ ${ampacity} A admissibles (colonne 75 °C), moins que le principal de ${main} A. Le tableau 39 du Code permet parfois un calibre réduit pour un logement unifamilial : à faire valider par un maître électricien.`};
+}
+
 // Familles de produits (métadonnées publiques seulement : la bibliothèque complète des panneaux
 // et des disjoncteurs est réservée aux abonnés et servie par l'API).
 // pitch = largeur d'un espace en pouces (3/4" ou 1"), utilisée pour le dessin réaliste.
