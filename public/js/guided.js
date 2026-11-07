@@ -79,13 +79,13 @@ export function positionQuiz(box,ctx){
   const pr=progress(ctx.getState());
   box.replaceChildren(
    h('div',{class:'gd-head'},h('span',{class:'ai-step',text:order()?`Point à vérifier ${order().indexOf(n)+1} / ${order().length}`:`Position ${n} sur ${st.positions}`}),h('h3',{text:`Position ${n}`}),h('span',{class:'small muted',text:`Colonne de ${side(n)}, ${row(n)}${row(n)===1?'re':'e'} rangée à partir du haut`})),
-   !order()&&h('div',{class:'progress gd-progress','aria-label':`${pr.percent} % des positions décrites`},h('i',{style:{width:pr.percent+'%'}})),
+   order()?null:h('div',{class:'progress gd-progress','aria-label':`${pr.percent} % des positions décrites`},h('i',{style:{width:pr.percent+'%'}})),
    h('p',{class:'gd-ask',text:'Qu’y a-t-il à cette position ?'}),
    formatBox,detail,err,
    h('datalist',{id:'gdLabels'},LABEL_SUGGESTIONS.map(l=>h('option',{value:l}))),
    h('div',{class:'form-actions gd-nav'},
     p!=null?h('button',{type:'button',class:'ghost',onclick:()=>ask(p)},'← Position précédente'):ctx.onBack?h('button',{type:'button',class:'ghost',onclick:ctx.onBack},'← Retour'):null,
-    !order()&&h('button',{type:'button',class:'ghost',onclick:async()=>{if(await confirmDialog(`Toutes les positions à partir de ${n} sont-elles vides (aucun disjoncteur) ?`,{title:'Positions restantes',confirm:'Oui, elles sont vides'})){ctx.setState(fillRestEmpty(ctx.getState(),n));ctx.onFinish();}}},'Les positions restantes sont vides'),
+    order()?null:h('button',{type:'button',class:'ghost',onclick:async()=>{if(await confirmDialog(`Toutes les positions à partir de ${n} sont-elles vides (aucun disjoncteur) ?`,{title:'Positions restantes',confirm:'Oui, elles sont vides'})){ctx.setState(fillRestEmpty(ctx.getState(),n));ctx.onFinish();}}},'Les positions restantes sont vides'),
     h('button',{type:'button',class:'primary',onclick:apply},next(n)==null?(ctx.finishLabel||'Valider et terminer'):'Valider et continuer →')));
   box.onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName==='INPUT'&&e.target.type!=='checkbox'){e.preventDefault();apply();}};
   ctx.art(n);
