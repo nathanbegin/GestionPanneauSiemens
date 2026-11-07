@@ -2,6 +2,7 @@
 import {brandingCard} from './branding.js';
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
+import {feedbackDialog} from './feedback.js';
 import {h,toast,confirmDialog,fmtRelative,field} from './dom.js';
 import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
@@ -29,6 +30,7 @@ function crumbs(items){
    h('a',{href:'#/abonnement',role:'menuitem'},'⭐ Mon abonnement'),
    state.user.isAdmin&&h('a',{href:'#/admin',role:'menuitem'},'🛠 Administration'),
    h('a',{href:webUrl('/fonctionnement'),role:'menuitem',target:NATIVE?'_blank':null},'❓ Fonctionnement'),
+   h('button',{type:'button',role:'menuitem',onclick:()=>feedbackDialog()},'💡 Suggérer une amélioration'),
    h('hr'),
    h('button',{type:'button',role:'menuitem',onclick:logout},'↩ Se déconnecter'));
   const btn=h('button',{type:'button',class:'ghost','aria-haspopup':'menu','aria-expanded':'false'},h('span',{class:'avatar',text:(state.user.name||'?').trim().charAt(0).toUpperCase()}),h('span',{class:'uname',text:state.user.name.split(' ')[0]}));

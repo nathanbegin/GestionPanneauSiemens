@@ -70,6 +70,8 @@ async function ensureSchema(sql){
  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS branding jsonb NOT NULL DEFAULT '{}'::jsonb`;
  await sql`CREATE TABLE IF NOT EXISTS app_ai_scans(id bigserial PRIMARY KEY, user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, model text NOT NULL, input_tokens integer NOT NULL DEFAULT 0, output_tokens integer NOT NULL DEFAULT 0, ok boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now())`;
  await sql`CREATE INDEX IF NOT EXISTS app_ai_scans_user ON app_ai_scans(user_id, created_at)`;
+ await sql`CREATE TABLE IF NOT EXISTS app_feedback(id bigserial PRIMARY KEY, user_id uuid REFERENCES app_users(id) ON DELETE SET NULL, email text NOT NULL DEFAULT '', name text NOT NULL DEFAULT '', category text NOT NULL, message text NOT NULL, page text NOT NULL DEFAULT '', app_version text NOT NULL DEFAULT '', client text NOT NULL DEFAULT 'web', status text NOT NULL DEFAULT 'nouveau', admin_note text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+ await sql`CREATE INDEX IF NOT EXISTS app_feedback_status ON app_feedback(status, created_at)`;
  await sql`CREATE TABLE IF NOT EXISTS app_settings(key text PRIMARY KEY, value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text NOT NULL DEFAULT '')`;
  const {seedPlans}=await import('./plans.js');
  await seedPlans(sql);

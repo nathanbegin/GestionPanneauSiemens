@@ -12,6 +12,9 @@ export const panelKinds=['Principal','Sous-panneau','Distribution','Temporaire /
 export const voltages=['120/240 V monophasé','120/208 V triphasé','347/600 V triphasé','Autre'];
 export const breakerFormats={single:'Unipolaire · 1 position',double:'Bipolaire · 2 positions (n et n+2)',triple:'Tripolaire · 3 positions',tandem:'Jumelé · 2 demi-positions A / B'};
 export const MIN_POSITIONS=2,MAX_POSITIONS=84,LEGACY_POSITIONS=40;
+// Suggestions d'amélioration envoyées par les utilisateurs (console d'administration → Suggestions).
+export const FEEDBACK_CATEGORIES=['Suggestion','Problème','Question','Autre'];
+export const FEEDBACK_STATUSES={nouveau:'Nouvelle','a-l-etude':'À l’étude',planifie:'Planifiée',fait:'Faite',refuse:'Refusée'};
 
 const emptyCircuit=(id,slots)=>({id,slots,label:'',room:'',usage:'Autre',amps:null,status:'À confirmer',notes:'',exceptions:''});
 export const blank=(positions=32)=>Array.from({length:positions},(_,i)=>emptyCircuit(String(i+1),[`${i+1}A`,`${i+1}B`]));

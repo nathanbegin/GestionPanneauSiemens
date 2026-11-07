@@ -3,7 +3,7 @@ import {createHash,timingSafeEqual} from 'node:crypto';
 import {getSql} from './_lib/db.js';
 import {route,body,HttpError,clientIp} from './_lib/http.js';
 import {requireUser,publicUser,verifyPassword,hashPassword,checkPassword,newId,rateLimit,recordAttempt,clearSessionCookie,readToken} from './_lib/auth.js';
-import {normalize,highestPosition,resize} from '../public/model.js';
+import {normalize,highestPosition,resize,FEEDBACK_CATEGORIES} from '../public/model.js';
 import {decodeLogo} from './_lib/pdf.js';
 import {entitlement} from './_lib/plans.js';
 import {adminEmails} from './_lib/auth.js';
@@ -60,6 +60,17 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
   await sql`DELETE FROM app_users WHERE id=${user.id}`;
   clearSessionCookie(req,res);
   return res.status(200).json({ok:true});
+ }
+ if(req.method==='POST'&&action==='feedback'){
+  // Suggestion d'amélioration : 10 envois par heure au maximum.
+  await rateLimit(sql,'fb:'+user.id,10,60);
+  const category=FEEDBACK_CATEGORIES.includes(data.category)?data.category:'Suggestion';
+  const message=s(data.message,3000);
+  if(message.length<5)throw new HttpError(400,'Décrivez votre suggestion en quelques mots.');
+  const client=['web','ios','android'].includes(data.client)?data.client:'web';
+  await recordAttempt(sql,'fb:'+user.id);
+  await sql`INSERT INTO app_feedback(user_id,email,name,category,message,page,app_version,client) VALUES(${user.id},${user.email},${user.name},${category},${message},${s(data.page,200)},${s(data.version,20)},${client})`;
+  return res.status(201).json({ok:true});
  }
  if(req.method==='POST'&&action==='legacy-import'){
   // Copie (sans rien supprimer) les panneaux de la version 1.x protégés par PANEL_ACCESS_KEY.

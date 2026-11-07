@@ -5,6 +5,7 @@ import {route,body,HttpError,isUuid} from './_lib/http.js';
 import {requireUser,adminEmails} from './_lib/auth.js';
 import {planOut,packOut,subOut,entitlement,grantCredits,QUOTA_TYPES,AUDIENCES,LIVE} from './_lib/plans.js';
 import {stripe,stripeConfigured,stripeMode,syncPlanPrices,syncPackPrice,upsertSubscription} from './_lib/stripe.js';
+import {FEEDBACK_STATUSES} from '../public/model.js';
 import {loadAiSettings,cleanAiSettings,aiModels,aiSource,imageDetail,modelOrder,deniedModels,aiConfigured,testModel,AI_CATALOG,IMAGE_DETAILS,DEFAULT_MODELS} from './_lib/ai.js';
 
 const int=(v,{min=0,max=1e7,nullable=false}={})=>{if(nullable&&(v===''||v==null))return null;const n=Number(v);if(!Number.isInteger(n)||n<min||n>max)throw new HttpError(400,'Valeur numérique invalide : '+v);return n;};
@@ -29,7 +30,8 @@ export default route(['GET','POST'],async(req,res)=>{
    for(const r of byPlan)if(['active','past_due'].includes(r.status)&&r.status!=='comp'){paying+=r.n;mrr+=r.n*(r.interval==='year'?(r.price_year||0)/12:(r.price_month||0));}
    const [{canceled30}]=await sql`SELECT count(*)::int AS canceled30 FROM app_subscriptions WHERE status='canceled' AND updated_at>now()-interval '30 days'`;
    const [{credits}]=await sql`SELECT coalesce(sum(panels),0)::int AS credits FROM app_credits WHERE source='pack' AND created_at>now()-interval '30 days'`;
-   return res.status(200).json({users,new30,panels,paying,mrr:Math.round(mrr),canceled30,packPanels30:credits,byPlan,stripe:stripeMode(),webhook:!!process.env.STRIPE_WEBHOOK_SECRET,tax:process.env.STRIPE_TAX==='1'});
+   const [{feedbackNew}]=await sql`SELECT count(*)::int AS "feedbackNew" FROM app_feedback WHERE status='nouveau'`;
+   return res.status(200).json({users,new30,panels,paying,mrr:Math.round(mrr),canceled30,packPanels30:credits,feedbackNew,byPlan,stripe:stripeMode(),webhook:!!process.env.STRIPE_WEBHOOK_SECRET,tax:process.env.STRIPE_TAX==='1'});
   }
   if(action==='users'){
    const search='%'+text(q.q,100).toLowerCase()+'%',plan=text(q.plan,60),status=text(q.status,20),page=Math.max(0,int(q.page||0,{max:10000}));
@@ -62,10 +64,25 @@ export default route(['GET','POST'],async(req,res)=>{
    return res.status(200).json({configured:aiConfigured(),settings,source:aiSource(settings),models:aiModels(settings),order:modelOrder(settings),detail:imageDetail(settings),denied:deniedModels(),
     envModel:process.env.OPENAI_MODEL||'',defaults:DEFAULT_MODELS,catalog:AI_CATALOG,details:IMAGE_DETAILS,usage});
   }
+  if(action==='feedback'){
+   const status=text(q.status,20);
+   const rows=await sql`SELECT id,user_id,email,name,category,message,page,app_version,client,status,admin_note,created_at,updated_at FROM app_feedback WHERE (${status}='' OR status=${status}) ORDER BY created_at DESC LIMIT 300`;
+   const counts=await sql`SELECT status,count(*)::int AS n FROM app_feedback GROUP BY status`;
+   return res.status(200).json({items:rows,counts:Object.fromEntries(counts.map(c=>[c.status,c.n])),statuses:FEEDBACK_STATUSES});
+  }
   if(action==='audit'){const rows=await sql`SELECT a.*,u.email AS target_email FROM app_admin_audit a LEFT JOIN app_users u ON u.id::text=a.target ORDER BY at DESC LIMIT 200`;return res.status(200).json({log:rows});}
   throw new HttpError(404,'Action inconnue.');
  }
  const d=body(req);
+ if(action==='feedback-update'){
+  const id=int(d.id,{min:1,max:1e12});
+  const status=text(d.status,20);if(!FEEDBACK_STATUSES[status])throw new HttpError(400,'Statut invalide.');
+  const note=text(d.note,2000);
+  const [row]=await sql`UPDATE app_feedback SET status=${status},admin_note=${note},updated_at=now() WHERE id=${id} RETURNING id`;
+  if(!row)throw new HttpError(404,'Suggestion introuvable.');
+  await audit(sql,admin,'feedback','fb-'+id,{status});
+  return res.status(200).json({ok:true});
+ }
  if(action==='ai'){
   const clean=cleanAiSettings(d);
   await sql`INSERT INTO app_settings(key,value,updated_by) VALUES('ai',${JSON.stringify(clean)}::jsonb,${admin.email}) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now(),updated_by=EXCLUDED.updated_by`;

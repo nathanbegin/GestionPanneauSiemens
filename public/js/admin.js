@@ -3,7 +3,7 @@ import {h,toast,money,fmtDate,fmtRelative,field,select,dialog,confirmDialog} fro
 import {api} from './api.js';
 
 const STATUS={active:'Actif',trialing:'Essai',past_due:'Paiement en retard',canceled:'Annulé',comp:'Offert',gratuit:'Gratuit'};
-const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['ia','Intelligence artificielle'],['journal','Journal']];
+const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['suggestions','Suggestions'],['ia','Intelligence artificielle'],['journal','Journal']];
 const centsInput=(name,cents)=>h('input',{name,type:'number',step:'0.01',min:0,value:cents==null?'':(cents/100).toFixed(2),inputmode:'decimal'});
 const toCents=v=>v===''||v==null?null:Math.round(Number(String(v).replace(',','.'))*100);
 
@@ -16,6 +16,7 @@ export async function adminView({ctx,tab='tableau',id}){
  else if(tab==='forfaits')content=await plans();
  else if(tab==='journal')content=await journal();
  else if(tab==='ia')content=await aiSettings();
+ else if(tab==='suggestions')content=await suggestions();
  else content=await overview();
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Console'}),h('h1',{text:'Administration'}))),nav,content);
 }
@@ -25,7 +26,7 @@ async function overview(){
  const stat=(v,l)=>h('div',{class:'card stat'},h('b',{text:v}),h('span',{text:l}));
  return h('div',{},
   h('p',{},'Paiement Stripe : ',h('span',{class:'mode'+(o.stripe==='live'?' live':''),text:{off:'non configuré',test:'mode test',live:'production'}[o.stripe]}),' · Webhook : ',o.webhook?'✓':'✗ non configuré',' · Taxes automatiques : ',o.tax?'✓':'✗'),
-  h('div',{class:'stats'},stat(money(o.mrr),'Revenu mensuel récurrent (estimé)'),stat(o.paying,'Abonnés payants'),stat(o.users,'Comptes'),stat(o.new30,'Nouveaux comptes (30 j)'),stat(o.canceled30,'Annulations (30 j)'),stat(o.panels,'Panneaux'),stat(o.packPanels30,'Panneaux prépayés vendus (30 j)')),
+  h('div',{class:'stats'},stat(money(o.mrr),'Revenu mensuel récurrent (estimé)'),stat(o.paying,'Abonnés payants'),stat(o.users,'Comptes'),stat(o.new30,'Nouveaux comptes (30 j)'),stat(o.canceled30,'Annulations (30 j)'),stat(o.panels,'Panneaux'),h('a',{class:'card stat link',href:'#/admin/suggestions'},h('b',{text:o.feedbackNew??0}),h('span',{text:'Suggestions nouvelles'})),stat(o.packPanels30,'Panneaux prépayés vendus (30 j)')),
   h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Forfait','Statut','Périodicité','Abonnés'].map(t=>h('th',{text:t})))),
    h('tbody',{},o.byPlan.length?o.byPlan.map(r=>h('tr',{},h('td',{text:r.name}),h('td',{text:STATUS[r.status]||r.status}),h('td',{text:r.interval==='year'?'Annuel':r.interval==='month'?'Mensuel':'—'}),h('td',{text:r.n}))):h('tr',{},h('td',{colspan:4,class:'muted',text:'Aucun abonnement pour l’instant : tous les comptes sont au forfait gratuit.'}))))));
 }
@@ -190,6 +191,38 @@ async function aiSettings(){
      h('tbody',{},usage.length?usage:[h('tr',{},h('td',{colspan:6,class:'muted',text:'Aucune analyse pour l’instant.'}))]))),
     h('p',{class:'small muted',text:'Coût estimé à partir des prix publics d’OpenAI ; la facture OpenAI fait foi.'})));
   draw();
+ }
+ await load();
+ return box;
+}
+
+// ---------- Suggestions d'amélioration envoyées par les utilisateurs ----------
+async function suggestions(){
+ const box=h('div',{class:'stack'});
+ let filter='nouveau';
+ const load=async()=>{const d=await api('/api/admin?action=feedback&status='+encodeURIComponent(filter));render(d);};
+ function render(d){
+  const total=Object.values(d.counts).reduce((a,b)=>a+b,0);
+  const tabsBar=h('div',{class:'gd-chips'},
+   h('button',{type:'button',class:'gd-chip'+(filter===''?' on':''),onclick:()=>{filter='';load();}},`Toutes (${total})`),
+   ...Object.entries(d.statuses).map(([k,l])=>h('button',{type:'button',class:'gd-chip'+(filter===k?' on':''),onclick:()=>{filter=k;load();}},`${l} (${d.counts[k]||0})`)));
+  const item=f=>{
+   const status=select('status',Object.entries(d.statuses),f.status);
+   const note=h('textarea',{rows:2,maxlength:2000,placeholder:'Note interne (non visible par l’utilisateur)',value:f.admin_note||''});
+   note.value=f.admin_note||'';
+   const saveBtn=h('button',{type:'button',class:'sm primary',onclick:async()=>{saveBtn.disabled=true;try{await api('/api/admin?action=feedback-update',{method:'POST',body:{id:f.id,status:status.value,note:note.value}});toast('Suggestion mise à jour.');await load();}catch(e){toast(e.message);saveBtn.disabled=false;}}},'Enregistrer');
+   return h('article',{class:'card fb-item fb-'+f.status},
+    h('div',{class:'fb-head'},h('span',{class:'badge '+(f.category==='Problème'?'warn':''),text:f.category}),
+     h('b',{},f.user_id?h('a',{href:'#/admin/abonne/'+f.user_id,text:f.name||f.email}):(f.name||f.email||'Compte supprimé')),
+     h('span',{class:'small muted',text:[f.email,new Date(f.created_at).toLocaleString('fr-CA'),f.client!=='web'?f.client:'',f.app_version&&'v'+f.app_version].filter(Boolean).join(' · ')})),
+    h('p',{class:'fb-msg',text:f.message}),
+    f.page?h('p',{class:'small muted',text:'Page : '+f.page}):null,
+    h('div',{class:'fb-actions'},status,note,saveBtn));
+  };
+  box.replaceChildren(
+   h('div',{class:'card form-card'},h('h2',{text:'Suggestions d’amélioration'}),
+    h('p',{class:'small muted',text:'Envoyées par les utilisateurs depuis le menu de leur compte (« 💡 Suggérer une amélioration »). Le statut et la note interne ne sont visibles que par l’administration.'}),tabsBar),
+   ...(d.items.length?d.items.map(item):[h('p',{class:'card muted',text:'Aucune suggestion dans cette catégorie.'})]));
  }
  await load();
  return box;
