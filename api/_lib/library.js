@@ -1,6 +1,7 @@
 // Bibliothèque de produits : normalisation des données fournies (api/_data/catalogue.js) pour le concepteur.
 // Réservée aux abonnés : n'est exposée que par /api/panels?catalog=1.
 import data from '../_data/catalogue.js';
+import generac from '../_data/generac.js';
 import {ampsList} from '../../public/model.js';
 
 const NOT_DESIGNABLE=['Spa','Insert (boîte à fusibles)','Boîtier de disjoncteur'];
@@ -62,14 +63,14 @@ export function normalizeBreaker(b){
 }
 export function normalizePanel(p){
  const designable=Number.isInteger(p.espaces)&&p.espaces>=2&&p.espaces<=84&&p.espaces%2===0&&!NOT_DESIGNABLE.includes(p.type);
- return {cat:p.cat,family:p.famille,type:p.type,bus:p.bus_A,main:p.principal_A,espaces:p.espaces,circuits:p.circuits,enveloppe:p.enveloppe,pon:p.pon,statut:p.statut,note:p.note||'',source:p.source,
+ return {cat:p.cat,family:p.famille,type:p.type,bus:p.bus_A,main:p.principal_A,espaces:p.espaces,circuits:p.circuits,enveloppe:p.enveloppe,pon:p.pon,statut:p.statut,note:p.note||'',source:p.source,accepts:p.accepte||null,
   tandem:p.circuits!=null&&p.espaces!=null&&p.circuits>p.espaces,designable};
 }
 let cache;
 export function library(){
  if(!cache){
-  cache={genere:data.genere,sources:data.sources,families:data.familles,
-   panels:data.panneaux.map(normalizePanel),breakers:data.disjoncteurs.map(normalizeBreaker),
+  cache={genere:data.genere,sources:{...data.sources,...generac.sources},families:[...data.familles,generac.famille],
+   panels:[...data.panneaux,...generac.panneaux].map(normalizePanel),breakers:data.disjoncteurs.map(normalizeBreaker),
    legacy:data.anciennes,generators:data.generatrices,holdDown:data.retenue,surge:data.parasurtenseurs};
  }
  return cache;
@@ -78,6 +79,6 @@ export const findPanel=cat=>library().panels.find(p=>p.cat===cat);
 // Instantané enregistré dans la fiche du panneau quand un modèle est choisi.
 export function panelSnapshot(p){
  const fam=library().families.find(f=>f.id===p.family);
- return {modelId:p.cat,family:p.family,maxCircuits:p.circuits??null,tandem:p.tandem,pon:p.pon,
+ return {modelId:p.cat,family:p.family,accepts:p.accepts||[],maxCircuits:p.circuits??null,tandem:p.tandem,pon:p.pon,
   modelInfo:`${fam?.marque||''} ${fam?.gamme||''} · ${p.type} · barres ${p.bus??'—'} A${p.main?` · principal ${p.main} A`:''} · ${p.espaces}/${p.circuits??'—'} · ${p.enveloppe||''}`.replace(/\s+/g,' ').trim().slice(0,160)};
 }

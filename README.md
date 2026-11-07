@@ -39,6 +39,13 @@ Compte ─┬─ Site (adresse, client, notes)
 - **Synchronisation** : enregistrement automatique, contrôle de révision (aucun écrasement silencieux entre deux appareils).
 - **PWA** installable (manifeste + service worker) et **applications natives** iOS/Android (Capacitor) dans `mobile/`.
 
+## Generac, calcul de charge expliqué et note de calcul (v2.5)
+
+- **Generac** (`api/_data/generac.js`, sources : fiches officielles HomeLink 0L1648-G et 6377, pages produit Generac, distributeurs pour les modèles abandonnés) : HomeLink 30 A (6852, 6853, 6854) et 50 A (9854, 9855) acceptant les disjoncteurs 1" Siemens, Eaton et Square D ; inverseurs manuels 6377, 6376, 6378 ; inverseurs automatiques avec centre de distribution RXG16EZA1, RXG16EZA1W, RXG16EZA3 ; inverseurs automatiques maison entière RXSW/RXSC (dont RXSW200A3CUL approuvé au Canada) et trousse 6869, affichés à titre informatif (aucun espace de dérivation).
+- **Calcul de charge expliqué** : page publique `/calcul-de-charge` (étapes, ce qui est compté ou exclu, exemple complet calculé par le moteur de l'application), contenu partagé dans `public/loadguide.js`. Superficie du sous-sol comptée à 75 % (8-110). Dans l'onglet Planification, chaque étape s'ouvre : explication, appareils comptés, couverts par la charge de base ou exclus, règle du Code.
+- **Note de calcul PDF** (`kind=calc`) : résultat et verdict sur le principal installé, méthode, chaque étape (règle, explication, formule, appareils), total, points à corriger, autres règles (80 %, fils, marge), références et avertissement, signature.
+- **PDF** : logo du fabricant et ligne « Modèle » dans les en-têtes, l'étiquette du panneau et le rapport de site.
+
 ## Attribution des modèles et liaison des sous-panneaux (v2.4)
 
 - **Attribuer les modèles** (onglet Planification, abonnés) : les fiches sont regroupées en disjoncteurs physiques (`public/units.js` : unipolaire, bipolaire, tripolaire, jumelé, quad, y compris les bipolaires sur demi-emplacements « 1B / 3A »). Modèles proposés selon le format, les calibres et la protection, neutre enfichable en premier si le panneau en a une barre.

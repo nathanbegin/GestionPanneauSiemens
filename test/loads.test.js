@@ -38,3 +38,13 @@ test('validation des charges, fils et métadonnées',()=>{
  const m=cleanPanelMeta({name:'P',details:{modelId:'CQO140M200PC',family:'QO',livingArea:'140',state:'Planifié'}});assert.equal(m.details.livingArea,140);assert.equal(m.details.family,'QO');
  assert.throws(()=>cleanPanelMeta({name:'P',details:{modelId:'mauvais modèle !'}}));assert.throws(()=>cleanPanelMeta({name:'P',details:{family:'XYZ'}}));
 });
+test('note de calcul : sous-sol à 75 %, étapes, exclusions',()=>{
+ const d=blank(20);
+ d[0].loads=[L('bb-2000',3)];d[1].loads=[L('hp-3t')];d[2].loads=[L('fridge')];d[3].loads=[{name:'Chauffe-plat',w:2400,v:120,qty:1,cat:'basic',cont:false}];
+ const r=dwellingCalc(d,{livingArea:100,basementArea:80,panelTag:'P-1'});
+ assert.equal(r.area,160);
+ const basic=r.steps.find(s=>s.id==='basic');assert.equal(basic.w,6000);assert.ok(basic.items.some(i=>i.name==='Réfrigérateur'));
+ const heat=r.steps.find(s=>s.id==='heat');assert.equal(heat.w,6000);assert.equal(heat.excluded.length,1);
+ assert.ok(r.warnings.some(w=>/Chauffe-plat/.test(w)));
+ assert.equal(r.items.find(i=>i.name==='Réfrigérateur').where,'P-1 · 3');
+});

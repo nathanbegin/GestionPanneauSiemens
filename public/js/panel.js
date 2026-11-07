@@ -5,6 +5,7 @@ import {designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
+import {GUIDE_STEPS,GUIDE_DISCLAIMER} from '../loadguide.js';
 import {panelArt,isEmptySlot} from './panelart.js';
 import {loadLibrary,breakerPalette,validStarts,compatibility} from './library.js';
 import {placeBreaker} from '../model.js';
@@ -159,6 +160,7 @@ export async function panelView({id,tab='panel',ctx}){
   const cards=[
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🗒'}),h('h3',{text:'Aide-mémoire de porte'}),h('p',{text:'Une page : tous les circuits en deux colonnes, comme sur le panneau. À fixer à l’intérieur de la porte.'}),h('div',{class:'opts'},f1),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'door',format:f1.value})},'Générer le PDF')),
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'📘'}),h('h3',{text:'Rapport complet'}),h('p',{text:'Informations du site et du panneau, répertoire, tableau détaillé avec notes et exceptions, préparé par et signature.'}),h('div',{class:'opts'},f2),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'report',format:f2.value})},'Générer le PDF')),
+   planning&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🧮'}),h('h3',{text:'Note de calcul de charge'}),h('p',{text:'Calcul de l’entrée électrique étape par étape, en langage clair, avec les règles du Code, les appareils comptés et exclus, et le verdict sur le principal installé.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'calc'})},'Générer le PDF')),
    planning&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'⚡'}),h('h3',{text:'Bilan de charges et matériel'}),h('p',{text:'Liste de charges par circuit, phases L1/L2, capacité du panneau, calcul selon la règle 8-200, alertes et liste de disjoncteurs.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'Générer le PDF')),
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🏷'}),h('h3',{text:'Étiquettes autocollantes'}),h('p',{text:'Feuille Lettre Avery 5160 / 8160 (30 étiquettes 2⅝ × 1 po) : repère du panneau puis un circuit par étiquette. Imprimez à 100 %.'}),h('label',{class:'opts'},skip,'Ignorer les positions libres'),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'labels',skipFree:skip.checked})},'Générer les étiquettes')),
   ];
@@ -244,10 +246,25 @@ export async function panelView({id,tab='panel',ctx}){
    return;
   }
   const calc=rep.calc;
-  const calcCard=h('div',{class:'card side-card'},h('h3',{text:'Calcul de charge du logement (règle 8-200)'}),
-   panel.kind!=='Principal'?h('p',{class:'small muted',text:'S’applique au panneau principal d’un logement.'}):!panel.details?.livingArea?h('p',{class:'small muted'},'Indiquez la superficie habitable dans ',h('a',{href:'#',onclick:e=>{e.preventDefault();go('info');},text:'la fiche du panneau'}),' pour activer ce calcul.'):null,
-   h('div',{class:'table-wrap'},h('table',{class:'data'},h('tbody',{},calc.lines.map(l=>h('tr',{},h('td',{text:l.label}),h('td',{text:kw(l.w)}))),h('tr',{},h('td',{},h('b',{text:'Charge calculée'})),h('td',{},h('b',{text:`${kw(calc.totalW)} · ${calc.amps} A`})))))),
-   h('p',{class:'small muted mt',text:`Entrée minimale : ${calc.minService} A · recommandée selon le calcul : ${calc.recommended??'—'} A. Calcul simplifié inspiré du CCÉ : à valider par un maître électricien.`}));
+  // Calcul de charge détaillé : chaque étape s'ouvre pour voir l'explication, les appareils comptés et exclus.
+  const stepView=st=>{const g=GUIDE_STEPS[st.id]||{};
+   return h('details',{class:'calc-step'},
+    h('summary',{},h('b',{text:st.title}),h('span',{class:'badge',text:st.id==='area'?st.value+' m²':kw(st.w)})),
+    h('p',{class:'small',text:st.formula}),
+    g.plain&&h('p',{class:'why',text:'Pourquoi : '+g.plain}),
+    st.items?.length?h('div',{},h('b',{class:'small',text:st.id==='basic'?'Appareils couverts par la charge de base (non additionnés) :':'Appareils comptés :'}),h('ul',{},st.items.map(i=>h('li',{text:`${i.name} — ${kw(i.w)} (${i.where})`})))):null,
+    st.itemsNote&&h('p',{class:'small muted',text:st.itemsNote}),
+    st.excluded?.length?h('div',{},h('b',{class:'small',text:'Exclu du total :'}),h('ul',{},st.excluded.map(i=>h('li',{text:`${i.name} — ${kw(i.w)}`})))):null,
+    h('p',{class:'small muted',text:'Règle : '+st.rule}));};
+  const calcCard=h('div',{class:'card side-card'},
+   h('div',{class:'row-between'},h('h3',{text:'Calcul de charge du logement (règle 8-200)'}),h('a',{href:'/calcul-de-charge',target:'_blank',class:'small',text:'Comprendre le calcul ↗'})),
+   panel.kind!=='Principal'?h('p',{class:'small muted',text:'S’applique au panneau principal d’un logement (les sous-panneaux y sont additionnés).'}):!calc.area?h('p',{class:'small muted'},'Indiquez la superficie (hors sol et sous-sol) dans ',h('a',{href:'#',onclick:e=>{e.preventDefault();go('info');},text:'la fiche du panneau'}),' pour activer ce calcul.'):null,
+   ...calc.warnings.map(w=>h('p',{class:'issue warn',text:w})),
+   ...calc.steps.map(stepView),
+   h('div',{class:'calc-step'},h('div',{class:'row-between'},h('b',{text:'Total'}),h('b',{text:`${kw(calc.totalW)} ÷ 240 V = ${calc.amps} A`}))),
+   h('p',{class:'small muted mt',text:`Entrée minimale du Code : ${calc.minService} A · recommandée selon le calcul : ${calc.recommended??'—'} A.`}),
+   h('div',{class:'page-actions'},h('button',{type:'button',class:'primary sm',onclick:()=>doc({kind:'calc'})},'📄 Note de calcul PDF')),
+   h('p',{class:'small muted',text:GUIDE_DISCLAIMER}));
   const loadRows=rep.rows.filter(x=>x.r.watts||x.c.amps);
   const table=h('div',{class:'card side-card'},h('h3',{text:'Liste de charges par circuit'}),
    h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Pos.','Circuit','Charges','kW','A','Disj.','%','Fil'].map(t=>h('th',{text:t})))),

@@ -21,8 +21,8 @@ async function hasLibrary(sql,user){
 // Vérifie le modèle choisi et remplace l'instantané par les données officielles de la bibliothèque.
 async function applyModel(sql,user,meta,previous){
  const id=meta.details.modelId;
- if(!id){Object.assign(meta.details,{family:meta.details.family||'',maxCircuits:null,tandem:true,pon:null,modelInfo:''});return;}
- if(previous?.modelId===id){Object.assign(meta.details,{family:previous.family,maxCircuits:previous.maxCircuits??null,tandem:previous.tandem!==false,pon:previous.pon??null,modelInfo:previous.modelInfo||''});return;}
+ if(!id){Object.assign(meta.details,{family:meta.details.family||'',accepts:[],maxCircuits:null,tandem:true,pon:null,modelInfo:''});return;}
+ if(previous?.modelId===id){Object.assign(meta.details,{family:previous.family,accepts:previous.accepts||[],maxCircuits:previous.maxCircuits??null,tandem:previous.tandem!==false,pon:previous.pon??null,modelInfo:previous.modelInfo||''});return;}
  if(!await hasLibrary(sql,user))throw new HttpError(402,'La bibliothèque de produits est incluse dans les forfaits Électricien.',{quota:true});
  const p=findPanel(id);
  if(!p||!p.designable)throw new HttpError(400,'Modèle introuvable dans la bibliothèque.');

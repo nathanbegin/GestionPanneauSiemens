@@ -9,7 +9,7 @@ test('lecture des calibres',()=>{
 });
 test('protections',()=>{assert.equal(protectionOf('CAFCI'),'Anti-arc');assert.equal(protectionOf('DDFT 5 mA intelligent (2e gén.)'),'DDFT');assert.equal(protectionOf('Double fonction (CAFCI + 5 mA)'),'DDFT + anti-arc');assert.equal(protectionOf('Protection équipement 30 mA'),'Protection équipement');assert.equal(protectionOf('Standard'),'Standard');});
 test('bibliothèque normalisée',()=>{
- const L=library();assert.equal(L.panels.length,332);assert.equal(L.breakers.length,680);
+ const L=library();assert.equal(L.panels.filter(p=>p.family!=='GEN').length,332);assert.equal(L.panels.filter(p=>p.family==='GEN').length,20);assert.equal(L.breakers.length,680);
  const by=c=>L.breakers.find(b=>b.cat===c);
  assert.equal(by('QO120CP').kind,'single');assert.equal(by('QO1520CP').kind,'tandem');assert.equal(by('DNPL152015').kind,'quad');
  assert.equal(by('QOM30L').kind,null);assert.equal(by('CHOM2150BB').kind,null);
@@ -39,4 +39,15 @@ test('compatibilité et positions valides',()=>{
  const free=c=>!c.label;
  const starts=validStarts(panel,L.breakers.find(b=>b.kind==='double'),free);
  assert.ok(starts.has(2)&&!starts.has(1)&&!starts.has(3)&&!starts.has(7));
+});
+
+test('Generac : HomeLink accepte Siemens, Eaton BR et HomeLine',()=>{
+ const L=library();const hl=findPanel('9854');
+ assert.deepEqual(hl.accepts,['SIE','BR','HOM']);assert.ok(hl.designable&&hl.tandem);
+ const snap=panelSnapshot(hl);
+ const qp=L.breakers.find(b=>b.cat==='Q120'),br=L.breakers.find(b=>b.family==='BR'&&b.kind==='single'),qo=L.breakers.find(b=>b.cat==='QO120CP');
+ assert.equal(compatibility(qp,snap).filter(i=>i.level==='error').length,0);
+ assert.equal(compatibility(br,snap).filter(i=>i.level==='error').length,0);
+ assert.ok(compatibility(qo,snap).some(i=>i.level==='error'));
+ assert.ok(!findPanel('RXSW200A3CUL').designable);
 });

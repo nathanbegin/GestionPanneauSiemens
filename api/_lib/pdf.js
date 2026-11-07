@@ -37,7 +37,10 @@ class Doc{
  // Remplace les caractères absents de l'encodage WinAnsi des polices standard.
  safe(text){
   let out='';
-  for(const ch of String(text??'').replace(/[\t\r]/g,' ')){
+  // Équivalents pour les symboles absents des polices standard.
+  const SUBST={'→':'->','←':'<-','≈':'~','≤':'<=','≥':'>=','✓':'v','✗':'x','⚡':'','×':'x'};
+  for(let ch of String(text??'').replace(/[\t\r]/g,' ')){
+   if(SUBST[ch]!==undefined&&!this.cache.get(ch)){let ok=true;try{this.font.encodeText(ch);}catch{ok=false;}if(!ok){out+=SUBST[ch];continue;}}
    if(ch==='\n'){out+=ch;continue;}
    if(!this.cache.has(ch)){let ok=true;try{this.font.encodeText(ch);}catch{ok=false;}this.cache.set(ch,ok);}
    out+=this.cache.get(ch)?ch:'?';
@@ -425,5 +428,63 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  for(const t of ['Charges : valeurs saisies ou valeurs typiques de la bibliothèque. La plaque signalétique de chaque appareil a préséance.','Phases : les rangées alternent L1 / L2 (positions 1-2 sur L1, 3-4 sur L2, etc.).','Calcul simplifié inspiré du Code canadien de l’électricité (règles 8-104, 8-106, 8-200, section 86) et du Code de construction du Québec, chapitre V. Ne remplace pas l’analyse d’un maître électricien.',...LOADS_SOURCES.map(s=>'Source : '+s)])for(const l of d.wrap('• '+t,7.5,d.W-2*M)){d.ensure(10);d.text(l,M,d.y,{size:7.5,color:C.muted});d.y-=9.5;}
  signature(d,user);
  footers(d,'Mon Panneau · Bilan de charges indicatif — la conformité de l’installation relève d’un maître électricien.');
+ return d.pdf.save();
+}
+
+// Note de calcul de la charge d'un logement : étape par étape, en langage clair, avec références au Code.
+export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version}){
+ const {panelReport}=await import('../../public/loadcalc.js');
+ const G=await import('../../public/loadguide.js');
+ const rep=panelReport(panel,{children});
+ const calc=rep.calc,det=panel.details||{};
+ const d=await Doc.create('letter','Note de calcul — '+panelTitle(panel));
+ const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
+ const para=(t,{size=8.6,color=C.ink,f=d.font,indent=0}={})=>{for(const l of d.wrap(t,size,d.W-2*M-indent,f)){d.ensure(size+3);d.text(l,M+indent,d.y,{size,color,f});d.y-=size+2.6;}};
+ d.page();
+ await header(d,{overline:'NOTE DE CALCUL — CHARGE DU LOGEMENT',title:panelTitle(panel),subtitle:[site.name,siteAddress(site)].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:panelLogos(det),model:panelModelLine(panel)});
+ infoGrid(d,[['Site',site.name+(site.client?' — '+site.client:'')],['Adresse',siteAddress(site)],['Panneau',`${panelTitle(panel)} (${panel.kind})`],['Disjoncteur principal installé',det.mainAmps?det.mainAmps+' A':'—'],
+  ['Superficie hors sol',det.livingArea?det.livingArea+' m²':'—'],['Superficie du sous-sol',det.basementArea?det.basementArea+' m² (compte à 75 %)':'—'],['Superficie habitable retenue',calc.area?calc.area+' m²':'—'],['Sous-panneaux inclus',children.length?children.map(c=>c.tag||c.name).join(', '):'Aucun']]);
+ preparedBlock(d,user,generatedAt);
+ // Synthèse.
+ sectionTitle(d,'Résultat');
+ const pct=det.mainAmps&&calc.amps?Math.round(calc.amps/det.mainAmps*100):null;
+ const boxes=[['Charge calculée',kw(calc.totalW)],['Intensité (÷ 240 V)',calc.amps+' A'],['Minimum du Code',calc.minService+' A'],['Entrée recommandée',(calc.recommended??'—')+' A'],['Principal installé',det.mainAmps?`${det.mainAmps} A${pct!=null?` (${pct} %)`:''}`:'—']];
+ const bw=(d.W-2*M-4*8)/5;d.ensure(50);
+ boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:C.soft,borderColor:C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:11.5,f:d.bold,color:i===4&&pct>100?rgb(.64,.24,.2):C.ink,max:bw-14});});
+ d.y-=54;
+ const verdict=!calc.area?'Superficie manquante : le calcul est incomplet.':!det.mainAmps?'Indiquez le calibre du disjoncteur principal pour comparer.':calc.amps<=det.mainAmps&&det.mainAmps>=calc.minService?`Le principal de ${det.mainAmps} A est suffisant pour la charge calculée (${pct} % utilisé).${pct>80?' Marge réduite : prévoyez les ajouts futurs.':''}`:`Le principal de ${det.mainAmps} A est insuffisant : une entrée d’au moins ${calc.recommended} A est requise selon ce calcul.`;
+ para(verdict,{f:d.bold,size:9});d.y-=6;
+ // Méthode.
+ sectionTitle(d,'Méthode');
+ para(G.GUIDE_INTRO.what);para(G.GUIDE_INTRO.why);para(G.GUIDE_INTRO.scope,{color:C.muted,size:8});d.y-=6;
+ // Étapes.
+ sectionTitle(d,'Calcul étape par étape');
+ for(const st of calc.steps){
+  const g=G.GUIDE_STEPS[st.id]||{};
+  d.ensure(60);
+  d.rect(M,d.y-16,d.W-2*M,18,{color:C.soft});
+  d.text(g.title||st.title,M+6,d.y-10,{size:9.5,f:d.bold,max:d.W-2*M-150});
+  const val=st.id==='area'?st.value+' m²':kw(st.w);d.text(val,d.W-M-6-d.width(val,9.5,d.bold),d.y-10,{size:9.5,f:d.bold});
+  d.y-=28;
+  para('Règle : CCÉ '+(g.rule||st.rule.replace(/^CCÉ\s*/,'')),{size:7.5,color:C.muted});
+  if(g.plain)para(g.plain,{size:8.4});
+  para('Calcul : '+st.formula,{size:8.4,f:d.bold});
+  if(st.items?.length){para(st.id==='basic'?'Appareils couverts par la charge de base (non additionnés) :':'Appareils comptés :',{size:8,color:C.muted});for(const i of st.items)para(`• ${i.name} — ${kw(i.w)} (${i.where})`,{size:8,indent:10});}
+  if(st.excluded?.length){para('Exclu du total :',{size:8,color:C.muted});for(const i of st.excluded)para(`• ${i.name} — ${kw(i.w)}`,{size:8,indent:10});}
+  if(st.itemsNote)para(st.itemsNote,{size:7.8,color:C.muted});
+  if(!st.items?.length&&g.excludes?.length&&st.id!=='area')para('À ne pas additionner : '+g.excludes.join(' ; '),{size:7.8,color:C.muted});
+  d.y-=8;
+ }
+ d.ensure(30);d.rect(M,d.y-18,d.W-2*M,20,{color:C.ink});
+ d.text('TOTAL',M+8,d.y-11,{size:9,f:d.bold,color:C.white});const tot=`${kw(calc.totalW)} ÷ 240 V = ${calc.amps} A`;d.text(tot,d.W-M-8-d.width(tot,9,d.bold),d.y-11,{size:9,f:d.bold,color:C.lime});d.y-=30;
+ para(G.GUIDE_STEPS.total.plain,{size:8.2});
+ if(calc.warnings.length){d.y-=4;sectionTitle(d,'Points à corriger');for(const w of calc.warnings)para('• '+w,{size:8.2,color:rgb(.55,.35,.1)});}
+ d.y-=6;sectionTitle(d,'Autres règles à respecter');
+ for(const r of G.GUIDE_RULES){para(`${r.title} (${r.rule})`,{size:8.4,f:d.bold});para(r.plain,{size:8,color:C.muted});d.y-=2;}
+ d.y-=4;sectionTitle(d,'Références et avertissement');
+ for(const r of G.GUIDE_REFS)para('• '+r,{size:7.6,color:C.muted});
+ para(G.GUIDE_DISCLAIMER,{size:7.8,f:d.bold});
+ signature(d,user);
+ footers(d,'Mon Panneau · Note de calcul indicative — à valider par un maître électricien selon l’édition du Code en vigueur.');
  return d.pdf.save();
 }

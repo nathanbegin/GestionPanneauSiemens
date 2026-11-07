@@ -57,7 +57,8 @@ const sameSet=(a,b)=>a.length===b.length&&[...a].sort((x,y)=>x-y).every((v,i)=>v
 export function matchBreakers(unit,breakers,det={}){
  if(unit.kind==='other'||unit.amps.some(a=>a==null))return {exact:[],other:[]};
  const fam=det.family;
- const pool=breakers.filter(b=>b.kind===unit.kind&&(!fam||b.family===fam)&&!(b.neutre==='PoN'&&det.pon===false));
+ const okFam=det.accepts?.length?det.accepts:fam?[fam]:null;
+ const pool=breakers.filter(b=>b.kind===unit.kind&&(!okFam||okFam.includes(b.family))&&!(b.neutre==='PoN'&&det.pon===false));
  const ampsOk=b=>unit.kind==='quad'?b.amps[1]===unit.amps[1]&&sameSet([b.amps[0],b.amps[2]],[unit.amps[0],unit.amps[2]]):unit.kind==='tandem'?sameSet(b.amps,unit.amps):b.amps[0]===unit.amps[0];
  const fits=pool.filter(ampsOk);
  // Neutre enfichable en premier si le panneau en a une barre, sinon les modèles à fil.

@@ -104,6 +104,7 @@ export const FAMILIES={
  CH:{brand:'Cutler-Hammer',maker:'Eaton Canada',parent:'Eaton',name:'Cutler-Hammer CH',pitch:.75,accent:'#1f5fa8',body:'#a8784b',handle:'#7b5232',ink:'#fff8ee',mark:'CH'},
  LEV:{brand:'Leviton',maker:'Leviton Canada',name:'Leviton LP / LR / LS',pitch:1,accent:'#2d63a6',body:'#d7dbdd',handle:'#596066',ink:'#22282c',mark:'LB'},
  CBM:{brand:'Eaton',maker:'Eaton Canada',name:'Eaton CBM / CBL (boulonné)',pitch:1,accent:'#1f5fa8',body:'#171717',handle:'#2a2a2a',ink:'#f3f3f3',mark:'BA'},
+ GEN:{brand:'Generac',maker:'Generac',name:'Generac (inverseurs et HomeLink)',pitch:1,accent:'#e2621b',body:'#1c1c1c',handle:'#2e2e2e',ink:'#f3f3f3',mark:''},
  generic:{brand:'',maker:'',name:'Générique / autre marque',pitch:1,accent:'#6b7a72',body:'#262b28',handle:'#3a403c',ink:'#eef2ec',mark:''},
 };
 export const FAMILY_IDS=Object.keys(FAMILIES);

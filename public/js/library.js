@@ -19,7 +19,8 @@ export const sourceUrl=(lib,id)=>lib.sources?.[id]?.u||'';
 // Compatibilité d'un disjoncteur avec le panneau (famille, neutre enfichable, jumelés).
 export function compatibility(b,det){
  const issues=[];
- if(det.family&&b.family!==det.family)issues.push({level:'error',text:`Famille ${b.family} : incompatible avec un panneau ${det.family}.`});
+ const ok=det.accepts?.length?det.accepts:det.family?[det.family]:null;
+ if(ok&&!ok.includes(b.family))issues.push({level:'error',text:`Famille ${b.family} : incompatible avec ce panneau (accepte ${ok.join(', ')}).`});
  if(b.neutre==='PoN'&&det.pon===false)issues.push({level:'error',text:'Disjoncteur à neutre enfichable (PoN) : ce panneau n’a pas de barre PoN.'});
  if(b.neutre==='PoN'&&det.pon==null)issues.push({level:'warn',text:'Neutre enfichable (PoN) : vérifiez que le panneau possède une barre PoN.'});
  if((b.kind==='tandem'||b.kind==='quad')&&det.tandem===false)issues.push({level:'error',text:'Ce panneau n’accepte pas de disjoncteurs jumelés ou quad (circuits = espaces).'});
@@ -43,21 +44,27 @@ export function validStarts(panel,b,isFree){
 export async function modelPicker({current,onPick}){
  let lib;
  try{lib=await loadLibrary();}catch(e){toast(e.message,7000);return;}
- const state={family:current?.family||'',type:'',q:'',bus:'',showOld:false};
+ const state={family:current?.family||'',type:'',q:'',bus:'',showOld:false,showInfo:false};
  const grid=h('div',{class:'model-grid'});
  const count=h('span',{class:'small muted'});
  const fams=lib.families.map(f=>f.id);
  const chips=h('div',{class:'brand-chips'});
  const drawChips=()=>chips.replaceChildren(h('button',{type:'button',class:'chip'+(state.family?'':' on'),onclick:()=>{state.family='';drawChips();draw();}},'Toutes'),
   ...fams.map(id=>{const b=h('button',{type:'button',class:'chip'+(state.family===id?' on':''),onclick:()=>{state.family=id;drawChips();draw();}},brandBadge(id,{size:'xs'}),h('span',{text:lib.familyInfo[id]?.gamme?.split(' (')[0]||id}));return b;}));
- const types=[...new Set(lib.panels.filter(p=>p.designable).map(p=>p.type))];
+ const types=[...new Set(lib.panels.map(p=>p.type))];
  const typeSel=h('select',{'aria-label':'Type de panneau',onchange:e=>{state.type=e.target.value;draw();}},new Option('Tous les types',''),...types.map(t=>new Option(t,t)));
  const busSel=h('select',{'aria-label':'Ampérage',onchange:e=>{state.bus=e.target.value;draw();}},new Option('Tous les ampérages',''),...[...new Set(lib.panels.filter(p=>p.designable).map(p=>p.main||p.bus))].filter(Boolean).sort((a,b)=>a-b).map(a=>new Option(a+' A',a)));
  const search=h('input',{type:'search',placeholder:'Numéro de catalogue (ex. CQO140M200PC)…',oninput:e=>{state.q=e.target.value.trim().toUpperCase();draw();}});
- const old=h('label',{class:'check small'},h('input',{type:'checkbox',onchange:e=>{state.showOld=e.target.checked;draw();}}),'Inclure les générations précédentes');
+ const old=h('div',{class:'page-actions'},h('label',{class:'check small'},h('input',{type:'checkbox',onchange:e=>{state.showOld=e.target.checked;draw();}}),'Inclure les générations précédentes'),
+  h('label',{class:'check small'},h('input',{type:'checkbox',onchange:e=>{state.showInfo=e.target.checked;draw();}}),'Afficher aussi les produits sans espaces (inverseurs maison entière, boîtiers, trousses)'));
  let d;
  function card(p){
   const fam=familyOf(p.family),info=lib.familyInfo[p.family];
+  if(!p.designable){
+   return h('div',{class:'model-card info'},h('div',{class:'model-thumb noart'},brandBadge(p.family,{size:'sm'}),h('span',{class:'small',text:'Aucun espace de dérivation'})),
+    h('div',{class:'model-info'},h('div',{class:'row'},brandBadge(p.family,{size:'xs'}),h('span',{class:'badge',text:'Information'})),h('b',{text:p.cat}),h('span',{class:'small',text:`${info?.gamme||fam.name} · ${p.type}`}),
+     h('span',{class:'specs'},p.bus&&h('span',{text:`${p.bus} A`}),p.main&&h('span',{text:`Principal ${p.main} A`}),p.enveloppe&&h('span',{text:p.enveloppe})),p.note&&h('span',{class:'small muted',text:p.note})));
+  }
   // Miniature : dessin réel du panneau vide.
   const thumb=panelArt({panel:{name:p.cat,kind:p.main?'Principal':'Sous-panneau',positions:p.espaces,details:{family:p.family,mainAmps:p.main,modelId:p.cat,maxCircuits:p.circuits,modelInfo:p.type},circuits:blank(p.espaces)},showLabels:false});
   thumb.classList.add('thumb');
@@ -71,8 +78,8 @@ export async function modelPicker({current,onPick}){
     p.note&&h('span',{class:'small muted',text:p.note})));
  }
  function draw(){
-  const list=lib.panels.filter(p=>p.designable&&(!state.family||p.family===state.family)&&(!state.type||p.type===state.type)&&(!state.bus||String(p.main||p.bus)===state.bus)&&(!state.q||p.cat.includes(state.q))&&(state.showOld||p.statut!=='Génération précédente'))
-   .sort((a,b)=>(a.family+a.cat).localeCompare(b.family+b.cat));
+  const list=lib.panels.filter(p=>(p.designable||state.showInfo)&&(!state.family||p.family===state.family)&&(!state.type||p.type===state.type)&&(!state.bus||String(p.main||p.bus)===state.bus)&&(!state.q||p.cat.includes(state.q))&&(state.showOld||p.statut!=='Génération précédente'))
+   .sort((a,b)=>(b.designable-a.designable)||(a.family+a.cat).localeCompare(b.family+b.cat));
   count.textContent=`${list.length} modèle(s)`;
   grid.replaceChildren(...list.slice(0,60).map(card));
   if(list.length>60)grid.append(h('p',{class:'small muted',text:`… ${list.length-60} autres : précisez la recherche.`}));
@@ -91,7 +98,8 @@ export async function modelPicker({current,onPick}){
 const KIND_LABEL={single:'Unipolaires',double:'Bipolaires',triple:'Tripolaires',tandem:'Jumelés',quad:'Quads'};
 export function breakerPalette({lib,det,selected,onSelect}){
  const fam=det.family;
- const all=lib.breakers.filter(b=>!fam||b.family===fam);
+ const okFam=det.accepts?.length?det.accepts:fam?[fam]:null;
+ const all=lib.breakers.filter(b=>!okFam||okFam.includes(b.family));
  const state={kind:'',prot:'',amps:'',q:''};
  const list=h('div',{class:'palette-list'});
  const prots=[...new Set(all.map(b=>b.protection))];
@@ -120,7 +128,7 @@ export function breakerPalette({lib,det,selected,onSelect}){
  draw();
  return h('div',{class:'card side-card palette'},
   h('div',{class:'row-between'},h('h3',{text:'Bibliothèque de disjoncteurs'}),brandBadge(fam,{size:'xs'})),
-  h('p',{class:'small muted',text:fam?`${all.length} produits ${familyOf(fam).name}. Choisissez un disjoncteur, puis touchez une position en surbrillance sur le panneau.`:'Choisissez d’abord un modèle de panneau pour filtrer les disjoncteurs compatibles.'}),
+  h('p',{class:'small muted',text:fam?`${all.length} produits ${(okFam||[fam]).map(f=>familyOf(f).name).join(', ')}. Choisissez un disjoncteur, puis touchez une position en surbrillance sur le panneau.`:'Choisissez d’abord un modèle de panneau pour filtrer les disjoncteurs compatibles.'}),
   h('label',{class:'search'},h('span',{'aria-hidden':'true',text:'⌕'}),search),
   h('div',{class:'palette-filters'},kindSel,protSel,ampsSel),list);
 }

@@ -56,31 +56,60 @@ export function phaseBalance(circuits){
  return {L1:round(legs.L1),L2:round(legs.L2),imbalance:max?round((max-min)/max*100,0):0};
 }
 
-// Calcul de charge d'un logement unifamilial (règle 8-200 du CCÉ, simplifiée).
-// children : sous-panneaux alimentés par ce panneau (leurs charges s'ajoutent).
-export function dwellingCalc(circuits,{livingArea=0,children=[]}={}){
- const all=[...circuits,...children.flatMap(p=>p.circuits||[])].flatMap(c=>c.loads||[]);
- const sum=cat=>all.filter(l=>l.cat===cat).reduce((s,l)=>s+lw(l),0);
- const area=Math.max(0,Number(livingArea)||0);
- const lines=[];
- const basic=area?5000+1000*Math.ceil(Math.max(0,area-90)/90):0;
- lines.push({label:area?`Charge de base (${area} m²) : 5000 W pour 90 m² + 1000 W par 90 m² additionnels`:'Charge de base : indiquez la superficie habitable',w:basic});
- const bb=sum('heating'),heatBB=Math.min(bb,10000)+0.75*Math.max(0,bb-10000);
- const heat=heatBB+sum('heating100'),cool=sum('cooling');
- // Chauffage et climatisation non simultanés : on retient le plus élevé (règle 8-106 3)).
- if(heat||cool)lines.push({label:`Chauffage (${round(bb/1000)} kW plinthes : 100 % des 10 premiers kW, 75 % au-delà${sum('heating100')?' + fournaise 100 %':''}) ou climatisation (100 %) : le plus élevé`,w:Math.max(heat,cool)});
- const rangeW=sum('range');
- const range=rangeW?6000+0.4*Math.max(0,rangeW-12000):0;
- if(rangeW)lines.push({label:`Cuisinière ${round(rangeW/1000)} kW : 6000 W + 40 % au-delà de 12 kW`,w:range});
- const w100=sum('water100');if(w100)lines.push({label:'Chauffe-eau instantané, piscine, spa : 100 %',w:w100});
- const ev=sum('ev');if(ev)lines.push({label:'Bornes de recharge : 100 % (sauf gestionnaire de charge)',w:ev});
+// Calcul de charge d'un logement unifamilial (règle 8-200 du CCÉ, simplifiée), détaillé étape par étape.
+// Chaque étape indique la règle, la formule, les appareils pris en compte et ceux qui sont exclus.
+// children : sous-panneaux alimentés par ce panneau (leurs charges font partie du même logement).
+export function dwellingCalc(circuits,{livingArea=0,basementArea=0,children=[],panelTag=''}={}){
+ const items=[];
+ const collect=(cs,tag)=>{for(const c of cs)for(const l of c.loads||[])items.push({name:l.qty>1?`${l.qty} × ${l.name}`:l.name,w:lw(l),cat:l.cat,cont:l.cont,where:[tag,designation(c)].filter(Boolean).join(' · ')});};
+ collect(circuits,panelTag);for(const p of children)collect(p.circuits||[],p.tag||p.name);
+ const of=cat=>items.filter(i=>i.cat===cat);
+ const sum=cat=>of(cat).reduce((t,i)=>t+i.w,0);
+ const kw=w=>(Math.round(w/100)/10).toLocaleString('fr-CA')+' kW';
+ const above=Math.max(0,Number(livingArea)||0),basement=Math.max(0,Number(basementArea)||0);
+ const area=Math.round((above+0.75*basement)*10)/10;
+ const steps=[];
+ // 1. Superficie habitable (règle 8-110).
+ steps.push({id:'area',title:'Superficie habitable',rule:'CCÉ 8-110',
+  formula:basement?`${above} m² (rez-de-chaussée et étages) + 75 % × ${basement} m² (sous-sol) = ${area} m²`:`${above} m² (rez-de-chaussée et étages)`,value:area,unit:'m²',w:0,items:[]});
+ // 2. Charge de base.
+ const extra=Math.max(0,Math.ceil((area-90)/90));
+ const basic=area?5000+1000*extra:0;
+ steps.push({id:'basic',title:'Charge de base',rule:'CCÉ 8-200 1) a) i) et ii)',
+  formula:area?`5000 W (90 premiers m²)${extra?` + ${extra} × 1000 W (tranches de 90 m² additionnelles)`:''} = ${basic} W`:'Indiquez la superficie habitable pour calculer la charge de base.',w:basic,
+  items:of('basic'),itemsNote:'Couvert par la charge de base, non additionné : éclairage, prises, petits appareils et appareils de 1500 W ou moins.'});
+ // 3. Chauffage et climatisation.
+ const bb=sum('heating'),heat100=sum('heating100'),cool=sum('cooling');
+ const heatBB=Math.min(bb,10000)+0.75*Math.max(0,bb-10000);
+ const heat=heatBB+heat100,keep=Math.max(heat,cool);
+ if(heat||cool)steps.push({id:'heat',title:'Chauffage ou climatisation (le plus élevé)',rule:'CCÉ 8-200 1) a) iii), 8-106 3) et section 62',
+  formula:[bb?`plinthes ${kw(bb)} → 100 % de ${kw(Math.min(bb,10000))}${bb>10000?` + 75 % de ${kw(bb-10000)}`:''} = ${kw(heatBB)}`:'',heat100?`fournaise / accumulateur ${kw(heat100)} à 100 %`:'',`chauffage retenu ${kw(heat)}`,cool?`climatisation ${kw(cool)} à 100 %`:'',`on garde le plus élevé : ${kw(keep)}`].filter(Boolean).join(' ; '),
+  w:keep,items:[...of('heating'),...of('heating100'),...of('cooling')],
+  excluded:heat&&cool?[{name:heat>=cool?'Climatisation (non simultanée avec le chauffage)':'Chauffage (non simultané avec la climatisation)',w:Math.min(heat,cool)}]:[]});
+ // 4. Cuisinière.
+ const rangeW=sum('range'),range=rangeW?6000+0.4*Math.max(0,rangeW-12000):0;
+ if(rangeW)steps.push({id:'range',title:'Cuisinière',rule:'CCÉ 8-200 1) a) iv)',formula:`6000 W${rangeW>12000?` + 40 % × (${kw(rangeW)} − 12 kW)`:` (cuisinière de ${kw(rangeW)}, 12 kW ou moins)`} = ${Math.round(range)} W`,w:range,items:of('range'),
+  itemsNote:of('range').length>1?'Table de cuisson et four encastré additionnés et traités comme une seule cuisinière.':''});
+ // 5. Chauffe-eau instantané, piscine, spa.
+ const w100=sum('water100');
+ if(w100)steps.push({id:'water100',title:'Chauffe-eau instantané, piscine, spa, bain de vapeur',rule:'CCÉ 8-200 1) a) v)',formula:`100 % de ${kw(w100)}`,w:w100,items:of('water100')});
+ // 6. Bornes de recharge.
+ const ev=sum('ev');
+ if(ev)steps.push({id:'ev',title:'Bornes de recharge de véhicule électrique',rule:'CCÉ 8-200 1) a) vi), 8-106 11) et section 86',formula:`100 % de ${kw(ev)}`,w:ev,items:of('ev'),
+  itemsNote:'Avec un système de gestion de l’énergie (EVEMS) qui limite la borne, la charge retenue peut être réduite au réglage du système.'});
+ // 7. Autres charges de plus de 1500 W.
  const other=sum('other');
- if(other){const w=rangeW?0.25*other:Math.min(other,6000)+0.25*Math.max(0,other-6000);lines.push({label:rangeW?`Autres charges > 1500 W (${round(other/1000)} kW) : 25 % (cuisinière présente)`:`Autres charges > 1500 W (${round(other/1000)} kW) : 100 % jusqu’à 6000 W, 25 % au-delà`,w});}
- const total=lines.reduce((s,l)=>s+l.w,0);
+ if(other){const w=rangeW?0.25*other:Math.min(other,6000)+0.25*Math.max(0,other-6000);
+  steps.push({id:'other',title:'Autres appareils de plus de 1500 W',rule:'CCÉ 8-200 1) a) vii)',formula:rangeW?`25 % de ${kw(other)} (une cuisinière est prévue) = ${Math.round(w)} W`:`100 % des 6 premiers kW${other>6000?` + 25 % de ${kw(other-6000)}`:''} (aucune cuisinière) = ${Math.round(w)} W`,w,items:of('other')});}
+ const total=steps.reduce((t,x)=>t+x.w,0);
  const amps=total/240;
  const minService=area>=80?100:60;
- const recommended=SERVICE_SIZES.find(s=>s>=Math.max(amps,minService))??null;
- return {lines:lines.map(l=>({...l,w:Math.round(l.w)})),totalW:Math.round(total),amps:round(amps),minService,recommended};
+ const recommended=SERVICE_SIZES.find(v=>v>=Math.max(amps,minService))??null;
+ const warnings=[];
+ for(const i of of('basic'))if(i.w>1500)warnings.push(`« ${i.name} » (${i.w} W, ${i.where}) dépasse 1500 W : classez-le dans une autre catégorie.`);
+ if(!area)warnings.push('Superficie habitable manquante : la charge de base vaut 0.');
+ const lines=steps.filter(x=>x.id!=='area').map(x=>({label:`${x.title} — ${x.formula}`,w:Math.round(x.w)}));
+ return {steps:steps.map(x=>({...x,w:Math.round(x.w)})),lines,area,totalW:Math.round(total),amps:round(amps),minService,recommended,warnings,items};
 }
 
 // Bilan complet d'un panneau.
@@ -95,8 +124,8 @@ export function panelReport(panel,{children=[]}={}){
  const childAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c).watts,0),0)/240;
  balance.L1=round(balance.L1+childAmps);balance.L2=round(balance.L2+childAmps);
  const mainAmps=Number(det.mainAmps)||null;
- const calc=dwellingCalc(circuits,{livingArea:det.livingArea,children});
- const isDwelling=panel.kind==='Principal'&&Number(det.livingArea)>0;
+ const calc=dwellingCalc(circuits,{livingArea:det.livingArea,basementArea:det.basementArea,children,panelTag:panel.tag||''});
+ const isDwelling=panel.kind==='Principal'&&calc.area>0;
  const designAmps=isDwelling?calc.amps:Math.max(balance.L1,balance.L2);
  const percent=mainAmps&&designAmps?round(designAmps/mainAmps*100,0):null;
  const issues=[];

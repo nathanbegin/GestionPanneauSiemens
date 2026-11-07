@@ -452,3 +452,21 @@ dialog.picker{width:min(1100px,calc(100vw - 24px))}
 .feeds-tag{display:inline-block;margin-top:3px;font-size:12px;font-weight:600;color:#245c8a}
 .feeds-tag.todo{color:#8a6a1f}
 .fed-circuit{display:block}
+.model-card.info{opacity:.9;cursor:default}.model-thumb.noart{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:120px;color:var(--muted)}
+/* ---------- Guide du calcul de charge ---------- */
+.g-step{border-top:1px solid var(--line);padding-top:6px}
+.g-step h2{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.g-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g-list{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.g-list.inc{border-left:4px solid #3f9a62}.g-list.exc{border-left:4px solid #c9944b}
+.g-list ul{margin:6px 0 0;padding-left:18px}.g-list li{font-size:14px}
+.g-tip{background:#eef5ef;border-radius:8px;padding:8px 12px;font-size:14px}
+.g-rule{padding:14px;margin:8px 0}.g-rule .badge{margin-left:8px}.g-rule p{margin:6px 0 0}
+.calc-step{border-top:1px solid var(--line);padding:8px 0}
+.calc-step summary{display:flex;justify-content:space-between;gap:10px;cursor:pointer;list-style:none}
+.calc-step summary::-webkit-details-marker{display:none}
+.calc-step summary b{flex:1}
+.calc-step .why{font-size:13px;color:#3e5149;margin:6px 0}
+.calc-step ul{margin:4px 0 0;padding-left:18px;font-size:13px}
+@media (max-width:720px){.g-cols{grid-template-columns:1fr}}
+.doc .cta-band p{color:#c8d6cf}

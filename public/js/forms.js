@@ -56,7 +56,8 @@ export function panelFields(panel={},siblings=[],{library=false}={}){
    field('Marque',input('brand',d.brand,{maxlength:60,placeholder:'Ex. Siemens, Square D, Eaton',list:'brands'})),
    field('Modèle',input('model',d.model,{maxlength:60,placeholder:'Ex. EQ, QO, BR'})),
    field('Tension',select('voltage',voltages,d.voltage||voltages[0])),
-   field('Superficie habitable (m²)',input('livingArea',d.livingArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 140'}),{hint:'Panneau principal d’un logement : sert au calcul de charge (règle 8-200).'}),
+   field('Superficie hors sol (m²)',input('livingArea',d.livingArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 140'}),{hint:'Rez-de-chaussée et étages, mesurés par l’extérieur (calcul de charge, règle 8-110).'}),
+   field('Superficie du sous-sol (m²)',input('basementArea',d.basementArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 80'}),{hint:'Compte à 75 % (parties de plus de 1,8 m de hauteur).'}),
    field('État',select('state',PANEL_STATES,d.state||'Existant'),{hint:'Planifié : panneau à construire ou à modifier.'}),
    h('datalist',{id:'brands'},['Siemens','Square D','Eaton','Cutler-Hammer','Schneider Electric','Federal Pioneer','Stab-Lok','Westinghouse','Commander','GE','Leviton'].map(b=>h('option',{value:b}))))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Alimentation'}),h('div',{class:'fields'},
@@ -111,7 +112,7 @@ function fedCircuitInput(fedSelect,value){
 }
 export function panelPayload(form){
  const f=formData(form);
- return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),state:f.state}},positions:Number(f.positions)};
+ return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),basementArea:f.basementArea===''||f.basementArea==null?null:Number(f.basementArea),state:f.state}},positions:Number(f.positions)};
 }
 export function panelDialog({siblings=[],onSave,library=false,initial={},title='Nouveau panneau',eyebrow='Étape 2 · un panneau dans ce site'}){
  const e=err();
@@ -233,7 +234,8 @@ function planningSection(c,panel,markDirty,root,lib){
  // Disjoncteur du catalogue : règle format, calibre, protection et référence.
  // Disjoncteurs de la bibliothèque (famille du panneau), plaçables depuis la fiche : simple, bipolaire, tripolaire, jumelé.
  const KIND_FMT={single:'single',double:'double',triple:'triple',tandem:'tandem'};
- const choices=lib?lib.breakers.filter(b=>(!fam||b.family===fam)&&KIND_FMT[b.kind]):[];
+ const okFam=panel.details?.accepts?.length?panel.details.accepts:fam?[fam]:null;
+ const choices=lib?lib.breakers.filter(b=>(!okFam||okFam.includes(b.family))&&KIND_FMT[b.kind]):[];
  const pick=h('select',{'aria-label':'Disjoncteur du catalogue'},new Option(lib?'— Choisir dans la bibliothèque —':'Bibliothèque non disponible',''),...choices.map(b=>new Option(`${b.cat} · ${b.label}${b.protection!=='Standard'?' · '+b.protection:''}`,b.cat)));
  pick.disabled=!choices.length;
  if(c.breakerRef&&choices.some(b=>b.cat===c.breakerRef))pick.value=c.breakerRef;
