@@ -50,7 +50,7 @@ export function brandBadge(familyId,{size='md'}={}){
 }
 
 // circuits vides = obturateurs (aucun calibre, aucune référence, aucune description).
-export const isEmptySlot=c=>!c.amps&&!c.breakerRef&&!c.label&&c.status!=='Libre'&&!(c.loads&&c.loads.length);
+export const isEmptySlot=c=>!!c.vacant||!c.amps&&!c.breakerRef&&!c.label&&c.status!=='Libre'&&!(c.loads&&c.loads.length);
 
 /**
  * opts : {panel, breakersByCat?, highlight?:Set<number> (positions de départ valides), selectedId?, onCircuit(id), onPosition(p)}
@@ -179,7 +179,7 @@ function drawBreaker(g,{c,x,y,w,h,right,fam,rh,yOf,meta,showLabels}){
  const ty=by+bh/2+(showLabels&&bh>=18?-1:3);
  const room=Math.max(0,textEnd-textStart);
  if(showLabels){
-  const label=c.status==='Libre'?'LIBRE':c.label||'À identifier';
+  const label=c.vacant?'ESPACE INUTILISÉ':c.status==='Libre'?'LIBRE':c.label||'À identifier';
   g.append(s('text',{x:right?textEnd:textStart,y:ty+(bh>=18?0:0),'text-anchor':right?'end':'start','font-size':fs,'font-weight':600,fill:fam.ink,opacity:c.label?1:.7},fit(label,room,fs)));
   if(bh>=18)g.append(s('text',{x:right?textEnd:textStart,y:ty+9,'text-anchor':right?'end':'start','font-size':6.2,fill:fam.ink,opacity:.6},fit(`${designation(c)}${c.breakerRef?' · '+c.breakerRef:''}`,room,6.2)));
  }

@@ -27,3 +27,29 @@ test('PDF rapport, aide-mémoire et étiquettes',async()=>{
  for(const kind of ['report','door']){const b=await buildReport({kind,user,site,panels:[{panel,fedFromLabel:''},{panel:{...panel,id:'q'},fedFromLabel:'P-1'}],version:'test'});assert.equal(Buffer.from(b.slice(0,5)).toString(),'%PDF-');}
  const l=await buildLabels({site,panel,fedFromLabel:''});assert.ok(l.length>1000);
 });
+
+import {bulkApply as bulk} from '../public/model.js';
+import {blank as blankPanel,validate as validatePanel} from '../public/model.js';
+test('actions groupées sur les circuits',()=>{
+ const c=blankPanel(6);c[0].label='Cuisine';c[0].amps=20;c[0].loads=[];
+ let r=bulk(c,['1','3'],{type:'vacant'});
+ assert.equal(r[0].vacant,true);assert.equal(r[0].label,'');assert.equal(r[0].status,'Libre');assert.equal(r[0].amps,null);
+ validatePanel(r,{positions:6});
+ r=bulk(r,['1'],{type:'set',patch:{amps:15,status:'Identifié'}});assert.equal(r[0].vacant,undefined);assert.equal(r[0].amps,15);
+ r=bulk(r,['2','4'],{type:'set',patch:{room:'Garage',protection:'DDFT'}});assert.equal(r[1].room,'Garage');assert.equal(r[3].protection,'DDFT');
+ r=bulk(r,['2'],{type:'free'});assert.equal(r[1].status,'Libre');assert.equal(r[1].room,'Garage');
+ r=bulk(r,['2'],{type:'clear'});assert.equal(r[1].room,'');assert.equal(r[1].status,'À confirmer');
+ assert.throws(()=>bulk(r,['1'],{type:'set',patch:{amps:17}}));
+ validatePanel(r,{positions:6});
+});
+
+import {brandTheme,decodeLogo} from '../api/_lib/pdf.js';
+test('image de marque des PDF',()=>{
+ const t=brandTheme({primary:'#ffd200',accent:'#222222'});
+ assert.ok(t.headText.red<.2,'texte foncé sur en-tête clair');
+ const d=brandTheme({primary:'#0b3d91'});assert.equal(d.headText.red,1);
+ assert.equal(brandTheme(null).headBg,brandTheme({}).headBg);
+ assert.equal(decodeLogo(''),null);
+ assert.throws(()=>decodeLogo('data:image/png;base64,'+Buffer.from('nope').toString('base64')));
+ const png=Buffer.from('89504e470d0a1a0a','hex');assert.equal(decodeLogo('data:image/png;base64,'+png.toString('base64')).type,'png');
+});

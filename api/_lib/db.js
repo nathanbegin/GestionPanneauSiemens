@@ -67,6 +67,9 @@ async function ensureSchema(sql){
  await sql`CREATE TABLE IF NOT EXISTS app_stripe_events(id text PRIMARY KEY, type text NOT NULL, received_at timestamptz NOT NULL DEFAULT now())`;
  await sql`CREATE TABLE IF NOT EXISTS app_admin_audit(id bigserial PRIMARY KEY, admin_email text NOT NULL, action text NOT NULL, target text NOT NULL DEFAULT '', details jsonb NOT NULL DEFAULT '{}'::jsonb, at timestamptz NOT NULL DEFAULT now())`;
  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS stripe_customer text`;
+ await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS branding jsonb NOT NULL DEFAULT '{}'::jsonb`;
+ await sql`CREATE TABLE IF NOT EXISTS app_ai_scans(id bigserial PRIMARY KEY, user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, model text NOT NULL, input_tokens integer NOT NULL DEFAULT 0, output_tokens integer NOT NULL DEFAULT 0, ok boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now())`;
+ await sql`CREATE INDEX IF NOT EXISTS app_ai_scans_user ON app_ai_scans(user_id, created_at)`;
  const {seedPlans}=await import('./plans.js');
  await seedPlans(sql);
 }

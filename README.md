@@ -39,6 +39,16 @@ Compte ─┬─ Site (adresse, client, notes)
 - **Synchronisation** : enregistrement automatique, contrôle de révision (aucun écrasement silencieux entre deux appareils).
 - **PWA** installable (manifeste + service worker) et **applications natives** iOS/Android (Capacitor) dans `mobile/`.
 
+## Ajout par photo (IA), actions groupées et PDF à votre image (v2.6)
+
+- **Ajout de panneau par photo (IA)** — forfaits payants. Sur la page d'un site : « 📷 Ajouter par photo (IA) ». Photos du panneau ouvert, de l'étiquette du fabricant et du répertoire, ou fichier récapitulatif (PDF, CSV, texte). L'IA lit la marque, la gamme, le principal, le nombre de positions et chaque disjoncteur (position, pôles, jumelé, calibre, DDFT/anti-arc, désignation). L'utilisateur confirme l'identification, voit le panneau se construire disjoncteur par disjoncteur, corrige au besoin, puis confirme « c'est la configuration en place » avant la création. Les circuits peu sûrs restent « À confirmer ».
+  - Variables Vercel : `OPENAI_API_KEY` (obligatoire), `OPENAI_MODEL` (défaut `gpt-6.1-terra`, le modèle d'OpenAI dédié au raisonnement visuel, 1 $ / 5 $ US par million de jetons ; `gpt-6-astra` pour les cas difficiles), `OPENAI_IMAGE_DETAIL` (défaut `high` ; `original` pour les très petites étiquettes).
+  - Quota : 100 analyses par mois (forfaits Électricien), 20 (autres forfaits payants) ; réglable par forfait avec `features.aiScans` dans la console. Journal dans `app_ai_scans` (jetons consommés). Les photos ne sont pas conservées (`store:false`).
+  - Photos réduites à 2000 px dans le navigateur ; 6 fichiers et 3 Mo au total par analyse.
+- **Actions groupées** (onglets Panneau et Nomenclature) : « ☑ Sélection multiple », sélection rapide (filtrés, positions vides, à confirmer), puis espace inutilisé (aucun disjoncteur), disjoncteur libre, statut, calibre, protection, usage, pièce ou effacement.
+- **PDF à l'image de l'entreprise** (forfaits avec `branding`) : dans « Mon compte », logo (PNG/JPEG redimensionné), couleur principale, couleur d'accent et pied de page, appliqués à tous les PDF. Le contraste est ajusté automatiquement (texte foncé sur en-tête clair).
+- **Entrée électrique** : calibre, matériau et type des conducteurs entre le point de raccordement d'Hydro-Québec et le panneau, avec vérification indicative.
+
 ## Generac, calcul de charge expliqué et note de calcul (v2.5)
 
 - **Generac** (`api/_data/generac.js`, sources : fiches officielles HomeLink 0L1648-G et 6377, pages produit Generac, distributeurs pour les modèles abandonnés) : HomeLink 30 A (6852, 6853, 6854) et 50 A (9854, 9855) acceptant les disjoncteurs 1" Siemens, Eaton et Square D ; inverseurs manuels 6377, 6376, 6378 ; inverseurs automatiques avec centre de distribution RXG16EZA1, RXG16EZA1W, RXG16EZA3 ; inverseurs automatiques maison entière RXSW/RXSC (dont RXSW200A3CUL approuvé au Canada) et trousse 6869, affichés à titre informatif (aucun espace de dérivation).

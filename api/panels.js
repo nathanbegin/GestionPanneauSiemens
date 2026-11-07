@@ -7,6 +7,9 @@ import {library,findPanel,panelSnapshot} from './_lib/library.js';
 import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
+import {scanPanel,aiAllowance,aiConfigured,aiModel} from './_lib/ai.js';
+import {scanToPanel} from '../public/aiscan.js';
+import {rateLimit,recordAttempt} from './_lib/auth.js';
 
 function checkPositions(v){
  const n=Number(v);
@@ -44,6 +47,28 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   if(!await hasLibrary(sql,user))throw new HttpError(402,'La bibliothèque de produits est incluse dans les forfaits Électricien.',{quota:true});
   res.setHeader('Cache-Control','private, max-age=3600');
   return res.status(200).json(library());
+ }
+ // Ajout de panneau assisté par IA : statut (GET) et analyse de photos / fichiers (POST).
+ if(req.query?.action==='scan'){
+  const isAdmin=adminEmails().includes(user.email);
+  const e=await entitlement(sql,user.id);
+  const allow=aiAllowance(e,isAdmin);
+  const [{n:used}]=await sql`SELECT count(*)::int AS n FROM app_ai_scans WHERE user_id=${user.id} AND ok AND created_at>=date_trunc('month',now())`;
+  const status={configured:aiConfigured(),allowed:allow.allowed,monthly:allow.monthly,used,model:aiModel()};
+  if(req.method==='GET')return res.status(200).json(status);
+  if(req.method!=='POST')throw new HttpError(405,'Méthode non permise.');
+  if(!allow.allowed)throw new HttpError(402,'L’ajout de panneau par photo (IA) est inclus dans les forfaits payants.',{quota:true});
+  if(allow.monthly!=null&&used>=allow.monthly)throw new HttpError(402,`Vous avez utilisé vos ${allow.monthly} analyses par IA ce mois-ci.`,{quota:true});
+  await rateLimit(sql,'ai:'+user.id,6,5);
+  await recordAttempt(sql,'ai:'+user.id);
+  const data=body(req);
+  let out;
+  try{out=await scanPanel({files:data.files,hint:data.hint||{}});}
+  catch(x){await sql`INSERT INTO app_ai_scans(user_id,model,ok) VALUES(${user.id},${aiModel()},false)`;throw x;}
+  await sql`INSERT INTO app_ai_scans(user_id,model,input_tokens,output_tokens) VALUES(${user.id},${out.model},${out.usage.input},${out.usage.output})`;
+  if(!out.scan.is_panel)return res.status(200).json({notPanel:true,summary:out.scan.summary||'',warnings:out.scan.warnings||[],used:used+1,monthly:allow.monthly});
+  const proposal=check(()=>scanToPanel(out.scan));
+  return res.status(200).json({scan:out.scan,proposal,model:out.model,used:used+1,monthly:allow.monthly});
  }
  const id=req.query?.id?String(req.query.id):'';
  if(id&&!isUuid(id))throw new HttpError(404,'Panneau introuvable.');

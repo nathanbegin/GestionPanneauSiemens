@@ -8,13 +8,14 @@ import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
 import {GUIDE_STEPS,GUIDE_DISCLAIMER} from '../loadguide.js';
 import {panelArt,isEmptySlot} from './panelart.js';
 import {loadLibrary,breakerPalette,validStarts,compatibility} from './library.js';
-import {placeBreaker} from '../model.js';
+import {placeBreaker,bulkApply,ampsList,protections,usages} from '../model.js';
 import {assignDialog} from './assign.js';
 import {linkedChild} from './feeds.js';
 import {breakerUnits} from '../units.js';
 import {panelDialog} from './forms.js';
 
-const statusClass=c=>c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
+const statusClass=c=>c.vacant?'free vacant':c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
+const shortText=c=>c.vacant?'Espace inutilisé':c.status==='Libre'?'Libre':c.label||'';
 const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
 
 export async function panelView({id,tab='panel',ctx}){
@@ -25,7 +26,7 @@ export async function panelView({id,tab='panel',ctx}){
  // Bibliothèque de produits (abonnés seulement).
  const lib=planning?await loadLibrary().catch(()=>null):null;
  let saving=Promise.resolve();
- const state={tab:tabNames[tab]?tab:'panel',q:'',status:'',tag:'',place:null};
+ const state={tab:tabNames[tab]?tab:'panel',q:'',status:'',tag:'',place:null,select:null};
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
 
  const root=h('div',{class:'container'});
@@ -77,6 +78,7 @@ export async function panelView({id,tab='panel',ctx}){
   return c=>(!state.status||c.status===state.status||(state.status==='À confirmer'&&c.status==='Non visible'))&&(!q||searchable(c).includes(q))&&(!state.tag||allTags(c).includes(state.tag));
  }
  function openCircuit(cid){
+  if(state.select){state.select.has(cid)?state.select.delete(cid):state.select.add(cid);renderBody();return;}
   const order=sortCircuits(panel.circuits).map(c=>c.id);
   const editor=circuitEditor({panel,id:cid,order,planning,lib,feeds:{siblings,createSubpanel,onChange:()=>{renderBody();}},onSave:async circuits=>{
    const p=await persist({circuits});
@@ -97,9 +99,9 @@ export async function panelView({id,tab='panel',ctx}){
   const list=sortCircuits(panel.circuits).filter(match);
   container.replaceChildren(...(list.length?list.map(c=>{
    const meta=h('span',{class:'meta'},c.amps?c.amps+' A':'— A',h('small',{class:'st-'+statusClass(c),text:c.status}));
-   return h('button',{type:'button',class:'circuit-card card '+statusClass(c),onclick:()=>openCircuit(c.id)},
+   return h('button',{type:'button',class:'circuit-card card '+statusClass(c)+(state.select?.has(c.id)?' selected':''),'aria-pressed':state.select?String(state.select.has(c.id)):null,onclick:()=>openCircuit(c.id)},
     h('span',{class:'pos',text:designation(c)}),
-    h('span',{class:'txt'},h('strong',{text:c.status==='Libre'?'Libre':c.label||'À identifier — touchez pour décrire'}),h('small',{text:[c.room,c.usage!=='Autre'?c.usage:'',c.protection,c.breakerRef].filter(Boolean).join(' · ')||'—'}),c.exceptions&&h('span',{class:'ex',text:'⚠ '+c.exceptions}),(()=>{const ch=linkedChild(panel,c,siblings);return ch?h('span',{class:'feeds-tag',text:'⚡ Alimente '+panelTitle(ch)}):c.usage==='Sous-panneau'?h('span',{class:'feeds-tag todo',text:'⚡ Sous-panneau à lier'}):null;})()),
+    h('span',{class:'txt'},h('strong',{text:shortText(c)||'À identifier — touchez pour décrire'}),h('small',{text:[c.room,c.usage!=='Autre'?c.usage:'',c.protection,c.breakerRef].filter(Boolean).join(' · ')||'—'}),c.exceptions&&h('span',{class:'ex',text:'⚠ '+c.exceptions}),(()=>{const ch=linkedChild(panel,c,siblings);return ch?h('span',{class:'feeds-tag',text:'⚡ Alimente '+panelTitle(ch)}):c.usage==='Sous-panneau'?h('span',{class:'feeds-tag todo',text:'⚡ Sous-panneau à lier'}):null;})()),
     meta);
   }):[h('p',{class:'empty-state muted',text:'Aucun circuit ne correspond à la recherche.'})]));
  }
@@ -112,8 +114,8 @@ export async function panelView({id,tab='panel',ctx}){
   for(const c of panel.circuits){
    const start=c.slots[0],n=slotPos(start),side=n%2===0?2:1;
    const linked=c.slots.length>2;
-   const b=h('button',{type:'button',class:`breaker ${statusClass(c)}${side===2?' even':''}${linked?' linked':''}${filtering?(match(c)?' match':' dimmed'):''}`,'aria-label':`${designation(c)} : ${c.label||'à identifier'}, ${c.amps??'?'} A`,onclick:()=>openCircuit(c.id)},
-    h('span',{class:'num',text:designation(c)}),h('span',{class:'lever',text:c.amps??'?'}),h('span',{class:'short',text:c.status==='Libre'?'Libre':c.label||'—'}),h('i',{class:'dot'}));
+   const b=h('button',{type:'button',class:`breaker ${statusClass(c)}${side===2?' even':''}${linked?' linked':''}${filtering?(match(c)?' match':' dimmed'):''}${state.select?.has(c.id)?' selected':''}`,'aria-label':`${designation(c)} : ${c.label||'à identifier'}, ${c.amps??'?'} A`,onclick:()=>openCircuit(c.id)},
+    h('span',{class:'num',text:designation(c)}),h('span',{class:'lever',text:c.amps??'?'}),h('span',{class:'short',text:shortText(c)||'—'}),h('i',{class:'dot'}));
    if(showLoads){
     // Phase et taux de charge du circuit.
     const r=circuitLoad(c);
@@ -133,7 +135,7 @@ export async function panelView({id,tab='panel',ctx}){
     h('div',{class:'rail-labels'},h('span',{text:'IMPAIRS'}),h('span',{text:'PAIRS'})),
     grid,
     h('div',{class:'panel-foot'},h('span',{text:(det.voltage||'').toUpperCase()}),h('span',{text:panel.positions+' POSITIONS'}))),
-   h('p',{class:'panel-tip',text:'Touchez un disjoncteur pour ouvrir sa fiche.'}));
+   h('p',{class:'panel-tip',text:state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche.'}));
  }
  const legend=()=>h('div',{class:'legend'},h('span',{},h('i',{style:{background:'#659972'}}),'Identifié'),h('span',{},h('i',{style:{background:'#c6a66f'}}),'À confirmer'),h('span',{},h('i',{style:{background:'#adb5a8'}}),'Libre'));
 
@@ -142,17 +144,47 @@ export async function panelView({id,tab='panel',ctx}){
    const listBox=h('div',{class:'circuit-list'});
    const cabBox=h('div');
    const refresh=()=>{cabBox.replaceChildren(cabinet());circuitList(listBox);};
-   body.replaceChildren(h('div',{class:'workspace'},cabBox,h('section',{'aria-label':'Liste des circuits'},filters(refresh),listBox,legend())));
+   body.replaceChildren(h('div',{class:'workspace'},cabBox,h('section',{'aria-label':'Liste des circuits'},bulkBar(),filters(refresh),listBox,legend())));
    refresh();
   }else if(state.tab==='list'){
    const listBox=h('div',{class:'circuit-list'});
-   body.replaceChildren(h('div',{class:'list-wide'},filters(()=>circuitList(listBox)),listBox,legend()));
+   body.replaceChildren(h('div',{class:'list-wide'},bulkBar(),filters(()=>circuitList(listBox)),listBox,legend()));
    circuitList(listBox);
   }else if(state.tab==='plan')renderPlan();
   else if(state.tab==='docs')renderDocs();
   else renderInfo();
  }
 
+ // ---------- Actions groupées ----------
+ function bulkBar(){
+  if(!state.select)return h('div',{class:'bulk-toggle'},h('button',{type:'button',onclick:()=>{state.select=new Set();renderBody();}},'☑ Sélection multiple'),h('span',{class:'small muted',text:'Modifier plusieurs circuits d’un coup (espaces inutilisés, libres, calibre, pièce…).'}));
+  const sel=state.select,n=sel.size;
+  const pick=(label,fn)=>h('button',{type:'button',class:'ghost small-btn',onclick:()=>{fn();renderBody();}},label);
+  const visible=()=>sortCircuits(panel.circuits).filter(filtered());
+  const chooser=(label,options,key,map=v=>v)=>{const s=h('select',{'aria-label':label,disabled:!n,onchange:async e=>{if(e.target.value==='')return;const v=map(e.target.value);e.target.value='';await apply({type:'set',patch:{[key]:v}},`${label} : ${v??'—'}`);}},new Option(label+'…',''),...options.map(o=>Array.isArray(o)?new Option(o[1],o[0]):new Option(o,o)));return s;};
+  const room=h('input',{type:'text',maxlength:80,placeholder:'Pièce…','aria-label':'Pièce pour la sélection',disabled:!n,list:'bulkRooms'});
+  const rooms=[...new Set(panel.circuits.map(c=>c.room).filter(Boolean))];
+  return h('div',{class:'bulk-bar card',role:'region','aria-label':'Actions groupées'},
+   h('div',{class:'bulk-head'},h('b',{text:n?`${n} circuit${n>1?'s':''} sélectionné${n>1?'s':''}`:'Aucun circuit sélectionné'}),
+    h('div',{class:'bulk-pick'},pick('Tout (filtrés)',()=>visible().forEach(c=>sel.add(c.id))),pick('Positions vides',()=>panel.circuits.filter(isEmptySlot).forEach(c=>sel.add(c.id))),pick('À confirmer',()=>panel.circuits.filter(c=>c.status==='À confirmer'&&!c.vacant).forEach(c=>sel.add(c.id))),pick('Aucun',()=>sel.clear()),
+     h('button',{type:'button',onclick:()=>{state.select=null;renderBody();}},'Terminer'))),
+   h('div',{class:'bulk-actions'},
+    h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'vacant'},'Espace inutilisé (aucun disjoncteur)',true)},'▭ Espace inutilisé'),
+    h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'free'},'Disjoncteur libre',true)},'○ Disjoncteur libre'),
+    chooser('Statut',states,'status'),
+    chooser('Calibre',[['none','— Aucun'],...ampsList.map(a=>[a,a+' A'])],'amps',v=>v==='none'?null:Number(v)),
+    chooser('Protection',protections,'protection'),
+    chooser('Usage',usages,'usage'),
+    h('span',{class:'bulk-room'},room,h('datalist',{id:'bulkRooms'},rooms.map(r=>h('option',{value:r}))),h('button',{type:'button',disabled:!n,onclick:()=>{const v=room.value.trim();if(v)apply({type:'set',patch:{room:v}},'Pièce : '+v);}},'Appliquer')),
+    h('button',{type:'button',class:'danger',disabled:!n,onclick:()=>apply({type:'clear'},'Effacer les fiches',true)},'Effacer')));
+ }
+ async function apply(action,label,destructive){
+  const ids=[...state.select];if(!ids.length)return;
+  const touched=panel.circuits.filter(c=>state.select.has(c.id)&&(c.label||c.loads?.length||c.notes));
+  if(destructive&&touched.length&&!await confirmDialog(`${label} pour ${ids.length} circuit(s) ? ${touched.length} fiche(s) contiennent déjà une description ou des charges, qui seront effacées.`,{title:'Action groupée',confirm:'Appliquer',danger:action.type==='clear'}))return;
+  try{const circuits=bulkApply(panel.circuits,ids,action);await persist({circuits});toast(`${label} — ${ids.length} circuit(s) mis à jour.`);state.select=new Set();renderHead();renderBody();}
+  catch(e){toast(e.message);}
+ }
  function renderDocs(){
   const fmt=()=>h('select',{'aria-label':'Format du papier'},new Option('Lettre 8½ × 11','letter'),new Option('Légal 8½ × 14','legal'));
   const f1=fmt(),f2=fmt();

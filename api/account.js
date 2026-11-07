@@ -4,6 +4,10 @@ import {getSql} from './_lib/db.js';
 import {route,body,HttpError,clientIp} from './_lib/http.js';
 import {requireUser,publicUser,verifyPassword,hashPassword,checkPassword,newId,rateLimit,recordAttempt,clearSessionCookie,readToken} from './_lib/auth.js';
 import {normalize,highestPosition,resize} from '../public/model.js';
+import {decodeLogo} from './_lib/pdf.js';
+import {entitlement} from './_lib/plans.js';
+import {adminEmails} from './_lib/auth.js';
+import {PDFDocument} from 'pdf-lib';
 
 const s=(v,max)=>String(v??'').trim().slice(0,max);
 function cleanProfile(p={}){
@@ -15,8 +19,25 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
  const sql=await getSql();
  const user=await requireUser(req,sql);
  const action=String(req.query?.action||'');
+ // Image de marque des PDF (logo, couleurs, pied de page).
+ const canBrand=async()=>adminEmails().includes(user.email)||!!(await entitlement(sql,user.id)).plan.features?.branding;
+ if(req.method==='GET'&&action==='branding')return res.status(200).json({branding:user.branding||{},allowed:await canBrand()});
  if(req.method==='GET')return res.status(200).json({user:publicUser(user)});
  const data=body(req);
+ if(req.method==='PUT'&&action==='branding'){
+  if(!await canBrand())throw new HttpError(402,'La personnalisation des documents est incluse dans les forfaits Électricien.',{quota:true});
+  const color=v=>{const c=String(v||'').trim();if(!c)return '';if(!/^#[0-9a-fA-F]{6}$/.test(c))throw new HttpError(400,'Couleur invalide (format #RRVVBB).');return c.toLowerCase();};
+  const branding={primary:color(data.primary),accent:color(data.accent),footer:s(data.footer,140)};
+  if(data.logo){
+   let l;try{l=decodeLogo(data.logo);}catch(e){throw new HttpError(400,e.message);}
+   if(!l)throw new HttpError(400,'Le logo doit être une image PNG ou JPEG.');
+   // Vérifie que l'image s'intègre réellement dans un PDF.
+   try{const doc=await PDFDocument.create();l.type==='png'?await doc.embedPng(l.buf):await doc.embedJpg(l.buf);}catch{throw new HttpError(400,'Image du logo illisible.');}
+   branding.logo=String(data.logo);
+  }
+  const [u]=await sql`UPDATE app_users SET branding=${JSON.stringify(branding)}::jsonb,updated_at=now() WHERE id=${user.id} RETURNING branding`;
+  return res.status(200).json({branding:u.branding});
+ }
  if(req.method==='PUT'&&action==='password'){
   await rateLimit(sql,'pwd:'+user.id,8,15);
   if(!await verifyPassword(String(data.current||''),user.password_hash)){await recordAttempt(sql,'pwd:'+user.id);throw new HttpError(400,'Mot de passe actuel incorrect.');}

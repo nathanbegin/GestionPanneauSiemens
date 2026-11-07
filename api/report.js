@@ -61,11 +61,14 @@ export default route(['GET','POST'],async(req,res)=>{
   const e=await entitlement(sql,userId);
   if(!e.plan.features?.planning&&!adminEmails().includes(user.email))throw new HttpError(402,'Le bilan de charges est inclus dans les forfaits Électricien.',{quota:true});
  }
+ // Image de marque de l'entreprise : forfaits avec la fonction « branding » (et administrateurs).
+ let brand=null;
+ if(user.branding&&Object.keys(user.branding).length){const e=await entitlement(sql,userId);if(e.plan.features?.branding||adminEmails().includes(user.email))brand=user.branding;}
  let children=[];
  if(p.kind==='loads'||p.kind==='calc'){const sitePanels=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${siteRow.id}`;const q=[rows[0].id],seen=new Set(q);while(q.length){const parent=q.shift();for(const x of sitePanels)if(x.details?.fedFrom===parent&&!seen.has(x.id)){seen.add(x.id);q.push(x.id);children.push(x);}}}
- const bytes=p.kind==='calc'?await buildCalcNote({user,site,...panels[0],children,version:APP_VERSION}):p.kind==='loads'?await buildLoads({user,site,...panels[0],children,version:APP_VERSION}):p.kind==='labels'
-  ?await buildLabels({site,...panels[0],skipFree:p.skipFree==='1'})
-  :await buildReport({kind:p.kind,format:p.format,user,site,panels,version:APP_VERSION});
+ const bytes=p.kind==='calc'?await buildCalcNote({user,site,...panels[0],children,version:APP_VERSION,brand}):p.kind==='loads'?await buildLoads({user,site,...panels[0],children,version:APP_VERSION,brand}):p.kind==='labels'
+  ?await buildLabels({site,...panels[0],skipFree:p.skipFree==='1',brand})
+  :await buildReport({kind:p.kind,format:p.format,user,site,panels,version:APP_VERSION,brand});
  const name={report:'rapport',door:'aide-memoire',labels:'etiquettes',loads:'bilan-charges',calc:'note-de-calcul'}[p.kind]+'-'+slug(p.panel?panelTitle(panels[0].panel):site.name)+'.pdf';
  res.setHeader('Content-Type','application/pdf');
  res.setHeader('Content-Disposition',`inline; filename="${name}"`);

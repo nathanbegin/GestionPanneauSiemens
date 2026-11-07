@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES} from './catalog.js';
-export const APP_VERSION='2.5.0';
+export const APP_VERSION='2.6.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -50,6 +50,7 @@ export function validate(data,{positions=LEGACY_POSITIONS}={}){
    }
   }
   if(c.wire!==undefined){const w=c.wire;if(!w||typeof w!=='object'||(w.gauge&&!WIRE_TABLE.some(x=>x.gauge===w.gauge))||(w.type&&!WIRE_TYPES.includes(w.type))||(w.length!=null&&(typeof w.length!=='number'||w.length<0||w.length>1000)))throw Error('Conducteur invalide.');}
+  if(c.vacant!==undefined&&typeof c.vacant!=='boolean')throw Error('Champ invalide : vacant');
   if(c.breakerRef!==undefined&&(typeof c.breakerRef!=='string'||c.breakerRef.length>40))throw Error('Référence de disjoncteur invalide.');
   for(const k of ['originalLabel','originalNotes','surveyDate'])if(c[k]!==undefined&&(typeof c[k]!=='string'||c[k].length>3000))throw Error('Historique invalide.');
   if(!usages.includes(c.usage)||!states.includes(c.status)||!(c.amps===null||ampsList.includes(c.amps)))throw Error('Caractéristiques invalides.');
@@ -79,6 +80,37 @@ export const formatOf=c=>{
  const p=new Set(c.slots.map(slotPos)).size;
  return p>=3?'triple':p===2?'double':'single';
 };
+// Actions groupées sur plusieurs circuits (onglet Panneau).
+// vacant : espace inutilisé, aucun disjoncteur installé (obturateur).
+// free   : disjoncteur présent mais libre (aucune charge).
+// set    : modifie les champs donnés (status, amps, protection, room, usage).
+// clear  : remet la fiche à zéro (positions conservées).
+export const BULK_FIELDS=['status','amps','protection','room','usage'];
+export function bulkApply(circuits,ids,action={}){
+ const sel=new Set(ids);
+ return circuits.map(c=>{
+  if(!sel.has(c.id))return c;
+  const base=emptyCircuit(c.id,c.slots);
+  if(action.type==='vacant')return {...base,status:'Libre',vacant:true,notes:c.notes||''};
+  if(action.type==='clear')return base;
+  if(action.type==='free'){const {vacant,loads,...rest}=c;return {...rest,label:'',usage:'Autre',status:'Libre'};}
+  if(action.type==='set'){
+   const out={...c};
+   for(const k of BULK_FIELDS)if(action.patch&&action.patch[k]!==undefined){
+    const v=action.patch[k];
+    if(k==='status'&&!states.includes(v))throw Error('Statut invalide.');
+    if(k==='amps'&&!(v===null||ampsList.includes(v)))throw Error('Calibre invalide.');
+    if(k==='protection'&&!protections.includes(v))throw Error('Protection invalide.');
+    if(k==='usage'&&!usages.includes(v))throw Error('Usage invalide.');
+    if(k==='room'&&(typeof v!=='string'||v.length>80))throw Error('Pièce invalide.');
+    out[k]=v;
+   }
+   if(out.vacant&&(out.amps||out.status!=='Libre'))delete out.vacant;
+   return out;
+  }
+  throw Error('Action groupée inconnue.');
+ }).map(c=>{const o={...c};for(const k of Object.keys(o))if(o[k]===undefined)delete o[k];return o;});
+}
 const freeId=(ids,base)=>{if(!ids.has(base))return base;for(let i=2;;i++)if(!ids.has(base+'-'+i))return base+'-'+i;};
 
 // Change le format d'un disjoncteur en conservant sa fiche.
