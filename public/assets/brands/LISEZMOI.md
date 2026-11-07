@@ -9,6 +9,7 @@ Fichiers affichés automatiquement sur les plaques de marque, les cartes de mod�
 | `siemens.svg` | Siemens | Wikimedia Commons — File:Siemens_AG_logo.svg |
 | `eaton.svg` | Eaton (BR, CH, CBM) | Wikimedia Commons — File:Eaton_Corporation_logo.svg |
 | `leviton.svg` | Leviton | Wikimedia Commons — File:Leviton_logo.svg |
+| `generac.svg` | Generac | Fichier vectoriel fourni par le propriétaire du projet (generac-power-systems-vector-logo.svg), recadré |
 | `cutler-hammer.svg` | Cutler-Hammer | **Absent** : la marque CH affiche « Cutler-Hammer » en texte avec le logo Eaton |
 
 Récupérés le 2026-11-06. Les PDF utilisent des copies PNG générées dans `api/_data/logos.js` : après l'ajout ou le remplacement d'un logo, relancez `NODE_PATH=$(npm root -g) node scripts/logos-png.mjs`.
