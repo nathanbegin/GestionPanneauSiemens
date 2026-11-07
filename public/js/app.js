@@ -1,6 +1,7 @@
 // Application Mon Panneau : routeur, authentification, sites, compte.
 import {brandingCard} from './branding.js';
 import {aiImportDialog} from './aiimport.js';
+import {guidedDialog} from './guided.js';
 import {h,toast,confirmDialog,fmtRelative,field} from './dom.js';
 import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
@@ -128,6 +129,7 @@ async function siteView(id){
  crumbs([['Mes sites','#/sites'],[site.name]]);
  const ent=await api('/api/billing').catch(()=>null);
  const library=!!(ent?.plan?.features?.planning||state.user.isAdmin);
+ const addGuided=()=>guidedDialog({site,siblings:panels,onCreated:p=>{location.hash='#/panneaux/'+p.id;}});
  const addByPhoto=()=>aiImportDialog({site,siblings:panels,onCreated:p=>{location.hash='#/panneaux/'+p.id;}});
  const addPanel=()=>panelDialog({siblings:panels,library,onSave:async f=>{const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});toast('Panneau créé. Touchez un disjoncteur pour commencer.');location.hash='#/panneaux/'+panel.id;}});
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
@@ -141,11 +143,11 @@ async function siteView(id){
  return h('div',{class:'container'},
   h('div',{class:'page-head'},
    h('div',{},h('div',{class:'eyebrow',text:'Site'}),h('h1',{text:site.name}),h('div',{class:'sub',text:siteAddress(site)||'Adresse à préciser'}),site.client&&h('div',{class:'sub',text:'Client : '+site.client})),
-   h('div',{class:'page-actions'},h('button',{type:'button',onclick:edit},'Modifier'),panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',onclick:addByPhoto},'📷 Ajouter par photo (IA)'),h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
+   h('div',{class:'page-actions'},h('button',{type:'button',onclick:edit},'Modifier'),panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',onclick:addGuided},'🧭 Mode guidé'),h('button',{type:'button',onclick:addByPhoto},'📷 Ajouter par photo (IA)'),h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
     panels.length?h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'))
-     :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'▦'}),h('h2',{text:'Aucun panneau pour l’instant'}),h('p',{text:'Ajoutez le panneau principal. Vous pourrez ensuite ajouter les sous-panneaux (garage, atelier, logement…) et indiquer lequel alimente l’autre.'}),h('div',{class:'page-actions center'},h('button',{type:'button',class:'primary lg',onclick:addPanel},'+ Ajouter le panneau principal'),h('button',{type:'button',class:'lg',onclick:addByPhoto},'📷 Par photo (IA)')))),
+     :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'▦'}),h('h2',{text:'Aucun panneau pour l’instant'}),h('p',{text:'Ajoutez le panneau principal. Vous pourrez ensuite ajouter les sous-panneaux (garage, atelier, logement…) et indiquer lequel alimente l’autre.'}),h('div',{class:'page-actions center'},h('button',{type:'button',class:'primary lg',onclick:addPanel},'+ Ajouter le panneau principal'),h('button',{type:'button',class:'lg',onclick:addGuided},'🧭 Mode guidé (questions)'),h('button',{type:'button',class:'lg',onclick:addByPhoto},'📷 Par photo (IA)')))),
    h('aside',{class:'stack'},
     panels.length>0&&h('div',{class:'card side-card'},h('h3',{text:'Hiérarchie d’alimentation'}),tree(panels)),
     h('div',{class:'card side-card'},h('h3',{text:'Informations'}),h('dl',{class:'facts'},h('dt',{text:'Adresse'}),h('dd',{text:siteAddress(site)||'—'}),h('dt',{text:'Client'}),h('dd',{text:site.client||'—'}),h('dt',{text:'Panneaux'}),h('dd',{text:String(panels.length)}),h('dt',{text:'Modifié'}),h('dd',{text:fmtRelative(site.updatedAt)})),site.notes&&h('p',{class:'small muted mt',text:site.notes})),

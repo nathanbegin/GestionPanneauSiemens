@@ -7,6 +7,7 @@ import {panelArt} from './panelart.js';
 import {blank,resize,designation,sortCircuits,ampsList,panelKinds,voltages,slotPos} from '../model.js';
 import {FAMILIES} from '../catalog.js';
 import {AI_CONFIDENT} from '../aiscan.js';
+import {positionQuiz} from './guided.js';
 
 const MAX_SIDE=2000,MAX_FILES=6,MAX_TOTAL=3*1024*1024;
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -169,6 +170,8 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
    const ch=changed.get(c.id);
    return h('tr',{class:[r?confClass(r.confidence):'',ch?'changed':''].join(' ')},h('td',{},designation(c),ch?h('span',{class:'ai-new',text:ch}):null),h('td',{},amps),h('td',{},label),h('td',{class:'small',text:pct(r?.confidence)}));
   });
+  // Positions incertaines : confiance faible ou disjoncteur sans désignation (hors corrections de l'utilisateur).
+  const uncertain=()=>[...new Set(circuits.filter(c=>!c.vacant&&!edited.has(c.id)&&(c.amps!=null||c.label||p.review[c.id])&&((p.review[c.id]&&p.review[c.id].confidence<AI_CONFIDENT)||!c.label)).map(c=>slotPos(c.slots[0])))].sort((a,b)=>a-b);
   const errBox=h('p',{class:'error',role:'alert'});
   const create=h('button',{type:'button',class:'primary lg',onclick:async()=>{
    create.disabled=true;errBox.textContent='';
@@ -186,9 +189,26 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
    h('div',{class:'form-actions'},
     h('button',{type:'button',class:'ghost',onclick:()=>identify(p)},'← Revenir à l’identification'),
     h('button',{type:'button',class:'ghost',onclick:()=>photos()},'Recommencer'),
+    uncertain().length?h('button',{type:'button',onclick:()=>quiz(p,{circuits,edited,changed})},`🧭 Questions sur les points incertains (${uncertain().length})`):null,
     h('button',{type:'button',onclick:()=>clarify(p,{circuits,edited})},'📷 Ajouter des photos pour préciser'),
     create));
   draw();
+ }
+
+ // ---------- Questions sur les points incertains (mode guidé appliqué aux doutes de l'IA) ----------
+ function quiz(p,state){
+  const list=[...new Set(state.circuits.filter(c=>!c.vacant&&!state.edited.has(c.id)&&(c.amps!=null||c.label||p.review[c.id])&&((p.review[c.id]&&p.review[c.id].confidence<AI_CONFIDENT)||!c.label)).map(c=>slotPos(c.slots[0])))].sort((a,b)=>a-b);
+  let st={positions:p.positions,circuits:state.circuits,done:[...new Set(state.circuits.filter(c=>c.label||c.amps!=null||c.vacant).map(c=>slotPos(c.slots[0])))]};
+  const qBox=h('div',{class:'gd-question'}),artBox=h('div',{class:'gd-art'});
+  stage.replaceChildren(h('div',{class:'gd-wrap'},qBox,artBox));
+  const draw=n=>artBox.replaceChildren(panelArt({panel:{name:p.meta.name,kind:p.meta.kind,positions:p.positions,details:p.meta.details,circuits:st.circuits},showLabels:true,highlight:new Set([n])}));
+  positionQuiz(qBox,{getState:()=>st,setState:x=>{st=x;},list,art:draw,
+   onBack:()=>confirm(p,state),finishLabel:'Valider et revenir à la confirmation',
+   onFinish:()=>{
+    const edited=new Set(state.edited),changed=new Map(state.changed||[]);
+    for(const c of st.circuits)if(list.includes(slotPos(c.slots[0]))){edited.add(c.id);changed.set(c.id,'répondu');}
+    confirm(p,{circuits:st.circuits,edited,changed,note:`${list.length} point(s) incertain(s) vérifié(s) par vos réponses.`});
+   }});
  }
 
  // ---------- Photos de précision : l'IA complète la configuration déjà établie ----------
