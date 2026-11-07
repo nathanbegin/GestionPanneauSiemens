@@ -4,7 +4,10 @@ import {h,field,select,dialog,toast,confirmDialog} from './dom.js';
 import {api} from './api.js';
 import {panelArt,brandBadge} from './panelart.js';
 import {designation,sortCircuits,ampsList,usages,panelTitle,slotPos} from '../model.js';
-import {FAMILIES} from '../catalog.js';
+import {FAMILIES,familyOf} from '../catalog.js';
+import {loadLibrary} from './library.js';
+import {breakerUnits,matchBreakers,applyModel,clearModel} from '../units.js';
+import {miniBreaker} from './assign.js';
 import {newGuided,answerPosition,nextPosition,prevPosition,coveredFrom,fillRestEmpty,currentAnswer,checkAppliances,assignAppliance,progress,canPlace,guessUsage,
  LABEL_SUGGESTIONS,APPLIANCES,FORMATS} from '../guided.js';
 
@@ -95,7 +98,8 @@ export function positionQuiz(box,ctx){
 }
 
 // ---------- Questionnaire complet ----------
-export function guidedDialog({site,siblings=[],onCreated}){
+export function guidedDialog({site,siblings=[],library=false,onCreated}){
+ let lib=null; // bibliothèque de produits (chargée à l'étape des modèles)
  const qBox=h('div',{class:'gd-question'});
  const artBox=h('div',{class:'gd-art'});
  const d=dialog({title:'Construire le panneau en répondant à des questions',eyebrow:'Mode guidé · '+site.name,wide:'xl',body:[h('div',{class:'gd-wrap'},qBox,artBox)]});
@@ -103,13 +107,60 @@ export function guidedDialog({site,siblings=[],onCreated}){
  const persist=()=>save(site.id,S);
  const drawArt=current=>{
   if(!S.st){artBox.replaceChildren(h('div',{class:'gd-art-empty'},h('span',{class:'gd-big','aria-hidden':'true',text:'▦'}),h('p',{class:'muted',text:'Le dessin de votre panneau apparaîtra ici au fil de vos réponses.'})));return;}
-  artBox.replaceChildren(panelArt({panel:{name:S.meta.name,kind:S.meta.kind,positions:S.st.positions,details:S.meta.details,circuits:S.st.circuits},showLabels:true,highlight:current?new Set([current]):null,
+  artBox.replaceChildren(panelArt({panel:{name:S.meta.name,kind:S.meta.kind,positions:S.st.positions,details:S.meta.details,circuits:S.st.circuits},showLabels:true,breakersByCat:lib?.byCat||new Map(),highlight:current?new Set([current]):null,
    onCircuit:id=>{const c=S.st.circuits.find(x=>x.id===id);if(c){S.step='pos';S.pos=slotPos(c.slots[0]);render();}},onPosition:p=>{S.step='pos';S.pos=p;render();}}),
    h('p',{class:'small muted gd-art-tip',text:'Touchez un disjoncteur du dessin pour revenir à sa question.'}));
  };
- const card=(title,help,body,nav)=>{qBox.replaceChildren(h('div',{class:'gd-head'},h('h3',{text:title})),help&&h('p',{class:'muted',text:help}),...[].concat(body),h('div',{class:'form-actions gd-nav'},...nav.filter(Boolean)));};
+ const card=(title,help,body,nav)=>{qBox.replaceChildren(h('div',{class:'gd-head'},h('h3',{text:title})),help?h('p',{class:'muted',text:help}):null,...[].concat(body).filter(Boolean),h('div',{class:'form-actions gd-nav'},...nav.filter(Boolean)));};
  const back=step=>h('button',{type:'button',class:'ghost',onclick:()=>{S.step=step;render();}},'← Retour');
  const choiceList=(items,current,onPick)=>h('div',{class:'gd-formats'},items.map(([v,label,hint,extra])=>h('button',{type:'button',class:'gd-format'+(current===v?' on':''),'aria-pressed':String(current===v),onclick:()=>onPick(v)},extra||null,h('b',{text:label}),hint?h('span',{class:'small muted',text:hint}):null)));
+
+ const afterFix=()=>library?'models':'review';
+ // ---------- Étape « modèles de disjoncteurs » (bibliothèque de produits) ----------
+ const kindText={single:'Simple',double:'Double',triple:'Triple',tandem:'Jumelé',quad:'Quad'};
+ function drawModels(){
+  const det=S.meta.details;
+  if(!det.family){
+   const fam=select('family',[['','— Choisir la gamme —'],...Object.entries(FAMILIES).filter(([k])=>k!=='generic').map(([k,f])=>[k,f.name])],'');
+   card('Quelle est la gamme du panneau ?','Pour proposer les disjoncteurs compatibles, l’application doit connaître la gamme du panneau (ex. Siemens EQ, Square D QO).',
+    [field('Gamme du panneau',fam)],
+    [h('button',{type:'button',class:'ghost',onclick:()=>{S.step='review';render();}},'Passer cette étape'),
+     h('button',{type:'button',class:'primary',onclick:()=>{if(!fam.value)return toast('Choisissez une gamme.');det.family=fam.value;if(!det.brand)det.brand=familyOf(fam.value).brand||'';render();}},'Voir les modèles compatibles →')]);
+   return;
+  }
+  const units=breakerUnits(S.st.circuits).filter(u=>u.kind!=='other');
+  const groups=new Map();for(const u of units){if(!groups.has(u.signature))groups.set(u.signature,[]);groups.get(u.signature).push(u);}
+  const withRef=units.filter(u=>u.ref).length;
+  const matches=new Map([...groups].map(([sig,us])=>[sig,matchBreakers(us[0],lib.breakers,det)]));
+  const unique=[...groups].filter(([sig,us])=>matches.get(sig).exact.length===1&&us.some(u=>!u.ref));
+  const applyTo=(us,b)=>{let cs=S.st.circuits;for(const u of us)cs=applyModel(cs,u,b);S.st={...S.st,circuits:cs};persist();drawModels();drawArt();};
+  const item=(b,us)=>{const on=us.every(u=>u.ref===b.cat);return h('button',{type:'button',class:'palette-item'+(on?' on':''),'aria-pressed':String(on),onclick:()=>applyTo(us,b)},
+   miniBreaker(b.family,us[0]),h('span',{class:'pi-text'},h('b',{text:b.cat}),h('span',{text:`${b.label} · ${b.protection==='Standard'?b.type:b.protection}${b.neutre&&b.neutre!=='—'?' · '+b.neutre:''} · ${b.kA} kA${b.smart?' · intelligent':''}`})));};
+  const groupCard=([sig,us])=>{
+   const u0=us[0],m=matches.get(sig),done=us.filter(u=>u.ref).length;
+   const refs=[...new Set(us.map(u=>u.ref).filter(Boolean))];
+   let body;
+   if(u0.amps.some(a=>a==null))body=h('p',{class:'small issue warn'},'Calibre inconnu : précisez-le pour voir les modèles. ',h('button',{type:'button',class:'ghost sm',onclick:()=>{S.step='pos';S.pos=u0.pos;render();}},'Préciser'));
+   else if(!m.exact.length&&!m.other.length)body=h('p',{class:'small muted',text:`Aucun modèle ${familyOf(det.family).name} de ce format et de ce calibre dans votre bibliothèque.`});
+   else body=h('div',{class:'stack'},
+    m.exact.length?h('div',{class:'palette-list'},m.exact.slice(0,6).map(b=>item(b,us))):h('p',{class:'small muted',text:`Aucun modèle avec la protection « ${u0.protection} ».`}),
+    m.other.length?h('details',{open:!m.exact.length},h('summary',{class:'small',text:`Autres protections (${m.other.length})`}),h('div',{class:'palette-list mt'},m.other.slice(0,8).map(b=>item(b,us)))):null);
+   return h('div',{class:'card gd-group'+(done===us.length?' done':'')},
+    h('div',{class:'gd-group-head'},miniBreaker(det.family,u0),
+     h('div',{class:'pi-text'},h('b',{text:`${kindText[u0.kind]||u0.label} ${u0.amps.map(a=>a??'?').join('/')} A${u0.protection!=='Standard'?' · '+u0.protection:''}`}),
+      h('span',{class:'small muted',text:`${us.length} disjoncteur(s) : `+us.map(u=>`${u.designation}${u.labels.length?' '+u.labels.join(' / '):''}`).join(' · ')})),
+     h('span',{class:'badge '+(done===us.length?'ok':'warn'),text:done===us.length?'✓ '+refs.join(', '):`${done}/${us.length}`}),
+     done?h('button',{type:'button',class:'ghost sm',onclick:()=>{let cs=S.st.circuits;for(const u of us)cs=clearModel(cs,u);S.st={...S.st,circuits:cs};persist();drawModels();drawArt();}},'Retirer'):null),
+    body);
+  };
+  card('Quels modèles de disjoncteurs sont installés ?',`Modèles de votre bibliothèque compatibles avec ${familyOf(det.family).name}, regroupés par disjoncteurs identiques (format, calibre, protection). Un clic attribue le modèle à tout le groupe ; un cas particulier se corrige ensuite dans l’onglet Panneau.`,
+   [h('div',{class:'progress-line'},h('div',{class:'progress'},h('i',{style:{width:(units.length?Math.round(withRef/units.length*100):0)+'%'}})),h('span',{text:`${withRef} / ${units.length} disjoncteurs avec un modèle`})),
+    unique.length?h('div',{class:'notice info gd-auto'},h('span',{text:`${unique.length} groupe(s) n’ont qu’un seul modèle compatible.`}),h('button',{type:'button',class:'primary sm',onclick:()=>{let cs=S.st.circuits;for(const [sig,us] of unique)for(const u of us.filter(x=>!x.ref))cs=applyModel(cs,u,matches.get(sig).exact[0]);S.st={...S.st,circuits:cs};persist();drawModels();drawArt();toast(`${unique.length} groupe(s) attribué(s) automatiquement.`);}},'Les attribuer automatiquement')):null,
+    units.length?h('div',{class:'stack'},[...groups].sort((a,b)=>b[1].length-a[1].length).map(groupCard)):h('p',{class:'muted',text:'Aucun disjoncteur avec un calibre pour l’instant.'})],
+   [h('button',{type:'button',class:'ghost',onclick:()=>{S.step='appliances';render();}},'← Vérification'),
+    h('button',{type:'button',class:'ghost',onclick:()=>{S.step='review';render();}},'Passer cette étape'),
+    h('button',{type:'button',class:'primary',onclick:()=>{S.step='review';render();}},'Continuer →')]);
+ }
 
  function render(){
   persist();
@@ -169,17 +220,22 @@ export function guidedDialog({site,siblings=[],onCreated}){
    card('Vérification : quels appareils avez-vous ?','Cochez ceux qui existent chez vous. L’application vérifie que chacun a bien son disjoncteur, pour que rien ne soit oublié.',
     h('div',{class:'gd-checks'},APPLIANCES.map(a=>h('label',{class:'gd-check'},h('input',{type:'checkbox',checked:owned.has(a.id),onchange:e=>{e.target.checked?owned.add(a.id):owned.delete(a.id);S.owned=[...owned];persist();}}),h('span',{text:a.label})))),
     [h('button',{type:'button',class:'ghost',onclick:()=>{S.step='pos';S.pos=prevPosition(S.st,S.st.positions+1)||1;render();}},'← Revenir aux positions'),
-     h('button',{type:'button',class:'primary',onclick:()=>{S.fixes=checkAppliances(S.st,S.owned).filter(f=>f.type==='missing').map(f=>f.appliance.id);S.step=S.fixes.length?'fix':'review';render();}},'Vérifier →')]);
+     h('button',{type:'button',class:'primary',onclick:()=>{S.fixes=checkAppliances(S.st,S.owned).filter(f=>f.type==='missing').map(f=>f.appliance.id);S.step=S.fixes.length?'fix':afterFix();render();}},'Vérifier →')]);
   }else if(S.step==='fix'){
    const ap=APPLIANCES.find(a=>a.id===S.fixes[0]);
-   if(!ap){S.step='review';return render();}
+   if(!ap){S.step=afterFix();return render();}
    drawArt();
    const cands=sortCircuits(S.st.circuits).filter(c=>!c.vacant);
-   const pick=id=>{if(id)S.st=assignAppliance(S.st,id,ap);S.fixes=S.fixes.slice(1);S.step=S.fixes.length?'fix':'review';render();};
+   const pick=id=>{if(id)S.st=assignAppliance(S.st,id,ap);S.fixes=S.fixes.slice(1);S.step=S.fixes.length?'fix':afterFix();render();};
    card(`Quel disjoncteur alimente : ${ap.label.toLowerCase()} ?`,`Aucun disjoncteur ne porte ce nom pour l’instant.${ap.volts===240?' C’est normalement un disjoncteur double (deux manettes reliées).':''}${ap.typical?` Calibre habituel : ${ap.typical} A.`:''}`,
     h('div',{class:'gd-pick'},[...cands.map(c=>{const dbl=new Set(c.slots.map(slotPos)).size>1;return h('button',{type:'button',class:'gd-pick-item'+(ap.volts===240&&dbl?' likely':''),onclick:()=>pick(c.id)},h('b',{text:designation(c)}),h('span',{text:`${c.amps?c.amps+' A':'? A'}${dbl?' · double':''}`}),h('span',{class:'muted',text:c.label||'sans désignation'}));}),
      h('button',{type:'button',class:'gd-pick-item none',onclick:()=>pick(null)},h('b',{text:'Je ne sais pas'}),h('span',{class:'muted',text:'On passe : à vérifier plus tard.'}))]),
     [h('button',{type:'button',class:'ghost',onclick:()=>{S.step='appliances';render();}},'← Retour')]);
+  }else if(S.step==='models'){
+   if(!library){S.step='review';return render();}
+   if(lib){drawArt();drawModels();}
+   else{qBox.replaceChildren(h('p',{class:'muted',text:'Chargement de votre bibliothèque de produits…'}));
+    loadLibrary().then(l=>{lib=l;if(S.step==='models'){drawArt();drawModels();}}).catch(e=>{qBox.replaceChildren(h('p',{class:'error',text:e.message}),h('button',{type:'button',onclick:()=>{S.step='review';render();}},'Continuer sans les modèles'));});}
   }else if(S.step==='review'){
    drawArt();
    const warn=checkAppliances(S.st,S.owned);
@@ -198,7 +254,7 @@ export function guidedDialog({site,siblings=[],onCreated}){
     [h('ul',{class:'gd-summary'},h('li',{text:`${counts.total} disjoncteur(s) décrit(s)`}),h('li',{text:`${counts.unknown} sans désignation (resteront « À confirmer »)`}),h('li',{text:`${counts.empty} espace(s) vide(s)`})),
      warn.length?h('div',{class:'notice'},h('b',{text:'À vérifier : '}),h('ul',{},warn.map(w=>h('li',{},w.text,w.circuit?h('button',{type:'button',class:'ghost sm',onclick:()=>{const c=S.st.circuits.find(x=>x.id===w.circuit);S.step='pos';S.pos=slotPos(c.slots[0]);render();}},'Revoir'):null)))):null,
      h('div',{class:'fields'},field('Nom du panneau',name),field('Étiquette',tag),field('Emplacement',location,{full:true})),err],
-    [h('button',{type:'button',class:'ghost',onclick:()=>{S.step='appliances';render();}},'← Vérification'),create]);
+    [h('button',{type:'button',class:'ghost',onclick:()=>{S.step=library?'models':'appliances';render();}},library?'← Modèles':'← Vérification'),create]);
    for(const [el,k] of [[name,'name'],[tag,'tag'],[location,'location']])el.addEventListener('input',()=>{S.meta[k]=el.value;persist();});
   }
  }

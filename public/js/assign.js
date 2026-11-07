@@ -6,7 +6,7 @@ import {familyOf} from '../catalog.js';
 import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
 
-function miniBreaker(fam,unit){
+export function miniBreaker(fam,unit){
  const f=familyOf(fam);
  const chip=h('span',{class:'mini-breaker'+(unit.kind==='tandem'||unit.kind==='quad'?' split':'')+(['double','triple','quad'].includes(unit.kind)?' tall':'')});
  chip.style.setProperty('--body',f.body);chip.style.setProperty('--handle',f.handle);chip.style.setProperty('--ink',f.ink);

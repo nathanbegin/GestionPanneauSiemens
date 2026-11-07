@@ -578,3 +578,8 @@ dialog.xl .ai-art svg{width:100%;height:calc(100dvh - 360px);min-height:420px;ma
 .gd-art-tip{text-align:center;margin:6px 0 0}
 .gd-summary{margin:6px 0 12px 18px}
 .gd-nav{flex-wrap:wrap}
+/* Mode guidé : modèles */
+.gd-group{padding:10px 12px;display:grid;gap:8px}
+.gd-group.done{border-color:#9fcbaa;background:#f6fbf6}
+.gd-group-head{display:flex;align-items:center;gap:10px}.gd-group-head .pi-text{flex:1;min-width:0;display:grid}
+.gd-auto{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}

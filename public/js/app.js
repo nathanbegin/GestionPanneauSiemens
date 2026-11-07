@@ -129,7 +129,7 @@ async function siteView(id){
  crumbs([['Mes sites','#/sites'],[site.name]]);
  const ent=await api('/api/billing').catch(()=>null);
  const library=!!(ent?.plan?.features?.planning||state.user.isAdmin);
- const addGuided=()=>guidedDialog({site,siblings:panels,onCreated:p=>{location.hash='#/panneaux/'+p.id;}});
+ const addGuided=()=>guidedDialog({site,siblings:panels,library,onCreated:p=>{location.hash='#/panneaux/'+p.id;}});
  const addByPhoto=()=>aiImportDialog({site,siblings:panels,onCreated:p=>{location.hash='#/panneaux/'+p.id;}});
  const addPanel=()=>panelDialog({siblings:panels,library,onSave:async f=>{const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});toast('Panneau créé. Touchez un disjoncteur pour commencer.');location.hash='#/panneaux/'+panel.id;}});
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
