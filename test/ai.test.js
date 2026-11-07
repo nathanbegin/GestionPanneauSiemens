@@ -63,17 +63,23 @@ test('droits d’accès à l’IA',()=>{
 });
 
 test('repli automatique quand le projet OpenAI n’a pas accès au modèle',async()=>{
- process.env.OPENAI_API_KEY='k';delete process.env.OPENAI_MODEL;
- const tried=[];
+ const {resetModelCache,modelOrder,DENY_TTL_MS}=await import('../api/_lib/ai.js');
+ resetModelCache();process.env.OPENAI_API_KEY='k';delete process.env.OPENAI_MODEL;
+ const tried=[];let terraOk=false;
  const fetchImpl=async(url,opts)=>{const m=JSON.parse(opts.body).model;tried.push(m);
-  if(m!=='gpt-6-astra')return {ok:false,status:403,json:async()=>({error:{code:'model_not_found',message:'no access'}})};
-  return {ok:true,status:200,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(scan)}]}],usage:{}})};};
- const out=await scanPanel({files:[{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}]},{fetchImpl});
- assert.equal(out.model,'gpt-6-astra');assert.deepEqual(tried,['gpt-6.1-terra','gpt-6.1-sol','gpt-6-astra']);
- // Ensuite, le modèle qui fonctionne est essayé en premier.
- tried.length=0;await scanPanel({files:[{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}]},{fetchImpl});assert.deepEqual(tried,['gpt-6-astra']);
+  if(m==='gpt-6-astra'||(m==='gpt-6.1-terra'&&terraOk))return {ok:true,status:200,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(scan)}]}],usage:{}})};
+  return {ok:false,status:403,json:async()=>({error:{code:'model_not_found',message:'no access'}})};};
+ const file=[{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}];
+ const out=await scanPanel({files:file},{fetchImpl});
+ assert.equal(out.model,'gpt-6-astra');assert.deepEqual(tried,['gpt-6.1-terra','gpt-6-astra']);
+ // Terra refusé récemment : Astra est essayé directement.
+ tried.length=0;await scanPanel({files:file},{fetchImpl});assert.deepEqual(tried,['gpt-6-astra']);
+ // Après le délai, Terra (maintenant autorisé) est réessayé et redevient le modèle utilisé.
+ assert.equal(modelOrder(Date.now()+DENY_TTL_MS+1000)[0],'gpt-6.1-terra');
+ resetModelCache();terraOk=true;tried.length=0;
+ assert.equal((await scanPanel({files:file},{fetchImpl})).model,'gpt-6.1-terra');assert.deepEqual(tried,['gpt-6.1-terra']);
  process.env.OPENAI_MODEL='modele-a, modele-b';
  const none=async()=>({ok:false,status:404,json:async()=>({error:{code:'model_not_found'}})});
- await assert.rejects(()=>scanPanel({files:[{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}]},{fetchImpl:none}),e=>e.status===503&&/modele-a, modele-b/.test(e.message));
- delete process.env.OPENAI_MODEL;delete process.env.OPENAI_API_KEY;
+ await assert.rejects(()=>scanPanel({files:file},{fetchImpl:none}),e=>e.status===503&&/modele-a, modele-b/.test(e.message));
+ delete process.env.OPENAI_MODEL;delete process.env.OPENAI_API_KEY;resetModelCache();
 });

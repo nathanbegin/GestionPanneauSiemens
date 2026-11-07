@@ -47,6 +47,7 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
  if(!status.configured){stage.replaceChildren(h('div',{class:'notice'},'L’analyse par IA n’est pas encore activée sur ce serveur. L’administrateur doit définir la variable OPENAI_API_KEY.'));return;}
  if(!status.allowed){stage.replaceChildren(h('div',{class:'ai-upsell'},h('h3',{text:'Inclus dans les forfaits payants'}),h('p',{text:'Photographiez le panneau ouvert ou téléversez un récapitulatif : l’IA lit la marque, le principal, le nombre de positions et chaque disjoncteur, puis construit le panneau avec vous.'}),h('a',{class:'btn primary',href:'#/abonnement',onclick:()=>d.close()},'Voir les forfaits')));return;}
  const files=[];
+ let usedModel='';
  photos();
 
  // ---------- 1. Photos et fichiers ----------
@@ -92,7 +93,7 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
   let i=0;const timer=setInterval(()=>{msg.textContent=steps[i++%steps.length];},4500);
   try{
    const out=await api('/api/panels?action=scan',{method:'POST',body:{files:files.map(({name,data})=>({name,data})),hint}});
-   status.used=out.used;
+   status.used=out.used;usedModel=out.model||'';
    if(out.notPanel)return photos('L’IA ne reconnaît pas de panneau électrique sur ces fichiers. '+(out.summary||''));
    identify(out.proposal);
   }catch(e){photos(e.message);}
@@ -115,7 +116,7 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
   };
   const conf=p.confidence;
   stage.replaceChildren(
-   h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Étape 1 de 2'}),h('h3',{text:'Est-ce bien ce panneau ?'}),h('span',{class:'ai-conf '+confClass(conf),text:'Confiance '+pct(conf)})),
+   h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Étape 1 de 2'}),h('h3',{text:'Est-ce bien ce panneau ?'}),h('span',{class:'ai-conf '+confClass(conf),text:'Confiance '+pct(conf)}),usedModel&&h('span',{class:'small muted',text:'Lu par '+usedModel})),
    det.notes&&h('p',{class:'small muted',text:det.notes}),
    p.warnings.length?h('div',{class:'notice'},h('b',{text:'À vérifier : '}),h('ul',{},p.warnings.slice(0,8).map(w=>h('li',{text:w})))):null,
    h('div',{class:'fields'},field('Nom du panneau',f.name),field('Étiquette',f.tag),field('Type',f.kind),field('Emplacement',f.location),
