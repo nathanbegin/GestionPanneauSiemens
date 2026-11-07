@@ -1,6 +1,27 @@
 // Génération des PDF : rapport complet, aide-mémoire de porte et étiquettes (feuille Avery 5160).
 import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
 import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,tagGroups,formatOf,breakerFormats} from '../../public/model.js';
+import {FAMILIES} from '../../public/catalog.js';
+import LOGOS from '../_data/logos.js';
+
+// ---------- Logos et modèle du panneau ----------
+const slug=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+// Logos à afficher pour un panneau : marque de la famille puis société mère (ex. Square D + Schneider Electric,
+// Cutler-Hammer → Eaton). Sans famille, on tente la marque saisie à la main.
+export function panelLogos(det={}){
+ const f=FAMILIES[det.family];
+ let names=f?[f.brand,f.parent]:[det.brand];
+ if(!f&&/cutler/i.test(det.brand||''))names=['Cutler-Hammer','Eaton'];
+ if(!f&&/square\s*d/i.test(det.brand||''))names=['Square D','Schneider Electric'];
+ const keys=[...new Set(names.map(slug).filter(Boolean))];
+ return keys.filter(k=>LOGOS[k]);
+}
+// Ligne « modèle » : marque, gamme, numéro de catalogue et espaces/circuits.
+export function panelModelLine(panel){
+ const det=panel.details||{},f=FAMILIES[det.family];
+ const brand=f?f.name:[det.brand,det.model].filter(Boolean).join(' ');
+ return [brand,det.modelId,det.maxCircuits?`${panel.positions}/${det.maxCircuits} circuits`:''].filter(Boolean).join(' · ');
+}
 
 const SIZES={letter:[612,792],legal:[612,1008]};
 const C={ink:rgb(.094,.235,.196),green:rgb(.133,.416,.318),muted:rgb(.42,.47,.44),line:rgb(.80,.84,.80),soft:rgb(.93,.95,.92),white:rgb(1,1,1),amber:rgb(.70,.52,.22),free:rgb(.62,.66,.62),lime:rgb(.89,.97,.66)};
@@ -11,7 +32,7 @@ class Doc{
   const d=new Doc();d.pdf=await PDFDocument.create();d.size=SIZES[format]||SIZES.letter;
   d.font=await d.pdf.embedFont(StandardFonts.Helvetica);d.bold=await d.pdf.embedFont(StandardFonts.HelveticaBold);
   d.pdf.setTitle(title);d.pdf.setCreator('Mon Panneau');d.pdf.setProducer('Mon Panneau');d.pdf.setLanguage('fr-CA');
-  d.cache=new Map();return d;
+  d.cache=new Map();d.images=new Map();return d;
  }
  // Remplace les caractères absents de l'encodage WinAnsi des polices standard.
  safe(text){
@@ -48,6 +69,21 @@ class Doc{
  text(t,x,y,{size=10,f=this.font,color=C.ink,max}={}){this.p.drawText(max?this.fit(t,size,max,f):this.safe(t),{x,y,size,font:f,color});}
  rect(x,y,w,h,opts){this.p.drawRectangle({x,y,width:w,height:h,...opts});}
  line(x1,y1,x2,y2,color=C.line,t=.6){this.p.drawLine({start:{x:x1,y:y1},end:{x:x2,y:y2},color,thickness:t});}
+ // Logo PNG intégré une seule fois par document.
+ async logo(key){
+  if(!LOGOS[key])return null;
+  if(!this.images.has(key))this.images.set(key,{img:await this.pdf.embedPng(Buffer.from(LOGOS[key].png,'base64')),w:LOGOS[key].w,h:LOGOS[key].h});
+  return this.images.get(key);
+ }
+ // Dessine des logos alignés sur une hauteur donnée ; renvoie la largeur occupée.
+ logosWidth(keys,height,gap){return keys.reduce((s,k,i)=>s+(LOGOS[k]?LOGOS[k].w/LOGOS[k].h*height*(i?0.8:1):0)+(i?gap:0),0);}
+ async drawLogos(keys,x,y,height,gap=8){
+  let cx=x;
+  for(const [i,k] of keys.entries()){const l=await this.logo(k);if(!l)continue;const hh=height*(i?0.8:1),w=l.w/l.h*hh;
+   if(i){this.line(cx+gap/2,y+1,cx+gap/2,y+height-1,C.line,.6);cx+=gap;}
+   this.p.drawImage(l.img,{x:cx,y:y+(height-hh)/2,width:w,height:hh});cx+=w;}
+  return cx-x;
+ }
  get W(){return this.size[0];}
  get H(){return this.size[1];}
  ensure(h,onBreak){if(this.y-h<M+28){this.page();onBreak?.();return true;}return false;}
@@ -72,14 +108,27 @@ function footers(d,label){
  });
 }
 
-function header(d,{overline,title,subtitle,right}){
- const h=78;
+async function header(d,{overline,title,subtitle,right,logos=[],model=''}){
+ const plate=logos.length>0;
+ const h=plate||model?94:78;
  d.rect(0,d.H-h,d.W,h,{color:C.ink});
  d.rect(M,d.H-h+16,4,h-32,{color:C.lime});
- d.text(overline,M+14,d.H-28,{size:8,f:d.bold,color:C.lime,max:d.W-2*M-180});
- d.text(title,M+14,d.H-48,{size:18,f:d.bold,color:C.white,max:d.W-2*M-170});
- if(subtitle)d.text(subtitle,M+14,d.H-64,{size:9,color:rgb(.8,.87,.83),max:d.W-2*M-170});
- right.forEach((r,i)=>{const s=d.safe(r);d.text(s,d.W-M-d.width(s,8),d.H-30-i*12,{size:8,color:rgb(.8,.87,.83)});});
+ // Plaque du fabricant (logos sur fond blanc) en haut à droite.
+ let rightW=170;
+ if(plate){
+  const lh=20,pad=9,gap=10,lw=Math.min(d.logosWidth(logos,lh,gap),150);
+  const pw=lw+pad*2,ph=lh+pad*2-2,px=d.W-M-pw,py=d.H-12-ph;
+  d.p.drawRectangle({x:px,y:py,width:pw,height:ph,color:C.white,borderColor:rgb(.75,.8,.77),borderWidth:.6});
+  const scale=lw<d.logosWidth(logos,lh,gap)?lw/d.logosWidth(logos,lh,gap):1;
+  await d.drawLogos(logos,px+pad,py+(ph-lh*scale)/2,lh*scale,gap*scale);
+  rightW=Math.max(rightW,pw+16);
+ }
+ d.text(overline,M+14,d.H-28,{size:8,f:d.bold,color:C.lime,max:d.W-2*M-rightW-14});
+ d.text(title,M+14,d.H-48,{size:18,f:d.bold,color:C.white,max:d.W-2*M-rightW-4});
+ if(subtitle)d.text(subtitle,M+14,d.H-64,{size:9,color:rgb(.8,.87,.83),max:d.W-2*M-rightW-4});
+ if(model)d.text('Modèle : '+model,M+14,d.H-79,{size:8.5,f:d.bold,color:C.lime,max:d.W-2*M-rightW-4});
+ const ry=plate?d.H-62:d.H-30;
+ right.forEach((r,i)=>{const t=d.safe(r);d.text(t,d.W-M-d.width(t,8),ry-i*11,{size:8,color:rgb(.8,.87,.83)});});
  d.y=d.H-h-20;
 }
 
@@ -217,18 +266,18 @@ function panelInfoRows(panel,site,fedFromLabel){
   ['Site',site.name+(site.client?' — '+site.client:'')],['Adresse',siteAddress(site)],
   ['Bâtiment',det.building],['Emplacement du panneau',panel.location],
   ['Type de panneau',panel.kind],['Alimenté par',fedFromLabel?(fedFromLabel+(det.fedFromCircuit?' — circuit '+det.fedFromCircuit:'')):'Réseau / entrée électrique'],
-  ['Marque et modèle',[det.brand,det.model].filter(Boolean).join(' ')],['Principal et tension',[det.mainAmps?det.mainAmps+' A':'',det.voltage].filter(Boolean).join(' · ')],
+  ['Marque et modèle',[[det.brand,det.model].filter(Boolean).join(' '),det.modelId].filter(Boolean).join(' · ')],['Principal et tension',[det.mainAmps?det.mainAmps+' A':'',det.voltage].filter(Boolean).join(' · ')],
   ['Positions',`${panel.positions} positions · ${s.total} circuits/groupes`],['Avancement',`${s.identified} identifié(s) · ${s.free} libre(s) · ${s.toConfirm} à confirmer (${s.progress} %)`],
   ['Relevé effectué',[surveyDate(det.surveyDate),det.surveyedBy&&'par '+det.surveyedBy].filter(Boolean).join(' ')],
  ];
 }
 
-function panelPages(d,{panel,site,fedFromLabel,user,kind,generatedAt,version}){
+async function panelPages(d,{panel,site,fedFromLabel,user,kind,generatedAt,version}){
  d.page();
- header(d,{overline:kind==='door'?'AIDE-MÉMOIRE DU PANNEAU ÉLECTRIQUE':'RAPPORT DE PANNEAU ÉLECTRIQUE',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version]});
+ await header(d,{overline:kind==='door'?'AIDE-MÉMOIRE DU PANNEAU ÉLECTRIQUE':'RAPPORT DE PANNEAU ÉLECTRIQUE',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:panelLogos(panel.details),model:panelModelLine(panel)});
  if(kind==='door'){
   const det=panel.details||{};
-  const info=[siteAddress(site),[det.brand,det.model].filter(Boolean).join(' '),det.mainAmps&&'Principal '+det.mainAmps+' A',det.voltage,fedFromLabel&&'Alimenté par '+fedFromLabel+(det.fedFromCircuit?' (circuit '+det.fedFromCircuit+')':'')].filter(Boolean).join('  ·  ');
+  const info=[siteAddress(site),det.mainAmps&&'Principal '+det.mainAmps+' A',det.voltage,fedFromLabel&&'Alimenté par '+fedFromLabel+(det.fedFromCircuit?' (circuit '+det.fedFromCircuit+')':'')].filter(Boolean).join('  ·  ');
   d.wrap(info,8.5,d.W-2*M).slice(0,2).forEach((l,i)=>d.text(l,M,d.y-i*11,{size:8.5,color:C.muted}));
   d.y-=30;
   const pb=preparedBy(user);
@@ -259,7 +308,7 @@ export async function buildReport({kind='report',format='letter',user,site,panel
  const d=await Doc.create(format,(kind==='door'?'Aide-mémoire — ':'Rapport — ')+(panels.length===1?panelTitle(panels[0].panel):site.name));
  if(panels.length>1&&kind==='report'){
   d.page();
-  header(d,{overline:'RAPPORT DES PANNEAUX ÉLECTRIQUES',title:site.name,subtitle:siteAddress(site),right:[fmtDate(generatedAt),'Mon Panneau v'+version]});
+  await header(d,{overline:'RAPPORT DES PANNEAUX ÉLECTRIQUES',title:site.name,subtitle:siteAddress(site),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:[...new Set(panels.flatMap(x=>panelLogos(x.panel.details)))].slice(0,3)});
   infoGrid(d,[['Site',site.name],['Client',site.client],['Adresse',siteAddress(site)],['Panneaux',String(panels.length)]]);
   preparedBlock(d,user,generatedAt);
   sectionTitle(d,'Panneaux du site','Hiérarchie d’alimentation et avancement de l’identification.');
@@ -268,7 +317,7 @@ export async function buildReport({kind='report',format='letter',user,site,panel
   for(const {panel,fedFromLabel} of panels){
    d.ensure(20,head);const s=stats(panel.circuits);
    d.text(panelTitle(panel),M+5,d.y-10,{size:8.5,f:d.bold,max:190});
-   d.text(`${s.progress} % identifié`,M+5,d.y-19,{size:6.5,color:C.muted});
+   d.text([`${s.progress} % identifié`,panelModelLine(panel)].filter(Boolean).join(' · '),M+5,d.y-19,{size:6.5,color:C.muted,max:190});
    d.text(panel.kind,M+200,d.y-10,{size:8,max:85});
    d.text(panel.location||'—',M+290,d.y-10,{size:8,max:125});
    d.text(fedFromLabel||'Entrée électrique',M+420,d.y-10,{size:8,max:d.W-M-(M+420)});
@@ -276,7 +325,7 @@ export async function buildReport({kind='report',format='letter',user,site,panel
   }
   if(site.notes){d.y-=10;sectionTitle(d,'Notes sur le site');d.wrap(site.notes,8.5,d.W-2*M).forEach(l=>{d.ensure(12);d.text(l,M,d.y,{size:8.5});d.y-=11;});}
  }
- for(const p of panels)panelPages(d,{...p,site,user,kind,generatedAt,version});
+ for(const p of panels)await panelPages(d,{...p,site,user,kind,generatedAt,version});
  footers(d,'Mon Panneau · Répertoire indicatif établi à partir d’un relevé visuel — ne remplace pas une inspection par un maître électricien.');
  return d.pdf.save();
 }
@@ -286,18 +335,23 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false}){
  const d=await Doc.create('letter','Étiquettes — '+panelTitle(panel));
  const W=189,H=72,left=13.5,top=36,pitchX=198;
  const items=[{type:'panel'},...sortCircuits(panel.circuits).filter(c=>!(skipFree&&c.status==='Libre')).map(c=>({type:'circuit',c}))];
- items.forEach((it,i)=>{
+ const logos=panelLogos(panel.details);
+ for(const [i,it] of items.entries()){
   const k=i%30;if(k===0)d.page();
   const col=k%3,row=Math.floor(k/3),x=left+col*pitchX,y=d.H-top-(row+1)*H;
   d.rect(x+2,y+2,W-4,H-4,{borderColor:rgb(.88,.9,.88),borderWidth:.4});
   if(it.type==='panel'){
    const det=panel.details||{};
    d.rect(x+8,y+10,W-16,H-20,{color:C.ink});
-   d.text('PANNEAU '+(panel.kind||'').toUpperCase(),x+14,y+H-22,{size:6,f:d.bold,color:C.lime,max:W-28});
+   // Logo de la marque sur une petite plaque blanche, en haut à droite de l'étiquette.
+   let plateW=0;
+   if(logos.length){const lh=10,lw=Math.min(d.logosWidth(logos.slice(0,1),lh,0),48);plateW=lw+8;const px=x+W-8-6-plateW,py=y+H-10-6-lh-4;
+    d.rect(px,py,plateW,lh+4,{color:C.white});const sc=lw/d.logosWidth(logos.slice(0,1),lh,0);await d.drawLogos(logos.slice(0,1),px+4,py+2+(lh-lh*sc)/2,lh*sc);}
+   d.text('PANNEAU '+(panel.kind||'').toUpperCase(),x+14,y+H-22,{size:6,f:d.bold,color:C.lime,max:W-28-plateW-6});
    d.text(panel.tag||panel.name,x+14,y+H-38,{size:15,f:d.bold,color:C.white,max:W-28});
    d.text(panel.tag?panel.name:panel.location,x+14,y+H-48,{size:7,color:C.white,max:W-28});
-   d.text([det.mainAmps&&det.mainAmps+' A',fedFromLabel&&'Alim. : '+fedFromLabel+(det.fedFromCircuit?' #'+det.fedFromCircuit:'')].filter(Boolean).join(' · ')||site.name,x+14,y+16,{size:6.5,color:rgb(.8,.87,.83),max:W-28});
-   return;
+   d.text([det.modelId||[det.brand,det.model].filter(Boolean).join(' '),det.mainAmps&&det.mainAmps+' A',fedFromLabel&&'Alim. : '+fedFromLabel+(det.fedFromCircuit?' #'+det.fedFromCircuit:'')].filter(Boolean).join(' · ')||site.name,x+14,y+16,{size:6.5,color:rgb(.8,.87,.83),max:W-28});
+   continue;
   }
   const c=it.c,pos=designation(c);
   let posSize=16;while(posSize>7&&d.width(pos,posSize,d.bold)>46)posSize--;
@@ -308,7 +362,7 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false}){
   lines.forEach((l,j)=>d.text(l,tx,y+H-22-j*11,{size:9,f:d.bold}));
   const meta=[c.amps&&c.amps+' A',c.room,c.protection&&c.protection!=='Standard'?c.protection:''].filter(Boolean).join(' · ');
   if(meta)d.text(meta,tx,y+14,{size:7,color:C.muted,max:tw});
- });
+ }
  return d.pdf.save();
 }
 
@@ -321,7 +375,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  const d=await Doc.create('letter','Bilan de charges — '+panelTitle(panel));
  const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
  d.page();
- header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version,(panel.details?.state||'Existant').toUpperCase()]});
+ await header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version,(panel.details?.state||'Existant').toUpperCase()],logos:panelLogos(panel.details),model:panelModelLine(panel)});
  infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?rep.model.id+' — '+rep.model.label:[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—']]);
  preparedBlock(d,user,generatedAt);
  // Synthèse.

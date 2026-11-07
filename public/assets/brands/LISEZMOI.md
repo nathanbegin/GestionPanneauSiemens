@@ -11,7 +11,8 @@ Fichiers affichés automatiquement sur les plaques de marque, les cartes de mod�
 | `leviton.svg` | Leviton | Wikimedia Commons — File:Leviton_logo.svg |
 | `cutler-hammer.svg` | Cutler-Hammer | **Absent** : la marque CH affiche « Cutler-Hammer » en texte avec le logo Eaton |
 
-Récupérés le 2026-11-06. Commentaires, DOCTYPE et métadonnées retirés ; aucun contenu actif (script, événements).
+Récupérés le 2026-11-06. Les PDF utilisent des copies PNG générées dans `api/_data/logos.js` : après l'ajout ou le remplacement d'un logo, relancez `NODE_PATH=$(npm root -g) node scripts/logos-png.mjs`.
+ Commentaires, DOCTYPE et métadonnées retirés ; aucun contenu actif (script, événements).
 
 Ces logos sont des **marques de commerce** de leurs propriétaires. Leur présence sur Wikimedia Commons ne vaut pas
 autorisation d'usage commercial : avant une mise en production commerciale, vérifiez les conditions de chaque
