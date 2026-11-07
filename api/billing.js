@@ -5,7 +5,7 @@ import {requireUser} from './_lib/auth.js';
 import {planOut,packOut,entitlement,LIVE,AUDIENCES,QUOTA_TYPES,findPromo,parsePromoCodes} from './_lib/plans.js';
 import {rateLimit,recordAttempt} from './_lib/auth.js';
 import {clientIp} from './_lib/http.js';
-import {stripe,stripeConfigured,ensureCustomer,syncPlanPrices,syncPackPrice,upsertSubscription,integrationId} from './_lib/stripe.js';
+import {stripe,stripeConfigured,ensureCustomer,syncPlanPrices,syncPackPrice,upsertSubscription,integrationId,billingMode} from './_lib/stripe.js';
 import {appUrl} from './_lib/mail.js';
 
 export default route(['GET','POST'],async(req,res)=>{
@@ -47,7 +47,7 @@ export default route(['GET','POST'],async(req,res)=>{
   const price=interval==='year'?plan.stripe_price_year:plan.stripe_price_month;
   const s=await stripe('POST','/checkout/sessions',{mode:'subscription',customer,locale:'fr-CA',...integrationId('abonnement'),line_items:[{price,quantity:1}],allow_promotion_codes:true,
    automatic_tax:{enabled:process.env.STRIPE_TAX==='1'},customer_update:process.env.STRIPE_TAX==='1'?{address:'auto'}:undefined,
-   subscription_data:{metadata:{user_id:user.id,plan_id:plan.id},trial_period_days:plan.trial_days>0?plan.trial_days:undefined},
+   subscription_data:{...billingMode(),metadata:{user_id:user.id,plan_id:plan.id},trial_period_days:plan.trial_days>0?plan.trial_days:undefined},
    metadata:{user_id:user.id,plan_id:plan.id},success_url:base+'/app#/abonnement/merci',cancel_url:base+'/app#/abonnement'});
   return res.status(200).json({url:s.url});
  }

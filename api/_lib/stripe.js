@@ -13,6 +13,8 @@ export const stripeMode=(key=process.env.STRIPE_SECRET_KEY)=>!key?'off':/^(sk|rk
 export const stripeKeyType=(key=process.env.STRIPE_SECRET_KEY)=>!key?'':key.startsWith('rk_')?'restricted':'secret';
 // Étiquette des parcours Checkout (tableau de bord Stripe), disponible depuis l'API 2026-03-25.
 export const integrationId=flow=>versionDate(STRIPE_VERSION)>='2026-03-25'?{integration_identifier:`mon-panneau-${flow}-${flow==='abonnement'?'qmzrtkwv':'hjdplxna'}`}:{};
+// Mode de facturation flexible (recommandé par Stripe ; défaut depuis l'API 2025-09-30, disponible dès 2025-06-30).
+export const billingMode=()=>versionDate(STRIPE_VERSION)>='2025-06-30'?{billing_mode:{type:'flexible'}}:{};
 // Abonnement d'une facture, quelle que soit la version d'API de l'événement
 // (invoice.subscription avant 2025-03-31, invoice.parent.subscription_details.subscription ensuite).
 export const invoiceSubscription=inv=>inv?.subscription||inv?.parent?.subscription_details?.subscription||inv?.lines?.data?.find(l=>l.parent?.subscription_item_details?.subscription)?.parent?.subscription_item_details?.subscription||null;
