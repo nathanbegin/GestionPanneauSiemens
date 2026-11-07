@@ -2,9 +2,28 @@
 import {createHmac,timingSafeEqual} from 'node:crypto';
 import {HttpError} from './http.js';
 
-export const STRIPE_VERSION='2024-06-20';
+// Version de l'API Stripe : la plus récente par défaut, modifiable sans redéploiement de code
+// (variable STRIPE_API_VERSION) pour revenir en arrière au besoin.
+export const STRIPE_LATEST='2026-10-28.endive';
+export const STRIPE_VERSION=process.env.STRIPE_API_VERSION||STRIPE_LATEST;
+const versionDate=v=>String(v).slice(0,10);
+// STRIPE_SECRET_KEY accepte une clé restreinte (rk_…, recommandée) ou une clé secrète (sk_…).
 export const stripeConfigured=()=>!!process.env.STRIPE_SECRET_KEY;
-export const stripeMode=()=>String(process.env.STRIPE_SECRET_KEY||'').startsWith('sk_live')?'live':process.env.STRIPE_SECRET_KEY?'test':'off';
+export const stripeMode=(key=process.env.STRIPE_SECRET_KEY)=>!key?'off':/^(sk|rk)_live_/.test(key)?'live':'test';
+export const stripeKeyType=(key=process.env.STRIPE_SECRET_KEY)=>!key?'':key.startsWith('rk_')?'restricted':'secret';
+// Étiquette des parcours Checkout (tableau de bord Stripe), disponible depuis l'API 2026-03-25.
+export const integrationId=flow=>versionDate(STRIPE_VERSION)>='2026-03-25'?{integration_identifier:`mon-panneau-${flow}-${flow==='abonnement'?'qmzrtkwv':'hjdplxna'}`}:{};
+// Abonnement d'une facture, quelle que soit la version d'API de l'événement
+// (invoice.subscription avant 2025-03-31, invoice.parent.subscription_details.subscription ensuite).
+export const invoiceSubscription=inv=>inv?.subscription||inv?.parent?.subscription_details?.subscription||inv?.lines?.data?.find(l=>l.parent?.subscription_item_details?.subscription)?.parent?.subscription_item_details?.subscription||null;
+const idOf=v=>typeof v==='string'?v:v?.id||null;
+// Utilisateur associé à un client Stripe (graphe d'objets Stripe d'abord, métadonnées en secours).
+export async function userForCustomer(sql,customer,fallbackUserId){
+ const id=idOf(customer);
+ if(id){const [u]=await sql`SELECT id FROM app_users WHERE stripe_customer=${id}`;if(u)return u.id;}
+ if(fallbackUserId){const [u]=await sql`SELECT id FROM app_users WHERE id::text=${String(fallbackUserId)}`;if(u)return u.id;}
+ return null;
+}
 
 // Encodage application/x-www-form-urlencoded avec objets et tableaux imbriqués (format Stripe).
 export function encode(obj,prefix='',out=new URLSearchParams()){
@@ -73,7 +92,7 @@ export async function syncPackPrice(sql,pack){
 }
 // Met à jour notre table à partir d'un objet subscription Stripe.
 export async function upsertSubscription(sql,s){
- const userId=s.metadata?.user_id||(await sql`SELECT id FROM app_users WHERE stripe_customer=${s.customer}`)[0]?.id;
+ const userId=await userForCustomer(sql,s.customer,s.metadata?.user_id);
  if(!userId)return null;
  const item=s.items?.data?.[0];
  let planId=s.metadata?.plan_id;
@@ -88,7 +107,7 @@ export async function upsertSubscription(sql,s){
  const ts=v=>v?new Date(v*1000).toISOString():null;
  const start=s.current_period_start??item?.current_period_start,end=s.current_period_end??item?.current_period_end;
  await sql`INSERT INTO app_subscriptions(user_id,plan_id,status,interval,source,stripe_customer,stripe_subscription,current_period_start,current_period_end,cancel_at_period_end,updated_at)
-  VALUES(${userId},${planId},${status},${item?.price?.recurring?.interval||null},'stripe',${s.customer},${s.id},${ts(start)},${ts(end)},${!!s.cancel_at_period_end},now())
+  VALUES(${userId},${planId},${status},${item?.price?.recurring?.interval||null},'stripe',${idOf(s.customer)},${s.id},${ts(start)},${ts(end)},${!!s.cancel_at_period_end},now())
   ON CONFLICT (user_id) DO UPDATE SET plan_id=EXCLUDED.plan_id,status=EXCLUDED.status,interval=EXCLUDED.interval,source='stripe',stripe_customer=EXCLUDED.stripe_customer,
   stripe_subscription=EXCLUDED.stripe_subscription,current_period_start=EXCLUDED.current_period_start,current_period_end=EXCLUDED.current_period_end,cancel_at_period_end=EXCLUDED.cancel_at_period_end,updated_at=now()`;
  return userId;

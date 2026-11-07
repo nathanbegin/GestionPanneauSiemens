@@ -5,7 +5,7 @@ import {requireUser} from './_lib/auth.js';
 import {planOut,packOut,entitlement,LIVE,AUDIENCES,QUOTA_TYPES,findPromo,parsePromoCodes} from './_lib/plans.js';
 import {rateLimit,recordAttempt} from './_lib/auth.js';
 import {clientIp} from './_lib/http.js';
-import {stripe,stripeConfigured,ensureCustomer,syncPlanPrices,syncPackPrice,upsertSubscription} from './_lib/stripe.js';
+import {stripe,stripeConfigured,ensureCustomer,syncPlanPrices,syncPackPrice,upsertSubscription,integrationId} from './_lib/stripe.js';
 import {appUrl} from './_lib/mail.js';
 
 export default route(['GET','POST'],async(req,res)=>{
@@ -30,7 +30,7 @@ export default route(['GET','POST'],async(req,res)=>{
    let [pack]=await sql`SELECT * FROM app_packs WHERE id=${String(data.pack)} AND active`;
    if(!pack)throw new HttpError(404,'Forfait de panneaux introuvable.');
    pack=await syncPackPrice(sql,pack);
-   const s=await stripe('POST','/checkout/sessions',{mode:'payment',customer,locale:'fr-CA',line_items:[{price:pack.stripe_price,quantity:1}],
+   const s=await stripe('POST','/checkout/sessions',{mode:'payment',customer,locale:'fr-CA',...integrationId('forfait-panneaux'),line_items:[{price:pack.stripe_price,quantity:1}],
     automatic_tax:{enabled:process.env.STRIPE_TAX==='1'},customer_update:process.env.STRIPE_TAX==='1'?{address:'auto'}:undefined,
     metadata:{user_id:user.id,pack_id:pack.id},payment_intent_data:{metadata:{user_id:user.id,pack_id:pack.id}},invoice_creation:{enabled:true},
     success_url:base+'/app#/abonnement/merci',cancel_url:base+'/app#/abonnement'});
@@ -45,7 +45,7 @@ export default route(['GET','POST'],async(req,res)=>{
   if(sub?.stripe_subscription&&LIVE.includes(sub.status))throw new HttpError(409,'Vous avez déjà un abonnement. Utilisez « Changer de forfait ».',{hasSubscription:true});
   plan=await syncPlanPrices(sql,plan);
   const price=interval==='year'?plan.stripe_price_year:plan.stripe_price_month;
-  const s=await stripe('POST','/checkout/sessions',{mode:'subscription',customer,locale:'fr-CA',line_items:[{price,quantity:1}],allow_promotion_codes:true,
+  const s=await stripe('POST','/checkout/sessions',{mode:'subscription',customer,locale:'fr-CA',...integrationId('abonnement'),line_items:[{price,quantity:1}],allow_promotion_codes:true,
    automatic_tax:{enabled:process.env.STRIPE_TAX==='1'},customer_update:process.env.STRIPE_TAX==='1'?{address:'auto'}:undefined,
    subscription_data:{metadata:{user_id:user.id,plan_id:plan.id},trial_period_days:plan.trial_days>0?plan.trial_days:undefined},
    metadata:{user_id:user.id,plan_id:plan.id},success_url:base+'/app#/abonnement/merci',cancel_url:base+'/app#/abonnement'});

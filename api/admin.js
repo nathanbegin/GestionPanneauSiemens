@@ -4,6 +4,7 @@ import {getSql} from './_lib/db.js';
 import {route,body,HttpError,isUuid} from './_lib/http.js';
 import {requireUser,adminEmails} from './_lib/auth.js';
 import {planOut,packOut,subOut,entitlement,grantCredits,QUOTA_TYPES,AUDIENCES,LIVE} from './_lib/plans.js';
+import {stripeKeyType,STRIPE_VERSION} from './_lib/stripe.js';
 import {stripe,stripeConfigured,stripeMode,syncPlanPrices,syncPackPrice,upsertSubscription} from './_lib/stripe.js';
 import {FEEDBACK_STATUSES} from '../public/model.js';
 import {loadAiSettings,cleanAiSettings,aiModels,aiSource,imageDetail,modelOrder,deniedModels,aiConfigured,testModel,AI_CATALOG,IMAGE_DETAILS,DEFAULT_MODELS} from './_lib/ai.js';
@@ -31,7 +32,7 @@ export default route(['GET','POST'],async(req,res)=>{
    const [{canceled30}]=await sql`SELECT count(*)::int AS canceled30 FROM app_subscriptions WHERE status='canceled' AND updated_at>now()-interval '30 days'`;
    const [{credits}]=await sql`SELECT coalesce(sum(panels),0)::int AS credits FROM app_credits WHERE source='pack' AND created_at>now()-interval '30 days'`;
    const [{feedbackNew}]=await sql`SELECT count(*)::int AS "feedbackNew" FROM app_feedback WHERE status='nouveau'`;
-   return res.status(200).json({users,new30,panels,paying,mrr:Math.round(mrr),canceled30,packPanels30:credits,feedbackNew,byPlan,stripe:stripeMode(),webhook:!!process.env.STRIPE_WEBHOOK_SECRET,tax:process.env.STRIPE_TAX==='1'});
+   return res.status(200).json({users,new30,panels,paying,mrr:Math.round(mrr),canceled30,packPanels30:credits,feedbackNew,byPlan,stripe:stripeMode(),stripeKey:stripeKeyType(),stripeVersion:STRIPE_VERSION,webhook:!!process.env.STRIPE_WEBHOOK_SECRET,tax:process.env.STRIPE_TAX==='1'});
   }
   if(action==='users'){
    const search='%'+text(q.q,100).toLowerCase()+'%',plan=text(q.plan,60),status=text(q.status,20),page=Math.max(0,int(q.page||0,{max:10000}));

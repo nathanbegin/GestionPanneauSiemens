@@ -102,7 +102,7 @@ Ces valeurs sont insérées au premier démarrage, puis **se modifient dans la c
 
 - **Limites appliquées côté serveur** à la création d'un panneau ou d'un site (HTTP 402). Quand le forfait est épuisé, un crédit prépayé est utilisé. Aucune donnée n'est jamais supprimée ni bloquée en lecture.
 - **Console** : tableau de bord (revenu mensuel récurrent estimé, abonnés, annulations), recherche d'abonnés, fiche abonné (attribuer un forfait offert avec date de fin, changer le forfait Stripe avec ou sans prorata, limite personnalisée, offrir des panneaux, annuler à la fin de la période ou immédiatement, réactiver, **rembourser en totalité ou en partie**), édition des forfaits et des forfaits de panneaux, journal de toutes les actions.
-- **Stripe sans SDK** (`api/_lib/stripe.js`, version d'API figée `2024-06-20`) : Checkout (abonnement ou paiement unique), changement de forfait au prorata, portail client (carte, factures, annulation), produits et prix créés automatiquement à l'enregistrement d'un forfait. Un prix modifié crée un nouveau prix Stripe : les abonnés existants conservent l'ancien.
+- **Stripe sans SDK** (`api/_lib/stripe.js`, dernière version d'API `2026-10-28.endive`, modifiable avec `STRIPE_API_VERSION` ; les deux formes d'objets facture sont gérées) : Checkout (abonnement ou paiement unique), changement de forfait au prorata, portail client (carte, factures, annulation), produits et prix créés automatiquement à l'enregistrement d'un forfait. Un prix modifié crée un nouveau prix Stripe : les abonnés existants conservent l'ancien.
 - **Webhook** `POST /api/stripe-webhook` : signature vérifiée, idempotent. Événements : `checkout.session.completed`, `customer.subscription.created|updated|deleted`, `invoice.payment_failed`, `charge.refunded`.
 - **Mobile** : pas d'achat dans l'application (règles Apple/Google). Les boutons ouvrent la page web.
 
@@ -114,12 +114,14 @@ Variable Vercel `PROMO_CODES`, codes séparés par des virgules, insensibles à 
 L'utilisateur entre le code dans *Mon abonnement*. Fonctionne sans Stripe. Tentatives limitées, utilisation inscrite au journal de la console. Retirer un code de la variable empêche les nouvelles utilisations ; pour retirer l'accès à quelqu'un, annulez son forfait dans la console.
 
 ### Activer Stripe (le moment venu)
-1. Créer le compte Stripe (entreprise, compte bancaire canadien), puis activer **Stripe Tax** (inscriptions TPS/TVQ) si applicable.
-2. Dans Vercel : `STRIPE_SECRET_KEY` (commencer par `sk_test_…`), `ADMIN_EMAILS`, et `STRIPE_TAX=1` si Stripe Tax est activé.
-3. Dans Stripe → Développeurs → Webhooks : ajouter `https://VOTRE-DOMAINE/api/stripe-webhook` avec les 6 événements ci-dessus, puis copier le secret dans `STRIPE_WEBHOOK_SECRET`.
-4. Stripe → Paramètres → Portail client : autoriser l'annulation, la mise à jour de la carte et l'historique des factures. Activer les courriels de rappel avant renouvellement.
-5. Dans la console, ouvrir et enregistrer chaque forfait payant : les produits et prix Stripe sont créés automatiquement.
-6. Tester avec la carte `4242 4242 4242 4242`, puis passer aux clés `sk_live_…` (et recréer le webhook en mode production).
+1. **Bac à sable (sandbox)** : dans Stripe, créer un *sandbox* dédié au développement (plutôt que le mode test partagé). Tout le paramétrage ci-dessous se fait d'abord dans ce sandbox.
+2. **Clé restreinte** (recommandée plutôt qu'une clé secrète `sk_…`) : Développeurs → Clés API → *Créer une clé restreinte* `rk_…` avec seulement ces permissions en **écriture** : Customers, Checkout Sessions, Products, Prices, Subscriptions, Customer portal, Refunds ; en **lecture** : Charges, Invoices, Payment Intents. Ajouter une politique d'accès (restriction d'IP) si possible.
+3. **Vercel** → Environment Variables, en cochant **Sensitive** (valeur non lisible après enregistrement) : `STRIPE_SECRET_KEY` (la clé `rk_test_…`), `STRIPE_WEBHOOK_SECRET`, et `STRIPE_TAX=1` seulement une fois l'inscription fiscale active. Utiliser des clés différentes pour Preview et Production.
+4. **Webhook** : Développeurs → Webhooks → `https://VOTRE-DOMAINE/api/stripe-webhook`, événements : `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`. Copier le secret de signature dans `STRIPE_WEBHOOK_SECRET`. Les litiges et alertes de fraude apparaissent dans **Console → Journal**.
+5. **Taxes (TPS/TVQ)** : Stripe Tax ne perçoit **aucune** taxe tant qu'une inscription n'est pas active (sans erreur). Ajouter les inscriptions Canada (TPS/TVH) et Québec (TVQ) dans Stripe Tax → Inscriptions, *puis* `STRIPE_TAX=1`. Les prix sont « taxes en sus » (`tax_behavior: exclusive`).
+6. **Portail client** : Paramètres → Portail client : autoriser l'annulation, la mise à jour de la carte et l'historique des factures ; activer les courriels de rappel avant renouvellement.
+7. Dans la console, ouvrir et enregistrer chaque forfait payant : les produits (un par forfait) et prix (mensuel / annuel) Stripe sont créés automatiquement.
+8. Tester avec la carte `4242 4242 4242 4242` (et `4000 0000 0000 0341` pour un échec de renouvellement), puis créer la clé restreinte et le webhook **en mode production** (`rk_live_…`) avant le lancement — voir la liste de contrôle « Go live » de Stripe.
 
 > Vercel Hobby interdit l'usage commercial et limite à 12 fonctions (l'application en compte 12) : passer au forfait **Vercel Pro** avant d'encaisser des paiements.
 

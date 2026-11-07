@@ -21,3 +21,17 @@ test('codes promo',()=>{
  assert.equal(findPromo('faux',codes),null);assert.equal(findPromo('',codes),null);
  assert.equal(parsePromoCodes('').length,0);
 });
+
+import {stripeMode,stripeKeyType,invoiceSubscription,integrationId,STRIPE_VERSION} from '../api/_lib/stripe.js';
+test('Stripe : clés, versions d’API et formes d’objets',()=>{
+ assert.equal(stripeMode('rk_live_x'),'live');assert.equal(stripeMode('sk_live_x'),'live');assert.equal(stripeMode('rk_test_x'),'test');assert.equal(stripeMode(''),'off');
+ assert.equal(stripeKeyType('rk_test_x'),'restricted');assert.equal(stripeKeyType('sk_test_x'),'secret');
+ // Ancienne forme (avant 2025-03-31) et nouvelle forme des factures.
+ assert.equal(invoiceSubscription({subscription:'sub_old'}),'sub_old');
+ assert.equal(invoiceSubscription({parent:{subscription_details:{subscription:'sub_new'}}}),'sub_new');
+ assert.equal(invoiceSubscription({lines:{data:[{parent:{subscription_item_details:{subscription:'sub_line'}}}]}}),'sub_line');
+ assert.equal(invoiceSubscription({}),null);
+ assert.match(STRIPE_VERSION,/^\d{4}-\d{2}-\d{2}/);
+ const id=integrationId('abonnement').integration_identifier;
+ assert.match(id,/-[a-z]{8}$/,'suffixe de 8 lettres');
+});
