@@ -521,3 +521,14 @@ dialog.picker{width:min(1100px,calc(100vw - 24px))}
 .ai-upsell{text-align:center;padding:20px}
 .page-actions.center{justify-content:center}
 label.f input[type=color]{width:96px;height:44px;padding:3px;cursor:pointer}
+/* Console : modèles d'IA */
+.ai-models{display:grid;gap:6px;margin:10px 0}
+.ai-model{display:grid;grid-template-columns:24px 22px minmax(0,1fr) auto auto auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid #dfe5dc;border-radius:8px;background:#fff}
+.ai-model.off{opacity:.6;background:#f6f8f5}
+.ai-model-name{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}.ai-model-name code{font-size:12px;color:#5b6b60}
+.ai-model-name .small{flex-basis:100%}
+.ai-rank{font-weight:800;color:#2f6b4f;text-align:center}
+.ai-move{display:inline-flex;gap:2px}
+.ai-test{font-size:12px;grid-column:3/-1}.ai-test:empty{display:none}.ai-test.ok{color:#235c3c}.ai-test.ko{color:#8a2f25}
+@media (max-width:760px){.ai-model{grid-template-columns:24px 22px minmax(0,1fr);}.ai-model>*:nth-child(n+4){grid-column:3}}
+.ai-models+.inline-form input{flex:1;min-width:220px;padding:9px 10px;border:1px solid #d4ddcf;border-radius:8px}

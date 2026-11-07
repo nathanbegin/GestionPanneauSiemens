@@ -5,6 +5,7 @@ import {route,body,HttpError,isUuid} from './_lib/http.js';
 import {requireUser,adminEmails} from './_lib/auth.js';
 import {planOut,packOut,subOut,entitlement,grantCredits,QUOTA_TYPES,AUDIENCES,LIVE} from './_lib/plans.js';
 import {stripe,stripeConfigured,stripeMode,syncPlanPrices,syncPackPrice,upsertSubscription} from './_lib/stripe.js';
+import {loadAiSettings,cleanAiSettings,aiModels,aiSource,imageDetail,modelOrder,deniedModels,aiConfigured,testModel,AI_CATALOG,IMAGE_DETAILS,DEFAULT_MODELS} from './_lib/ai.js';
 
 const int=(v,{min=0,max=1e7,nullable=false}={})=>{if(nullable&&(v===''||v==null))return null;const n=Number(v);if(!Number.isInteger(n)||n<min||n>max)throw new HttpError(400,'Valeur numérique invalide : '+v);return n;};
 const text=(v,max)=>String(v??'').trim().slice(0,max);
@@ -55,10 +56,26 @@ export default route(['GET','POST'],async(req,res)=>{
    const counts=await sql`SELECT plan_id,count(*)::int AS n FROM app_subscriptions WHERE status=ANY(${LIVE}) GROUP BY plan_id`;
    return res.status(200).json({plans:plans.map(p=>({...planOut(p),stripePriceMonth:p.stripe_price_month,stripePriceYear:p.stripe_price_year,subscribers:counts.find(c=>c.plan_id===p.id)?.n||0})),packs:packs.map(k=>({...packOut(k),stripePrice:k.stripe_price})),quotaTypes:QUOTA_TYPES,audiences:AUDIENCES});
   }
+  if(action==='ai'){
+   const settings=await loadAiSettings(sql);
+   const usage=await sql`SELECT model,count(*) FILTER (WHERE ok)::int AS ok,count(*) FILTER (WHERE NOT ok)::int AS failed,coalesce(sum(input_tokens),0)::int AS input,coalesce(sum(output_tokens),0)::int AS output FROM app_ai_scans WHERE created_at>now()-interval '30 days' GROUP BY model ORDER BY 2 DESC`;
+   return res.status(200).json({configured:aiConfigured(),settings,source:aiSource(settings),models:aiModels(settings),order:modelOrder(settings),detail:imageDetail(settings),denied:deniedModels(),
+    envModel:process.env.OPENAI_MODEL||'',defaults:DEFAULT_MODELS,catalog:AI_CATALOG,details:IMAGE_DETAILS,usage});
+  }
   if(action==='audit'){const rows=await sql`SELECT a.*,u.email AS target_email FROM app_admin_audit a LEFT JOIN app_users u ON u.id::text=a.target ORDER BY at DESC LIMIT 200`;return res.status(200).json({log:rows});}
   throw new HttpError(404,'Action inconnue.');
  }
  const d=body(req);
+ if(action==='ai'){
+  const clean=cleanAiSettings(d);
+  await sql`INSERT INTO app_settings(key,value,updated_by) VALUES('ai',${JSON.stringify(clean)}::jsonb,${admin.email}) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now(),updated_by=EXCLUDED.updated_by`;
+  await audit(sql,admin,'ai-settings','ai',clean);
+  return res.status(200).json({ok:true,settings:clean,models:aiModels(clean)});
+ }
+ if(action==='ai-test'){
+  const model=text(d.model,64);
+  return res.status(200).json({model,...await testModel(model)});
+ }
  if(action==='plan'){
   const id=text(d.id,60).toLowerCase();
   if(!/^[a-z0-9][a-z0-9-]{1,59}$/.test(id))throw new HttpError(400,'Identifiant de forfait invalide (lettres minuscules, chiffres, tirets).');

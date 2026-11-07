@@ -3,7 +3,7 @@ import {h,toast,money,fmtDate,fmtRelative,field,select,dialog,confirmDialog} fro
 import {api} from './api.js';
 
 const STATUS={active:'Actif',trialing:'Essai',past_due:'Paiement en retard',canceled:'Annulé',comp:'Offert',gratuit:'Gratuit'};
-const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['journal','Journal']];
+const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['ia','Intelligence artificielle'],['journal','Journal']];
 const centsInput=(name,cents)=>h('input',{name,type:'number',step:'0.01',min:0,value:cents==null?'':(cents/100).toFixed(2),inputmode:'decimal'});
 const toCents=v=>v===''||v==null?null:Math.round(Number(String(v).replace(',','.'))*100);
 
@@ -15,6 +15,7 @@ export async function adminView({ctx,tab='tableau',id}){
  else if(tab==='abonnes')content=await users();
  else if(tab==='forfaits')content=await plans();
  else if(tab==='journal')content=await journal();
+ else if(tab==='ia')content=await aiSettings();
  else content=await overview();
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Console'}),h('h1',{text:'Administration'}))),nav,content);
 }
@@ -135,4 +136,61 @@ async function journal(){
  const {log}=await api('/api/admin?action=audit');
  return h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Date','Administrateur','Action','Cible','Détails'].map(t=>h('th',{text:t})))),
   h('tbody',{},log.length?log.map(l=>h('tr',{},h('td',{text:new Date(l.at).toLocaleString('fr-CA')}),h('td',{text:l.admin_email}),h('td',{text:l.action}),h('td',{text:l.target_email||l.target}),h('td',{class:'small',text:JSON.stringify(l.details).slice(0,200)}))):h('tr',{},h('td',{colspan:5,class:'muted',text:'Aucune action.'})))));
+}
+
+// ---------- Intelligence artificielle : choix et ordre des modèles ----------
+const DETAIL_LABELS={high:'Élevé (recommandé)',original:'Original : pleine résolution, pour les très petites étiquettes',auto:'Automatique',low:'Faible : moins cher, lecture des calibres moins fiable'};
+async function aiSettings(){
+ const box=h('div',{class:'stack'});
+ const load=async()=>{const d=await api('/api/admin?action=ai');render(d);};
+ function render(d){
+  const known=new Map(d.catalog.map(m=>[m.id,m]));
+  // Liste ordonnée : modèles actifs d'abord (dans l'ordre actuel), puis les autres modèles connus.
+  let list=[...d.models.map(id=>({id,on:true})),...d.catalog.filter(m=>!d.models.includes(m.id)).map(m=>({id:m.id,on:false}))];
+  const results=new Map();
+  const rowsBox=h('div',{class:'ai-models'});
+  const detail=select('detail',d.details.map(k=>[k,DETAIL_LABELS[k]||k]),d.detail);
+  const err=h('p',{class:'error',role:'alert'});
+  const price=m=>m&&m.input!=null?`${m.input} $ / ${m.output} $`:'—';
+  const test=async id=>{results.set(id,{pending:true});draw();const r=await api('/api/admin?action=ai-test',{method:'POST',body:{model:id}}).catch(e=>({ok:false,message:e.message}));results.set(id,r);draw();};
+  function draw(){
+   let rank=0;
+   rowsBox.replaceChildren(...list.map((it,i)=>{
+    const m=known.get(it.id),r=results.get(it.id);
+    const move=dir=>{const j=i+dir;if(j<0||j>=list.length)return;[list[i],list[j]]=[list[j],list[i]];draw();};
+    const cb=h('input',{type:'checkbox',checked:it.on,'aria-label':'Utiliser '+it.id,onchange:e=>{it.on=e.target.checked;draw();}});
+    return h('div',{class:'ai-model'+(it.on?'':' off')},
+     h('span',{class:'ai-rank',text:it.on?String(++rank):'—'}),cb,
+     h('div',{class:'ai-model-name'},h('b',{text:m?.label||it.id}),h('code',{text:it.id}),m?.note&&h('span',{class:'small muted',text:m.note}),d.denied.includes(it.id)&&h('span',{class:'badge warn',text:'refusé récemment'})),
+     h('span',{class:'small',title:'Prix par million de jetons (entrée / sortie, $ US)',text:price(m)}),
+     h('span',{class:'ai-move'},h('button',{type:'button',class:'ghost sm','aria-label':'Monter',disabled:i===0,onclick:()=>move(-1)},'▲'),h('button',{type:'button',class:'ghost sm','aria-label':'Descendre',disabled:i===list.length-1,onclick:()=>move(1)},'▼')),
+     h('button',{type:'button',class:'sm',disabled:!d.configured||r?.pending,onclick:()=>test(it.id)},r?.pending?'Test…':'Tester l’accès'),
+     h('span',{class:'ai-test '+(r?.pending?'':r?(r.ok?'ok':'ko'):''),text:r&&!r.pending?(r.ok?`✓ ${r.message}${r.ms?' ('+r.ms+' ms)':''}`:'✗ '+r.message):''}));
+   }));
+  }
+  const custom=h('input',{placeholder:'Autre identifiant de modèle (ex. gpt-6.2-terra)',maxlength:64});
+  const addCustom=()=>{const id=custom.value.trim();if(!/^[a-z0-9][a-z0-9._-]{1,63}$/i.test(id))return toast('Identifiant invalide.');if(!list.some(x=>x.id===id))list.unshift({id,on:true});custom.value='';draw();};
+  const save=async(models,det)=>{err.textContent='';try{await api('/api/admin?action=ai',{method:'POST',body:{models,detail:det}});toast('Réglages de l’IA enregistrés : ils s’appliquent dès la prochaine analyse.');await load();}catch(e){err.textContent=e.message;}};
+  const srcText={console:'réglage de cette console',variable:`variable Vercel OPENAI_MODEL (${d.envModel})`,defaut:'valeurs par défaut de l’application'}[d.source];
+  const usage=d.usage.map(u=>{const m=known.get(u.model);const cost=m&&m.input!=null?(u.input*m.input+u.output*m.output)/1e6:null;return h('tr',{},h('td',{text:u.model}),h('td',{text:u.ok}),h('td',{text:u.failed}),h('td',{text:u.input.toLocaleString('fr-CA')}),h('td',{text:u.output.toLocaleString('fr-CA')}),h('td',{text:cost==null?'—':cost.toLocaleString('fr-CA',{style:'currency',currency:'USD'})}));});
+  box.replaceChildren(
+   h('div',{class:'card form-card'},
+    h('h2',{text:'Lecture de panneaux par IA'}),
+    h('p',{},'Clé OpenAI : ',d.configured?h('b',{text:'✓ configurée'}):h('b',{class:'error',text:'✗ OPENAI_API_KEY manquante dans Vercel'}),' · Modèles utilisés selon : ',h('b',{text:srcText})),
+    h('p',{class:'small muted',text:'Les modèles cochés sont essayés dans l’ordre. Si votre projet OpenAI n’a pas accès à un modèle, le suivant prend le relais, et le modèle refusé est réessayé après 10 minutes (délai d’activation chez OpenAI). Le réglage de cette console a priorité sur la variable OPENAI_MODEL.'}),
+    rowsBox,
+    h('div',{class:'inline-form'},custom,h('button',{type:'button',onclick:addCustom},'Ajouter')),
+    h('div',{class:'fields'},field('Niveau de détail des photos',detail,{hint:'« Original » lit mieux les petites étiquettes mais consomme plus de jetons.'})),
+    err,
+    h('div',{class:'form-actions'},
+     h('button',{type:'button',class:'ghost',onclick:async()=>{if(await confirmDialog('Revenir aux valeurs par défaut (ou à la variable OPENAI_MODEL si elle est définie) ?'))save([],'');}},'Valeurs par défaut'),
+     h('button',{type:'button',class:'primary',onclick:()=>{const models=list.filter(x=>x.on).map(x=>x.id);if(!models.length)return toast('Cochez au moins un modèle.');save(models,detail.value);}},'Enregistrer'))),
+   h('div',{class:'card form-card'},h('h2',{text:'Utilisation (30 derniers jours)'}),
+    h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Modèle','Analyses réussies','Échecs','Jetons en entrée','Jetons en sortie','Coût estimé'].map(t=>h('th',{text:t})))),
+     h('tbody',{},usage.length?usage:[h('tr',{},h('td',{colspan:6,class:'muted',text:'Aucune analyse pour l’instant.'}))]))),
+    h('p',{class:'small muted',text:'Coût estimé à partir des prix publics d’OpenAI ; la facture OpenAI fait foi.'})));
+  draw();
+ }
+ await load();
+ return box;
 }

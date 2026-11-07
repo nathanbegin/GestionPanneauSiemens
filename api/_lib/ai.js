@@ -10,7 +10,34 @@ import {voltages} from '../../public/model.js';
 // on passe au suivant. OPENAI_MODEL peut contenir un modèle ou une liste séparée par des virgules.
 export const DEFAULT_MODELS=['gpt-6.1-terra','gpt-6-astra','gpt-6-luna','gpt-6.1-sol','gpt-5.6-terra','gpt-5.4-mini'];
 export const DEFAULT_MODEL=DEFAULT_MODELS[0];
-export const aiModels=()=>{const v=String(process.env.OPENAI_MODEL||'').split(',').map(x=>x.trim()).filter(Boolean);return v.length?v:DEFAULT_MODELS;};
+// Modèles connus (affichés dans la console d'administration). Prix en $ US par million de jetons (entrée / sortie).
+export const AI_CATALOG=[
+ {id:'gpt-6.1-terra',label:'GPT-6.1 Terra',input:1,output:5,note:'Raisonnement visuel, rapide et économique (recommandé).'},
+ {id:'gpt-6-astra',label:'GPT-6 Astra',input:10,output:50,note:'Le plus puissant : étiquettes difficiles, photos imparfaites.'},
+ {id:'gpt-6.1-sol',label:'GPT-6.1 Sol',input:2,output:10,note:'Proche d’Astra, moins cher.'},
+ {id:'gpt-6-luna',label:'GPT-6 Luna',input:0.1,output:0.5,note:'Très économique, moins précis pour les petits caractères.'},
+ {id:'gpt-5.6-terra',label:'GPT-5.6 Terra',input:null,output:null,note:'Génération précédente.'},
+ {id:'gpt-5.4-mini',label:'GPT-5.4 mini',input:0.75,output:4.5,note:'Génération précédente, économique.'},
+];
+export const IMAGE_DETAILS=['high','original','auto','low'];
+export const MODEL_ID=/^[a-z0-9][a-z0-9._-]{1,63}$/i;
+const parseList=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
+// Réglages enregistrés dans la console (table app_settings, clé « ai »). Priorité : console > OPENAI_MODEL > défaut.
+export async function loadAiSettings(sql){
+ try{const [r]=await sql`SELECT value FROM app_settings WHERE key='ai'`;return r?.value||{};}catch{return {};}
+}
+export function cleanAiSettings(input={}){
+ const models=[...new Set((Array.isArray(input.models)?input.models:[]).map(m=>String(m).trim()).filter(Boolean))];
+ if(models.length>8)throw new HttpError(400,'8 modèles au maximum.');
+ for(const m of models)if(!MODEL_ID.test(m))throw new HttpError(400,'Identifiant de modèle invalide : '+m.slice(0,60));
+ const detail=input.detail?String(input.detail):'';
+ if(detail&&!IMAGE_DETAILS.includes(detail))throw new HttpError(400,'Niveau de détail invalide.');
+ return {models,detail};
+}
+export const aiSource=(settings={})=>settings.models?.length?'console':parseList(process.env.OPENAI_MODEL).length?'variable':'defaut';
+export const aiModels=(settings={})=>settings.models?.length?settings.models:parseList(process.env.OPENAI_MODEL).length?parseList(process.env.OPENAI_MODEL):DEFAULT_MODELS;
+export const imageDetail=(settings={})=>settings.detail||process.env.OPENAI_IMAGE_DETAIL||'high';
+export const deniedModels=(now=Date.now())=>[...deniedAt.keys()].filter(m=>isDenied(m,now));
 // Modèles refusés récemment (model_not_found) : on les saute pendant 10 minutes, puis on les réessaie.
 // Ainsi, un modèle qu'on vient d'autoriser dans le projet OpenAI est repris automatiquement dès qu'il est actif.
 export const DENY_TTL_MS=10*60*1000;
@@ -18,8 +45,8 @@ const deniedAt=new Map();
 export const resetModelCache=()=>deniedAt.clear();
 const isDenied=(m,now=Date.now())=>deniedAt.has(m)&&now-deniedAt.get(m)<DENY_TTL_MS;
 // Ordre d'essai : les modèles non refusés récemment d'abord (dans l'ordre préféré), puis les autres.
-export const modelOrder=(now=Date.now())=>{const list=aiModels();return [...list.filter(m=>!isDenied(m,now)),...list.filter(m=>isDenied(m,now))];};
-export const aiModel=()=>modelOrder()[0];
+export const modelOrder=(settings={},now=Date.now())=>{const list=aiModels(settings);return [...list.filter(m=>!isDenied(m,now)),...list.filter(m=>isDenied(m,now))];};
+export const aiModel=(settings={})=>modelOrder(settings)[0];
 export const aiConfigured=()=>!!process.env.OPENAI_API_KEY;
 export const MAX_FILES=6,MAX_BYTES=3*1024*1024; // ≈ 4 Mo une fois encodé en base64 (limite Vercel : 4,5 Mo).
 
@@ -107,10 +134,10 @@ export function outputText(data){
  throw new HttpError(502,'Réponse de l’IA vide ou incomplète.');
 }
 
-export async function scanPanel({files,hint={}},{fetchImpl=fetch,timeoutMs=55000}={}){
+export async function scanPanel({files,hint={},settings={}},{fetchImpl=fetch,timeoutMs=55000}={}){
  if(!aiConfigured())throw new HttpError(503,'L’analyse par IA n’est pas configurée sur ce serveur (OPENAI_API_KEY manquante).');
- const content=[{type:'input_text',text:scanPrompt(hint)},...toInputParts(files)];
- const order=modelOrder();
+ const content=[{type:'input_text',text:scanPrompt(hint)},...toInputParts(files,imageDetail(settings))];
+ const order=modelOrder(settings);
  const denied=[];
  const started=Date.now();
  for(const model of order){
@@ -137,7 +164,24 @@ export async function scanPanel({files,hint={}},{fetchImpl=fetch,timeoutMs=55000
   let scan;try{scan=JSON.parse(outputText(data));}catch(e){if(e instanceof HttpError)throw e;throw new HttpError(502,'Réponse de l’IA illisible.');}
   return {scan,model,denied,usage:{input:data.usage?.input_tokens||0,output:data.usage?.output_tokens||0}};
  }
- throw new HttpError(503,`Votre projet OpenAI n’a accès à aucun de ces modèles : ${denied.join(', ')}. Autorisez-en un dans platform.openai.com (Settings → Project → Limits → modèles permis), ou indiquez un modèle accessible dans la variable Vercel OPENAI_MODEL.`);
+ throw new HttpError(503,`Votre projet OpenAI n’a accès à aucun de ces modèles : ${denied.join(', ')}. Autorisez-en un dans platform.openai.com (Settings → Project → Limits → modèles permis), ou choisissez un modèle accessible dans Administration → Intelligence artificielle.`);
+}
+
+// Test d'accès à un modèle (console d'administration) : petite requête texte, sans image.
+export async function testModel(model,{fetchImpl=fetch}={}){
+ if(!aiConfigured())return {ok:false,message:'OPENAI_API_KEY manquante.'};
+ if(!MODEL_ID.test(model))return {ok:false,message:'Identifiant invalide.'};
+ const t=Date.now();
+ try{
+  const res=await fetchImpl('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+process.env.OPENAI_API_KEY},
+   body:JSON.stringify({model,input:'Réponds seulement : OK',max_output_tokens:16,store:false}),signal:AbortSignal.timeout(20000)});
+  const data=await res.json().catch(()=>({}));
+  if(res.ok){deniedAt.delete(model);return {ok:true,ms:Date.now()-t,message:'Accessible'};}
+  if(res.status===404||data?.error?.code==='model_not_found'){deniedAt.set(model,Date.now());return {ok:false,status:res.status,message:'Non autorisé pour ce projet OpenAI (ou modèle inexistant).'};}
+  if(res.status===401)return {ok:false,status:401,message:'Clé OpenAI invalide.'};
+  if(res.status===429)return {ok:false,status:429,message:'Limite atteinte ou crédit épuisé.'};
+  return {ok:false,status:res.status,message:String(data?.error?.message||'Erreur '+res.status).slice(0,200)};
+ }catch(e){return {ok:false,message:e?.name==='TimeoutError'?'Délai dépassé.':'Service injoignable.'};}
 }
 
 // Droits : forfaits payants (abonnement actif hors forfait gratuit), fonction « ai » explicite, ou administrateurs.

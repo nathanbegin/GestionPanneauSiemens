@@ -75,11 +75,28 @@ test('repli automatique quand le projet OpenAI n’a pas accès au modèle',asyn
  // Terra refusé récemment : Astra est essayé directement.
  tried.length=0;await scanPanel({files:file},{fetchImpl});assert.deepEqual(tried,['gpt-6-astra']);
  // Après le délai, Terra (maintenant autorisé) est réessayé et redevient le modèle utilisé.
- assert.equal(modelOrder(Date.now()+DENY_TTL_MS+1000)[0],'gpt-6.1-terra');
+ assert.equal(modelOrder({},Date.now()+DENY_TTL_MS+1000)[0],'gpt-6.1-terra');
  resetModelCache();terraOk=true;tried.length=0;
  assert.equal((await scanPanel({files:file},{fetchImpl})).model,'gpt-6.1-terra');assert.deepEqual(tried,['gpt-6.1-terra']);
  process.env.OPENAI_MODEL='modele-a, modele-b';
  const none=async()=>({ok:false,status:404,json:async()=>({error:{code:'model_not_found'}})});
  await assert.rejects(()=>scanPanel({files:file},{fetchImpl:none}),e=>e.status===503&&/modele-a, modele-b/.test(e.message));
  delete process.env.OPENAI_MODEL;delete process.env.OPENAI_API_KEY;resetModelCache();
+});
+
+test('réglages IA de la console : priorité, validation, test d’accès',async()=>{
+ const {aiModels,aiSource,cleanAiSettings,imageDetail,testModel,DEFAULT_MODELS,toInputParts:parts}=await import('../api/_lib/ai.js');
+ delete process.env.OPENAI_MODEL;
+ assert.deepEqual(aiModels({}),DEFAULT_MODELS);assert.equal(aiSource({}),'defaut');
+ process.env.OPENAI_MODEL='gpt-6-luna';assert.deepEqual(aiModels({}),['gpt-6-luna']);assert.equal(aiSource({}),'variable');
+ assert.deepEqual(aiModels({models:['gpt-6-astra']}),['gpt-6-astra'],'la console a priorité sur la variable');assert.equal(aiSource({models:['gpt-6-astra']}),'console');
+ delete process.env.OPENAI_MODEL;
+ assert.deepEqual(cleanAiSettings({models:['gpt-6-astra','gpt-6-astra',' gpt-6-luna '],detail:'original'}),{models:['gpt-6-astra','gpt-6-luna'],detail:'original'});
+ assert.throws(()=>cleanAiSettings({models:['bad model!']}));assert.throws(()=>cleanAiSettings({detail:'max'}));
+ assert.equal(imageDetail({detail:'original'}),'original');assert.equal(imageDetail({}),'high');
+ assert.equal(parts([{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}],imageDetail({detail:'original'}))[0].detail,'original');
+ process.env.OPENAI_API_KEY='k';
+ const ok=await testModel('gpt-6-astra',{fetchImpl:async()=>({ok:true,status:200,json:async()=>({})})});assert.equal(ok.ok,true);
+ const no=await testModel('gpt-6.1-terra',{fetchImpl:async()=>({ok:false,status:403,json:async()=>({error:{code:'model_not_found'}})})});assert.equal(no.ok,false);assert.match(no.message,/Non autorisé/);
+ delete process.env.OPENAI_API_KEY;
 });
