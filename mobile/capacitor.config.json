@@ -1,0 +1,19 @@
+{
+  "appId": "xyz.nathanbegin.monpanneau",
+  "appName": "Mon Panneau",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#183c32",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#183c32"
+    }
+  }
+}

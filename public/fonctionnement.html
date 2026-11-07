@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#183c32">
+<title>Fonctionnement · Mon Panneau</title>
+<meta name="description" content="Guide pas à pas : créer un compte, ajouter un site et ses panneaux, identifier les circuits, produire les rapports PDF et les étiquettes.">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="stylesheet" href="/assets/mp.css">
+<script type="module" src="/js/site.js"></script>
+</head>
+<body>
+<header class="site-header">
+ <div class="container">
+  <a class="brand" href="/"><span class="brand-icon" aria-hidden="true">ϟ</span><span>MON PANNEAU<small>RÉPERTOIRE ÉLECTRIQUE</small></span></a>
+  <button class="nav-toggle ghost" type="button" aria-controls="siteNav" aria-expanded="false" aria-label="Menu">☰</button>
+  <nav class="site-nav" id="siteNav" aria-label="Navigation principale">
+   <a href="/">Accueil</a>
+   <a href="/fonctionnement" aria-current="page">Fonctionnement</a>
+   <a href="/calcul-de-charge">Calcul de charge</a>
+   <a href="/tarifs">Tarifs</a>
+   <a href="/app#/connexion" data-guest>Se connecter</a>
+   <a class="btn primary" href="/app#/inscription" data-guest>Créer un compte gratuit</a>
+   <a class="btn primary" href="/app#/sites" data-member hidden>Mon espace →</a>
+  </nav>
+ </div>
+</header>
+
+<main class="container doc">
+ <section class="hero">
+  <div class="eyebrow">Guide d’utilisation</div>
+  <h1>Comment fonctionne <em>Mon Panneau</em></h1>
+  <p class="lead">Une démarche en quatre niveaux, toujours dans le même ordre. Le fil d’Ariane en haut de l’application vous indique à chaque instant où vous êtes.</p>
+  <nav class="toc" aria-label="Sommaire">
+   <a href="#organisation">Organisation</a><a href="#compte">1. Compte</a><a href="#site">2. Site</a><a href="#panneau">3. Panneau</a><a href="#circuits">4. Circuits</a><a href="#formats">Formats de disjoncteurs</a><a href="#documents">PDF et étiquettes</a><a href="#planification">Planification et charges</a><a href="#pro">Électriciens</a><a href="#mobile">Mobile</a><a href="#faq">Questions</a>
+  </nav>
+ </section>
+
+ <h2 id="organisation">L’organisation : du général au précis</h2>
+ <div class="hierarchy">
+  <div><b>👤 Compte</b><span>Vous, ou votre entreprise d’électricité.</span></div>
+  <div><b>🏠 Site</b><span>Une adresse : maison, chalet, duplex, client…</span></div>
+  <div><b>▦ Panneau</b><span>Panneau principal, sous-panneau du garage, panneau de distribution…</span></div>
+  <div><b>⚡ Circuit</b><span>Chaque disjoncteur : ce qu’il alimente, son calibre, ses notes.</span></div>
+ </div>
+ <p>Un compte peut avoir plusieurs sites, un site plusieurs panneaux, et un panneau autant de circuits que de positions.</p>
+
+ <h2 id="compte">1. Créer votre compte</h2>
+ <ol>
+  <li>Cliquez sur <a href="/app#/inscription">Créer un compte gratuit</a>.</li>
+  <li>Entrez votre nom, votre courriel et un mot de passe d’au moins 10 caractères.</li>
+  <li>Choisissez votre profil : <strong>Particulier</strong> ou <strong>Électricien / entrepreneur</strong>. Le profil pro ajoute votre entreprise, votre licence RBQ et vos coordonnées dans les rapports PDF. Vous pourrez le modifier plus tard dans « Mon compte ».</li>
+ </ol>
+
+ <h2 id="site">2. Ajouter un site (une adresse)</h2>
+ <p>Depuis « Mes sites », touchez <strong>+ Nouveau site</strong>. Donnez-lui un nom facile à reconnaître (« Maison », « Chalet du lac », « Client Tremblay »), puis l’adresse. Le champ client est facultatif et sert surtout aux électriciens.</p>
+
+ <h2 id="panneau">3. Ajouter un panneau</h2>
+ <p>Dans le site, touchez <strong>+ Ajouter un panneau</strong>. Les informations demandées :</p>
+ <ul>
+  <li><strong>Nom</strong> : « Panneau principal », « Sous-panneau garage »…</li>
+  <li><strong>Étiquette (repère)</strong> : un code court inscrit sur le panneau et sur les documents, par exemple <em>P-1</em>, <em>SP-GAR</em>, <em>PD-2</em>.</li>
+  <li><strong>Type</strong> : principal, sous-panneau, distribution, temporaire.</li>
+  <li><strong>Emplacement</strong> : où le trouver. Ex. « Sous-sol, salle mécanique, mur nord ». Précisez le bâtiment s’il y en a plusieurs (garage détaché, atelier…).</li>
+  <li><strong>Nombre de positions</strong> : comptez les emplacements numérotés du panneau (souvent 24, 30, 32, 40 ou 42). Vous pourrez l’ajuster.</li>
+  <li><strong>Marque, modèle, calibre principal et tension</strong> : inscrits sur l’étiquette du fabricant, à l’intérieur de la porte.</li>
+  <li><strong>Alimenté par</strong> : pour un sous-panneau, indiquez le panneau et le circuit qui l’alimentent. Le site affiche alors la hiérarchie d’alimentation.</li>
+ </ul>
+
+ <h2 id="circuits">4. Identifier les circuits</h2>
+ <p>L’onglet <strong>Panneau</strong> reproduit la face avant : positions impaires à gauche, paires à droite, comme sur la plupart des panneaux nord-américains. Touchez un disjoncteur pour ouvrir sa fiche.</p>
+ <ol>
+  <li>Coupez un seul disjoncteur à la fois.</li>
+  <li>Repérez ce qui s’éteint (lumières, prises avec un testeur ou une lampe, appareils).</li>
+  <li>Dans la fiche, indiquez la <strong>désignation</strong> (« Prises du salon »), la <strong>pièce</strong>, le <strong>type d’usage</strong>, le <strong>calibre</strong> (le chiffre sur la manette), la <strong>protection</strong> (DDFT, anti-arc) et passez le statut à <strong>Identifié</strong>.</li>
+  <li>Touchez <strong>Enregistrer et suivant</strong> pour passer au disjoncteur suivant. L’enregistrement est automatique et synchronisé sur tous vos appareils.</li>
+ </ol>
+ <p>Les champs <em>Exceptions</em> et <em>Notes</em> servent aux particularités : « Prise près de la fenêtre non desservie », « Partagé avec la salle de bain ». Les <em>tags</em> (emplacements, fonctions, appareils) facilitent la recherche : tapez « routeur » et le bon disjoncteur s’illumine.</p>
+
+ <h2 id="formats">Formats de disjoncteurs</h2>
+ <p>Dans la fiche d’un circuit, le champ <strong>Format</strong> adapte l’affichage :</p>
+ <div class="formats">
+  <div><strong>Unipolaire</strong>1 position, 120 V. Éclairage, prises.</div>
+  <div><strong>Bipolaire</strong>2 positions (n et n+2), 240 V. Cuisinière, sécheuse, chauffe-eau, plinthes.</div>
+  <div><strong>Tripolaire</strong>3 positions, triphasé (commercial).</div>
+  <div><strong>Jumelé (tandem)</strong>2 demi-disjoncteurs A / B dans une seule position.</div>
+ </div>
+ <p class="muted small">Une position voisine ne peut être fusionnée que si sa fiche est vide : l’application protège vos données.</p>
+
+ <h2 id="documents">Rapports PDF et étiquettes</h2>
+ <p>Dans l’onglet <strong>Documents</strong> d’un panneau, ou depuis la page d’un site :</p>
+ <ul>
+  <li><strong>Aide-mémoire de porte</strong> : une page claire avec tous les circuits en deux colonnes, à fixer à l’intérieur de la porte du panneau.</li>
+  <li><strong>Rapport complet</strong> : informations du site et du panneau, répertoire illustré, tableau détaillé (notes, exceptions, protections), préparé par et ligne de signature.</li>
+  <li><strong>Rapport du site</strong> : tous les panneaux d’une adresse avec la hiérarchie d’alimentation.</li>
+  <li><strong>Étiquettes</strong> : feuille Lettre au format Avery 5160 / 8160 (30 étiquettes de 2⅝ × 1 po) : une étiquette de repère pour le panneau, puis une par circuit. Imprimez à 100 % (taille réelle).</li>
+  <li><strong>Export JSON</strong> : une sauvegarde complète, réimportable dans un nouveau panneau.</li>
+ </ul>
+
+
+ <h2 id="planification">Planification et calcul de charges (forfaits Électricien)</h2>
+ <p>L’onglet <strong>⚡ Planification et charges</strong> d’un panneau sert à concevoir ou vérifier un panneau pièce par pièce :</p>
+ <ol>
+  <li><strong>Choisir un modèle du catalogue</strong> (Siemens EQ, Square D QO et Homeline, Eaton BR, Cutler-Hammer CH, Leviton…) dans la fiche du panneau : marque, calibre principal, positions, circuits maximaux et famille de disjoncteurs se remplissent.</li>
+  <li><strong>Placer les disjoncteurs</strong> : touchez une position, choisissez un disjoncteur du catalogue (unipolaire, bipolaire, jumelé, DDFT, anti-arc) ; la référence indicative est proposée.</li>
+  <li><strong>Ajouter les charges</strong> du circuit à partir de la bibliothèque : bornes de recharge niveaux 1 et 2, thermopompes, plinthes, fournaise, chauffe-eau, thermopompe de piscine, spa, cuisinière, sécheuse… ou une charge personnalisée.</li>
+  <li><strong>Lire les résultats</strong> : courant du circuit, taux de charge du disjoncteur (une charge continue doit rester sous 80 % du calibre), disjoncteur et fil suggérés, phases L1/L2, capacité du panneau par rapport au principal, calcul de charge du logement selon la règle 8-200 (avec la superficie habitable) et suggestions (par exemple la borne la plus puissante qui entre encore sous 80 %).</li>
+  <li><strong>Imprimer</strong> le PDF « Bilan de charges et matériel » : synthèse, alertes, calcul 8-200, liste de charges par circuit et liste de disjoncteurs.</li>
+ </ol>
+ <h3>Bornes de recharge : repères</h3>
+ <ul>
+  <li><strong>Niveau 1</strong> : prise 120 V, 1,4 à 1,9 kW, environ 5 à 8 km d’autonomie par heure.</li>
+  <li><strong>Niveau 2</strong> : 208/240 V, 3,8 à 11,5 kW (7,2 kW le plus courant). Une borne est une charge continue : borne de 30 A → disjoncteur de 40 A ; 40 A → 50 A ; 48 A → 60 A.</li>
+  <li><strong>Niveau 3</strong> (rapide, courant continu) : 50 à 350 kW sur une alimentation triphasée 480 ou 600 V ; ne s’installe pas sur un panneau résidentiel.</li>
+ </ul>
+ <p class="notice">Les valeurs de la bibliothèque sont typiques : la plaque signalétique (MCA/MOP pour les thermopompes) a toujours préséance. Les calculs sont des outils d’aide inspirés du Code canadien de l’électricité et du Code de construction du Québec, chapitre V ; la conformité relève d’un maître électricien.</p>
+ <h2 id="pro">Pour les électriciens</h2>
+ <p>Dans « Mon compte », choisissez le profil <strong>Électricien / entrepreneur</strong> et remplissez le nom de l’entreprise, la licence RBQ, le téléphone et le courriel. Ils apparaissent dans l’en-tête « Préparé par » de chaque rapport. Indiquez aussi dans la fiche du panneau la <strong>date du relevé</strong> et la personne qui l’a effectué. Créez un site par client : le nom du client figure sur le rapport.</p>
+
+ <h2 id="mobile">Application mobile (iOS et Android)</h2>
+ <p>L’application mobile offre les mêmes fonctions et partage le même compte. En attendant sa publication dans l’App Store et Google Play, installez la version web :</p>
+ <ul>
+  <li><strong>iPhone / iPad (Safari)</strong> : ouvrez le site, touchez <em>Partager</em> puis <em>Sur l’écran d’accueil</em>.</li>
+  <li><strong>Android (Chrome)</strong> : ouvrez le site, menu ⋮ puis <em>Installer l’application</em>.</li>
+ </ul>
+
+ <h2 id="faq">Questions fréquentes</h2>
+ <details class="faq"><summary>Mes données sont-elles privées ?</summary><p>Oui. Chaque site et chaque panneau n’est visible que par le compte qui l’a créé. Les mots de passe sont chiffrés (scrypt) et les liens de téléchargement des PDF expirent après 10 minutes.</p></details>
+ <details class="faq"><summary>Mon panneau n’est pas un Siemens. Ça fonctionne ?</summary><p>Oui, toutes les marques sont prises en charge (Siemens, Square D, Eaton, Schneider, Federal Pioneer, etc.). Vous choisissez le nombre de positions de 2 à 84.</p></details>
+ <details class="faq"><summary>Je me suis trompé de nombre de positions.</summary><p>Modifiez-le dans l’onglet « Fiche du panneau ». Les positions ajoutées sont vides; une réduction n’est acceptée que si les positions retirées sont vides.</p></details>
+ <details class="faq"><summary>Puis-je modifier depuis deux appareils ?</summary><p>Oui. Si le même panneau est modifié en même temps ailleurs, l’application vous avertit au lieu d’écraser les changements, et vous propose de recharger.</p></details>
+ <details class="faq"><summary>J’utilisais l’ancienne version avec une clé d’accès.</summary><p>Dans « Mon compte », section « Ancienne version », entrez votre ancienne clé : vos panneaux sont copiés dans un nouveau site, sans rien supprimer. L’ancienne interface reste disponible à l’adresse <a href="/ancien/">/ancien/</a>.</p></details>
+
+ <p class="notice mt">⚠️ Mon Panneau ne contrôle ni ne mesure l’installation. Les informations sont fournies par l’utilisateur. Tout travail électrique doit être confié à un maître électricien.</p>
+ <div class="cta-band mt"><div><h2>On commence ?</h2><p>Votre premier panneau identifié, aujourd’hui.</p></div><a class="btn lg" href="/app#/inscription">Créer un compte gratuit</a></div>
+</main>
+
+<footer class="site-footer">
+ <div class="container">
+  <span>© Mon Panneau · Répertoire électrique</span>
+  <span><a href="/">Accueil</a> · <a href="/conditions">Conditions et confidentialité</a> · <a href="/app#/connexion">Se connecter</a></span>
+ </div>
+</footer>
+</body>
+</html>
