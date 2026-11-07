@@ -84,6 +84,24 @@ export const SCAN_SCHEMA={
  },
 };
 
+// Photos de précision : configuration déjà établie (lecture précédente + corrections de l'utilisateur).
+export function cleanPrevious(list){
+ if(!Array.isArray(list))return [];
+ return list.slice(0,200).filter(b=>Number.isInteger(b?.position)&&b.position>=1&&b.position<=84).map(b=>({
+  position:b.position,half:b.half==='A'||b.half==='B'?b.half:'',poles:[1,2,3].includes(b.poles)?b.poles:1,
+  amps:Number.isInteger(b.amps)?b.amps:null,label:String(b.label||'').slice(0,100),vacant:b.vacant===true,user_confirmed:b.user_confirmed===true}));
+}
+function previousPrompt(hint){
+ const prev=cleanPrevious(hint.previous);
+ if(!prev.length)return [];
+ const panel={brand:String(hint.brand||'').slice(0,60),series:String(hint.series||'').slice(0,60),main_amps:Number.isInteger(hint.mainAmps)?hint.mainAmps:null,positions:Number.isInteger(hint.positions)?hint.positions:null};
+ return [
+  'PHOTOS DE PRÉCISION : une première lecture de ce panneau a déjà été faite. Les nouvelles photos sont des compléments (gros plans, autre angle, répertoire) pour préciser ce qui manquait ou était incertain.',
+  'Renvoie la configuration COMPLÈTE du panneau : conserve les éléments déjà établis ci-dessous, ajoute ce qui manquait, et corrige seulement ce que les nouvelles photos montrent clairement. Ne modifie jamais un élément marqué user_confirmed: true (corrigé par l’utilisateur). Pour les éléments conservés sans nouvelle information, garde la même valeur et une confiance raisonnable.',
+  'Panneau déjà identifié : '+JSON.stringify(panel),
+  'Disjoncteurs déjà établis : '+JSON.stringify(prev),
+ ];
+}
 export function scanPrompt(hint={}){
  const fams=Object.entries(FAMILIES).filter(([k])=>k!=='generic').map(([k,f])=>`${k} = ${f.name}`).join('; ');
  return [
@@ -99,6 +117,7 @@ export function scanPrompt(hint={}){
   hint.brand?`Indication de l’utilisateur — marque : ${String(hint.brand).slice(0,60)}.`:'',
   hint.positions?`Indication de l’utilisateur — nombre de positions : ${Number(hint.positions)||''}.`:'',
   hint.note?`Note de l’utilisateur : ${String(hint.note).slice(0,300)}`:'',
+  ...previousPrompt(hint),
  ].filter(Boolean).join('\n');
 }
 

@@ -40,7 +40,8 @@ export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide
  const content=[h('div',{class:'dlg-head'},h('div',{},eyebrow&&h('div',{class:'eyebrow',text:eyebrow}),h('h2',{text:title})),h('button',{type:'button','aria-label':'Fermer',text:'✕',onclick:close})),h('div',{class:'dlg-body'},body),foot];
  const inner=form?h('form',{novalidate:true},content):content;
  const el=h('dialog',{},inner);
- if(wide)el.style.width='min(860px, calc(100vw - 24px))';
+ // wide : true (860 px) ou 'xl' (presque toute la largeur de l'écran, pour voir un panneau en grand).
+ if(wide==='xl')el.classList.add('xl');else if(wide)el.style.width='min(860px, calc(100vw - 24px))';
  el.addEventListener('close',()=>{el.remove();onClose?.();});
  document.body.append(el);el.showModal();
  return {el,close,form:form?inner:null};

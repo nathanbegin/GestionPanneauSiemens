@@ -40,7 +40,7 @@ const confClass=v=>v==null?'':v>=AI_CONFIDENT?'ok':v>=.5?'mid':'low';
 
 export async function aiImportDialog({site,siblings=[],onCreated}){
  const stage=h('div',{class:'ai-stage'});
- const d=dialog({title:'Ajouter un panneau par photo',eyebrow:'Assistant IA · '+site.name,wide:true,body:[stage]});
+ const d=dialog({title:'Ajouter un panneau par photo',eyebrow:'Assistant IA · '+site.name,wide:'xl',body:[stage]});
  stage.append(h('p',{class:'muted',text:'Vérification de votre forfait…'}));
  let status;
  try{status=await api('/api/panels?action=scan');}catch(e){stage.replaceChildren(h('p',{class:'error',text:e.message}));return;}
@@ -154,17 +154,20 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
   }
   confirm(p);
  }
- function confirm(p){
-  let circuits=p.circuits.map(c=>({...c}));
+ // state : {circuits, edited:Set (corrigés à la main), changed:Map id→'nouveau'|'modifié', note}
+ function confirm(p,state={}){
+  let circuits=(state.circuits||p.circuits).map(c=>({...c}));
+  const edited=new Set(state.edited||[]),changed=state.changed||new Map();
   const art=h('div',{class:'ai-art'});
   const draw=()=>art.replaceChildren(panelArt({panel:{name:p.meta.name,kind:p.meta.kind,positions:p.positions,details:p.meta.details,circuits},showLabels:true}));
-  const rows=sortCircuits(circuits).filter(c=>c.label||c.amps||p.review[c.id]).map(c=>{
+  const rows=sortCircuits(circuits).filter(c=>c.label||c.amps||c.vacant||p.review[c.id]||changed.has(c.id)).map(c=>{
    const r=p.review[c.id];
    const amps=h('select',{'aria-label':'Calibre '+designation(c)},new Option('?',''),...ampsList.map(a=>new Option(a+' A',a)));amps.value=c.amps??'';
-   const label=h('input',{value:c.label,maxlength:100,'aria-label':'Désignation '+designation(c),placeholder:'Désignation'});
-   const upd=()=>{circuits=circuits.map(x=>x.id!==c.id?x:{...x,amps:amps.value===''?null:Number(amps.value),label:label.value.trim(),status:label.value.trim()&&x.status==='Identifié'?'Identifié':'À confirmer'});draw();};
+   const label=h('input',{value:c.vacant?'':c.label,maxlength:100,'aria-label':'Désignation '+designation(c),placeholder:c.vacant?'Espace inutilisé':'Désignation'});
+   const upd=()=>{edited.add(c.id);circuits=circuits.map(x=>x.id!==c.id?x:{...x,vacant:undefined,amps:amps.value===''?null:Number(amps.value),label:label.value.trim(),status:label.value.trim()&&x.status==='Identifié'?'Identifié':'À confirmer'});draw();};
    amps.addEventListener('change',upd);label.addEventListener('change',upd);
-   return h('tr',{class:r?confClass(r.confidence):''},h('td',{text:designation(c)}),h('td',{},amps),h('td',{},label),h('td',{class:'small',text:pct(r?.confidence)}));
+   const ch=changed.get(c.id);
+   return h('tr',{class:[r?confClass(r.confidence):'',ch?'changed':''].join(' ')},h('td',{},designation(c),ch?h('span',{class:'ai-new',text:ch}):null),h('td',{},amps),h('td',{},label),h('td',{class:'small',text:pct(r?.confidence)}));
   });
   const errBox=h('p',{class:'error',role:'alert'});
   const create=h('button',{type:'button',class:'primary lg',onclick:async()=>{
@@ -175,11 +178,79 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
    }catch(e){errBox.textContent=e.message;create.disabled=false;}
   }},'Oui, c’est la configuration en place — créer le panneau');
   stage.replaceChildren(
-   h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Confirmation'}),h('h3',{text:'Est-ce bien la configuration en place ?'})),
-   h('p',{class:'small muted',text:'Comparez avec le panneau réel. Corrigez un calibre ou une désignation directement dans le tableau. Les lignes orange sont à vérifier en priorité. Les circuits sans désignation fiable resteront « À confirmer ».'}),
-   h('div',{class:'ai-build'},art,h('div',{class:'ai-table-wrap'},h('table',{class:'ai-table'},h('thead',{},h('tr',{},h('th',{text:'Pos.'}),h('th',{text:'Calibre'}),h('th',{text:'Désignation'}),h('th',{text:'Confiance'}))),h('tbody',{},rows.length?rows:[h('tr',{},h('td',{colspan:4,class:'muted',text:'Aucun disjoncteur lu : le panneau sera créé vide.'}))])))),
+   h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Confirmation'}),h('h3',{text:'Est-ce bien la configuration en place ?'}),usedModel&&h('span',{class:'small muted',text:'Lu par '+usedModel})),
+   state.note?h('div',{class:'notice info'},state.note):null,
+   h('p',{class:'small muted',text:'Comparez avec le panneau réel. Corrigez un calibre ou une désignation directement dans le tableau. Les lignes orange sont à vérifier en priorité. Il manque quelque chose ? Ajoutez des photos rapprochées pour préciser.'}),
+   h('div',{class:'ai-build'},art,h('div',{class:'ai-table-wrap'},h('table',{class:'ai-table'},h('thead',{},h('tr',{},h('th',{text:'Pos.'}),h('th',{text:'Calibre'}),h('th',{text:'Désignation'}),h('th',{text:'Confiance'}))),h('tbody',{},rows.length?rows:[h('tr',{},h('td',{colspan:4,class:'muted',text:'Aucun disjoncteur lu : ajoutez des photos pour préciser, ou créez le panneau vide.'}))])))),
    errBox,
-   h('div',{class:'form-actions'},h('button',{type:'button',class:'ghost',onclick:()=>identify(p)},'← Revenir à l’identification'),h('button',{type:'button',class:'ghost',onclick:()=>photos()},'Recommencer avec d’autres photos'),create));
+   h('div',{class:'form-actions'},
+    h('button',{type:'button',class:'ghost',onclick:()=>identify(p)},'← Revenir à l’identification'),
+    h('button',{type:'button',class:'ghost',onclick:()=>photos()},'Recommencer'),
+    h('button',{type:'button',onclick:()=>clarify(p,{circuits,edited})},'📷 Ajouter des photos pour préciser'),
+    create));
   draw();
+ }
+
+ // ---------- Photos de précision : l'IA complète la configuration déjà établie ----------
+ function clarify(p,state,err=''){
+  const extra=[];
+  const list=h('div',{class:'ai-files'});
+  const errBox=h('p',{class:'error',role:'alert',text:err});
+  const go=h('button',{type:'button',class:'primary',disabled:true},'Analyser les photos supplémentaires');
+  const refresh=()=>{list.replaceChildren(...extra.map((f,i)=>h('div',{class:'ai-file'},f.thumb?h('img',{src:f.data,alt:f.name}):h('span',{class:'ai-doc',text:'📄'}),h('span',{class:'small',text:f.name}),h('button',{type:'button',class:'ghost sm','aria-label':'Retirer '+f.name,onclick:()=>{extra.splice(i,1);refresh();}},'✕'))));go.disabled=!extra.length;};
+  const add=async input=>{
+   errBox.textContent='';
+   for(const file of [...input.files]){
+    if(extra.length>=MAX_FILES){errBox.textContent=`${MAX_FILES} fichiers au maximum.`;break;}
+    try{const f=await prepare(file);if(extra.reduce((s,x)=>s+x.data.length*.75,0)+f.data.length*.75>MAX_TOTAL)throw Error('Total trop lourd : retirez un fichier.');extra.push(f);}catch(e){errBox.textContent=e.message;}
+   }
+   input.value='';refresh();
+  };
+  const note=h('input',{maxlength:300,placeholder:'Ex. gros plan des positions 21 à 32, répertoire de la porte, étiquette du fabricant'});
+  go.addEventListener('click',()=>readMore(p,state,extra,note.value.trim()));
+  stage.replaceChildren(
+   h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Précision'}),h('h3',{text:'Ajouter des photos pour préciser'})),
+   h('p',{class:'muted',text:'Photographiez de près ce qui manque ou semble incorrect : une rangée de disjoncteurs, des calibres peu lisibles, le répertoire de la porte. L’IA garde ce qui est déjà établi (et vos corrections), puis complète.'}),
+   h('div',{class:'ai-extra'},
+    h('div',{class:'page-actions'},h('label',{class:'btn primary',for:'aiCamera2'},'📷 Prendre une photo'),h('input',{type:'file',accept:'image/*',capture:'environment',class:'sr-only',id:'aiCamera2',onchange:e=>add(e.target)}),
+     h('label',{class:'btn',for:'aiFiles2'},'📁 Choisir des fichiers'),h('input',{type:'file',multiple:true,accept:'image/*,application/pdf,.csv,.txt,.json',class:'sr-only',id:'aiFiles2',onchange:e=>add(e.target)})),
+    list,
+    field('Que montrent ces photos ? (facultatif)',note)),
+   errBox,
+   h('div',{class:'form-actions'},h('button',{type:'button',class:'ghost',onclick:()=>confirm(p,state)},'← Retour à la confirmation'),go));
+  refresh();
+ }
+ async function readMore(p,state,extra,note){
+  const msg=h('p',{class:'ai-wait-msg',text:'Lecture des photos de précision…'});
+  stage.replaceChildren(h('div',{class:'ai-wait'},h('div',{class:'spinner','aria-hidden':'true'}),msg,h('p',{class:'small muted',text:'L’IA complète la configuration déjà établie.'})));
+  const current=state.circuits;
+  // Configuration actuelle transmise à l'IA (les corrections de l'utilisateur sont marquées).
+  const previous=current.filter(c=>c.label||c.amps||c.vacant).map(c=>({position:slotPos(c.slots[0]),half:c.slots.length===1?c.slots[0].slice(-1):'',poles:new Set(c.slots.map(slotPos)).size,amps:c.amps??null,label:c.label||'',vacant:!!c.vacant,user_confirmed:state.edited.has(c.id)}));
+  const det=p.meta.details;
+  try{
+   const out=await api('/api/panels?action=scan',{method:'POST',body:{files:extra.map(({name,data})=>({name,data})),hint:{note,previous,brand:det.brand,series:det.model,mainAmps:det.mainAmps??undefined,positions:p.positions}}});
+   status.used=out.used;usedModel=out.model||usedModel;
+   if(out.notPanel)return clarify(p,state,'L’IA ne reconnaît pas d’éléments de panneau sur ces photos. '+(out.summary||''));
+   const np=out.proposal;
+   let circuits=np.circuits,positions=np.positions;
+   if(positions<p.positions){circuits=resize(circuits,p.positions);positions=p.positions;}
+   // Les corrections de l'utilisateur sont réappliquées si le disjoncteur occupe les mêmes positions.
+   const key=c=>c.slots.join(',');
+   const mine=new Map(current.filter(c=>state.edited.has(c.id)).map(c=>[key(c),c]));
+   const edited=new Set();
+   circuits=circuits.map(c=>{const m=mine.get(key(c));if(!m)return c;edited.add(c.id);return {...c,label:m.label,amps:m.amps,status:m.status,vacant:m.vacant};});
+   // Ce qui a changé par rapport à la configuration précédente.
+   const before=new Map(current.map(c=>[key(c),c]));
+   const changed=new Map();
+   for(const c of circuits){
+    const b=before.get(key(c));
+    const has=c.label||c.amps||c.vacant;
+    if(!b){if(has)changed.set(c.id,'nouveau');continue;}
+    if(has&&(b.label!==c.label||b.amps!==c.amps||!!b.vacant!==!!c.vacant))changed.set(c.id,(b.label||b.amps||b.vacant)?'modifié':'nouveau');
+   }
+   const np2={...p,positions,circuits,review:{...np.review},steps:np.steps,warnings:np.warnings};
+   const note2=`${changed.size} circuit(s) ajouté(s) ou modifié(s) grâce aux photos de précision.`+(np.warnings.length?' À vérifier : '+np.warnings.slice(0,4).join(' · '):'');
+   confirm(np2,{circuits,edited,changed,note:note2});
+  }catch(e){clarify(p,state,e.message);}
  }
 }

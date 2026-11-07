@@ -100,3 +100,13 @@ test('réglages IA de la console : priorité, validation, test d’accès',async
  const no=await testModel('gpt-6.1-terra',{fetchImpl:async()=>({ok:false,status:403,json:async()=>({error:{code:'model_not_found'}})})});assert.equal(no.ok,false);assert.match(no.message,/Non autorisé/);
  delete process.env.OPENAI_API_KEY;
 });
+
+test('photos de précision : configuration précédente transmise à l’IA',async()=>{
+ const {scanPrompt,cleanPrevious}=await import('../api/_lib/ai.js');
+ const prev=[{position:1,poles:2,half:'',amps:40,label:'Cuisinière',user_confirmed:true},{position:99,poles:1},{position:3,poles:7,half:'Z',amps:'x',label:'X'.repeat(300)}];
+ const c=cleanPrevious(prev);
+ assert.equal(c.length,2);assert.equal(c[1].poles,1);assert.equal(c[1].half,'');assert.equal(c[1].amps,null);assert.equal(c[1].label.length,100);
+ const txt=scanPrompt({previous:prev,brand:'Siemens',positions:32});
+ assert.match(txt,/PHOTOS DE PRÉCISION/);assert.match(txt,/"user_confirmed":true/);assert.match(txt,/"positions":32/);
+ assert.doesNotMatch(scanPrompt({}),/PHOTOS DE PRÉCISION/);
+});

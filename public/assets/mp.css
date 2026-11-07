@@ -532,3 +532,13 @@ label.f input[type=color]{width:96px;height:44px;padding:3px;cursor:pointer}
 .ai-test{font-size:12px;grid-column:3/-1}.ai-test:empty{display:none}.ai-test.ok{color:#235c3c}.ai-test.ko{color:#8a2f25}
 @media (max-width:760px){.ai-model{grid-template-columns:24px 22px minmax(0,1fr);}.ai-model>*:nth-child(n+4){grid-column:3}}
 .ai-models+.inline-form input{flex:1;min-width:220px;padding:9px 10px;border:1px solid #d4ddcf;border-radius:8px}
+/* Assistant IA en grand */
+dialog.xl{width:min(1600px,calc(100vw - 24px));height:calc(100dvh - 24px)}
+dialog.xl .ai-build{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+dialog.xl .ai-art svg,dialog.xl .ai-log,dialog.xl .ai-table-wrap{max-height:calc(100dvh - 360px)}
+dialog.xl .ai-art{display:flex;justify-content:center}
+dialog.xl .ai-art svg{width:100%;height:calc(100dvh - 360px);min-height:420px;max-height:none}
+@media (max-width:720px){dialog.xl .ai-art svg{height:auto;max-height:70vh}}
+.ai-table tr.changed td{background:#eef7e9}
+.ai-table .ai-new{font-size:10px;font-weight:800;color:#235c3c;background:#d9efd9;border-radius:99px;padding:1px 6px;margin-left:4px}
+.ai-extra{border:1px dashed #b9c8b5;border-radius:10px;padding:12px;margin:10px 0;background:#f7faf5}
