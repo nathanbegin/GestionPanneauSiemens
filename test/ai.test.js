@@ -61,3 +61,19 @@ test('droits d’accès à l’IA',()=>{
  assert.deepEqual(aiAllowance(e('electricien-solo',true,{planning:true}),false),{allowed:true,monthly:100});
  assert.equal(aiAllowance(e('gratuit',false),true).allowed,true);
 });
+
+test('repli automatique quand le projet OpenAI n’a pas accès au modèle',async()=>{
+ process.env.OPENAI_API_KEY='k';delete process.env.OPENAI_MODEL;
+ const tried=[];
+ const fetchImpl=async(url,opts)=>{const m=JSON.parse(opts.body).model;tried.push(m);
+  if(m!=='gpt-6-astra')return {ok:false,status:403,json:async()=>({error:{code:'model_not_found',message:'no access'}})};
+  return {ok:true,status:200,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(scan)}]}],usage:{}})};};
+ const out=await scanPanel({files:[{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}]},{fetchImpl});
+ assert.equal(out.model,'gpt-6-astra');assert.deepEqual(tried,['gpt-6.1-terra','gpt-6.1-sol','gpt-6-astra']);
+ // Ensuite, le modèle qui fonctionne est essayé en premier.
+ tried.length=0;await scanPanel({files:[{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}]},{fetchImpl});assert.deepEqual(tried,['gpt-6-astra']);
+ process.env.OPENAI_MODEL='modele-a, modele-b';
+ const none=async()=>({ok:false,status:404,json:async()=>({error:{code:'model_not_found'}})});
+ await assert.rejects(()=>scanPanel({files:[{name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}]},{fetchImpl:none}),e=>e.status===503&&/modele-a, modele-b/.test(e.message));
+ delete process.env.OPENAI_MODEL;delete process.env.OPENAI_API_KEY;
+});
