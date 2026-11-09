@@ -61,7 +61,11 @@ export async function billingView({ctx,sub,a,b}){
  const grid=pricingGrid({plans:catalog.plans,packs:catalog.packs,currentPlan:me.plan.id,interval:b||'month',onChoose:choose,onPack:buyPack});
  // Lien direct depuis /tarifs : #/abonnement/choisir/:plan/:interval
  if(sub==='choisir'&&a){const p=catalog.plans.find(x=>x.id===a);if(p&&p.id!==me.plan.id&&catalog.billing)setTimeout(()=>choose(p,b==='year'?'year':'month'),0);history.replaceState(null,'','#/abonnement');}
- return h('div',{class:'container stack'},
+ // Équipe : membre (forfait du propriétaire) ou invitation à rejoindre l'équipe de son électricien.
+ const teamCard=me.team?.role==='member'?h('div',{class:'notice info'},'Vous profitez du forfait de votre équipe. ',h('a',{href:'#/equipe',text:'Voir mon équipe'})):
+  me.team?.role==='owner'?h('div',{class:'notice info'},`Forfait d’équipe : ${me.teamSize} / ${me.seats} places utilisées. `,h('a',{href:'#/equipe',text:'Gérer mon équipe et inviter des membres'})):
+  (!me.live||me.plan.id==='gratuit')?h('div',{class:'notice info'},'Vous travaillez pour un électricien qui a le forfait Électricien Équipe ? ',h('a',{href:'#/equipe',text:'Rejoindre son équipe (lien d’invitation ou recherche)'}),' — sans payer d’abonnement.'):null;
+ return h('div',{class:'container stack'},teamCard,
   h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Compte'}),h('h1',{text:'Mon abonnement'}))),
   thanks,usage,promoForm,billingOff,nativeNote,h('h2',{class:'mt',text:'Forfaits'}),grid);
 }

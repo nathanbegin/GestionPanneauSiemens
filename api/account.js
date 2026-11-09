@@ -9,6 +9,7 @@ import {entitlement} from './_lib/plans.js';
 import {adminEmails} from './_lib/auth.js';
 import {PDFDocument} from 'pdf-lib';
 import {loadPdfSettings} from './_lib/footers.js';
+import {teamAction} from './_lib/team.js';
 
 const s=(v,max)=>String(v??'').trim().slice(0,max);
 function cleanProfile(p={}){
@@ -20,6 +21,8 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
  const sql=await getSql();
  const user=await requireUser(req,sql);
  const action=String(req.query?.action||'');
+ // Équipes (invitations, annuaire, demandes, gestion).
+ if(action.startsWith('team')){const r=await teamAction(sql,req,res,user,action,req.method==='GET'?{}:body(req));if(r!==false)return r;}
  // Image de marque des PDF (logo, couleurs, pied de page).
  const canBrand=async()=>adminEmails().includes(user.email)||!!(await entitlement(sql,user.id)).plan.features?.branding;
  if(req.method==='GET'&&action==='branding'){const ps=await loadPdfSettings(sql);return res.status(200).json({branding:user.branding||{},allowed:await canBrand(),footers:(ps.footers||[]).map(({id,label,text})=>({id,label,text})),legal:ps.legal||''});}

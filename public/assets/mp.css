@@ -614,3 +614,8 @@ html,body{overflow-x:clip}
 .panel-real .rp-target{fill:#7cc58a;fill-opacity:.3;stroke:#2f7048;stroke-width:2;stroke-dasharray:5 3;cursor:copy;animation:pa-pulse 1.4s ease-in-out infinite}
 .plan-art .panel-caption{margin-bottom:6px}
 .workspace>.span-all{grid-column:1/-1}
+/* Équipe */
+.team-row{padding:8px 0;border-bottom:1px solid #e3e8e1;gap:10px}.team-row:last-child{border-bottom:0}
+.team-result{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.invite-link{word-break:break-all;background:#fff;padding:6px 8px;border-radius:6px;font-size:12px}
+.container.narrow{max-width:640px}

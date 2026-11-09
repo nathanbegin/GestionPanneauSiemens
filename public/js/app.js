@@ -3,6 +3,7 @@ import {brandingCard} from './branding.js';
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
+import {teamView,joinInviteView} from './team.js';
 import {h,toast,confirmDialog,fmtRelative,field} from './dom.js';
 import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
@@ -28,6 +29,7 @@ function crumbs(items){
    h('a',{href:'#/sites',role:'menuitem'},'🏠 Mes sites'),
    h('a',{href:'#/compte',role:'menuitem'},'👤 Mon compte'),
    h('a',{href:'#/abonnement',role:'menuitem'},'⭐ Mon abonnement'),
+   h('a',{href:'#/equipe',role:'menuitem'},'👥 Mon équipe'),
    state.user.isAdmin&&h('a',{href:'#/admin',role:'menuitem'},'🛠 Administration'),
    h('a',{href:webUrl('/fonctionnement'),role:'menuitem',target:NATIVE?'_blank':null},'❓ Fonctionnement'),
    h('button',{type:'button',role:'menuitem',onclick:()=>feedbackDialog()},'💡 Suggérer une amélioration'),
@@ -220,6 +222,8 @@ async function route(){
   else if(name==='sites'&&id)node=await siteView(id);
   else if(name==='panneaux'&&id)node=await panelView({id,tab:sub,ctx});
   else if(name==='compte')node=accountView();
+  else if(name==='equipe')node=await teamView({ctx});
+  else if(name==='rejoindre'&&id)node=await joinInviteView({ctx,token:id});
   else if(name==='abonnement')node=await billingView({ctx,sub:id,a:sub,b:extra});
   else if(name==='admin'&&state.user.isAdmin)node=await adminView({ctx,tab:id||'tableau',id:sub});
   else if(name===''||name==='sites')node=await sitesView();

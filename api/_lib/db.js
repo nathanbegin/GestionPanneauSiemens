@@ -72,6 +72,11 @@ async function ensureSchema(sql){
  await sql`CREATE INDEX IF NOT EXISTS app_ai_scans_user ON app_ai_scans(user_id, created_at)`;
  await sql`CREATE TABLE IF NOT EXISTS app_feedback(id bigserial PRIMARY KEY, user_id uuid REFERENCES app_users(id) ON DELETE SET NULL, email text NOT NULL DEFAULT '', name text NOT NULL DEFAULT '', category text NOT NULL, message text NOT NULL, page text NOT NULL DEFAULT '', app_version text NOT NULL DEFAULT '', client text NOT NULL DEFAULT 'web', status text NOT NULL DEFAULT 'nouveau', admin_note text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
  await sql`CREATE INDEX IF NOT EXISTS app_feedback_status ON app_feedback(status, created_at)`;
+ // ---- Équipes (forfaits avec la fonction « team ») ----
+ await sql`CREATE TABLE IF NOT EXISTS app_team_members(user_id uuid PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE, owner_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, status text NOT NULL DEFAULT 'active', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+ await sql`CREATE INDEX IF NOT EXISTS app_team_members_owner ON app_team_members(owner_id, status)`;
+ await sql`CREATE TABLE IF NOT EXISTS app_team_invites(id text PRIMARY KEY, owner_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, email text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, used_by uuid, used_at timestamptz, revoked boolean NOT NULL DEFAULT false)`;
+ await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_public boolean NOT NULL DEFAULT false`;
  await sql`CREATE TABLE IF NOT EXISTS app_settings(key text PRIMARY KEY, value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text NOT NULL DEFAULT '')`;
  const {seedPlans}=await import('./plans.js');
  await seedPlans(sql);

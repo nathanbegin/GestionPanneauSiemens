@@ -46,21 +46,44 @@ function periodStart(sub,quotaType){
  }
  return null;
 }
-export async function entitlement(sql,userId){
+// Équipe d'un utilisateur : propriétaire (abonné) et membres actifs. Un membre actif profite du forfait
+// du propriétaire si ce forfait comprend la fonction « team » et que le membre n'a pas son propre forfait payant.
+export async function teamIds(sql,ownerId){
+ const rows=await sql`SELECT user_id FROM app_team_members WHERE owner_id=${ownerId} AND status='active'`;
+ return [ownerId,...rows.map(r=>r.user_id)];
+}
+async function ownEntitlement(sql,userId,ids){
  const [sub]=await sql`SELECT * FROM app_subscriptions WHERE user_id=${userId}`;
  const live=isLive(sub);
  const planId=live?sub.plan_id:FREE_PLAN;
  let [plan]=await sql`SELECT * FROM app_plans WHERE id=${planId}`;
  if(!plan)[plan]=await sql`SELECT * FROM app_plans WHERE id=${FREE_PLAN}`;
+ // Le quota d'un forfait d'équipe couvre tous ses membres.
+ if(!ids)ids=plan.features?.team?await teamIds(sql,userId):[userId];
  const limit=live&&sub.limit_override!=null?sub.limit_override:plan.panel_limit;
  const since=periodStart(live?sub:null,plan.quota_type);
- const [{n:activePanels}]=await sql`SELECT count(*)::int AS n FROM app_panels WHERE user_id=${userId}`;
+ const [{n:activePanels}]=await sql`SELECT count(*)::int AS n FROM app_panels WHERE user_id=ANY(${ids}::uuid[])`;
  const [{n:sites}]=await sql`SELECT count(*)::int AS n FROM app_sites WHERE user_id=${userId}`;
  let used=activePanels;
- if(since){const [{n}]=await sql`SELECT count(*)::int AS n FROM app_panel_events WHERE user_id=${userId} AND source='plan' AND created_at>=${since.toISOString()}`;used=n;}
+ if(since){const [{n}]=await sql`SELECT count(*)::int AS n FROM app_panel_events WHERE user_id=ANY(${ids}::uuid[]) AND source='plan' AND created_at>=${since.toISOString()}`;used=n;}
  const [{n:credits}]=await sql`SELECT coalesce(sum(remaining),0)::int AS n FROM app_credits WHERE user_id=${userId} AND remaining>0 AND expires_at>now()`;
  return {plan:planOut(plan),subscription:sub?subOut(sub):null,live,limit,used,activePanels,sites,credits,periodStart:since?.toISOString()||null,
-  canCreatePanel:limit==null||used<limit||credits>0,canCreateSite:plan.site_limit==null||sites<plan.site_limit};
+  canCreatePanel:limit==null||used<limit||credits>0,canCreateSite:plan.site_limit==null||sites<plan.site_limit,seats:plan.seats||1,teamSize:ids.length};
+}
+export async function entitlement(sql,userId){
+ const own=await ownEntitlement(sql,userId);
+ if(own.live&&own.plan.id!==FREE_PLAN)return {...own,team:own.plan.features?.team?{role:'owner',ownerId:userId}:null};
+ const [m]=await sql`SELECT owner_id FROM app_team_members WHERE user_id=${userId} AND status='active'`;
+ if(m){
+  const ids=await teamIds(sql,m.owner_id);
+  const owner=await ownEntitlement(sql,m.owner_id,ids);
+  if(owner.live&&owner.plan.features?.team){
+   const [{n:sites}]=await sql`SELECT count(*)::int AS n FROM app_sites WHERE user_id=${userId}`;
+   return {...owner,subscription:null,sites,credits:own.credits,canCreatePanel:owner.limit==null||owner.used<owner.limit||own.credits>0,
+    canCreateSite:owner.plan.siteLimit==null||sites<owner.plan.siteLimit,team:{role:'member',ownerId:m.owner_id}};
+  }
+ }
+ return {...own,team:null};
 }
 export const subOut=s=>({planId:s.plan_id,status:s.status,interval:s.interval,source:s.source,currentPeriodStart:s.current_period_start,currentPeriodEnd:s.current_period_end,cancelAtPeriodEnd:s.cancel_at_period_end,limitOverride:s.limit_override,note:s.note,hasStripe:!!s.stripe_subscription});
 
