@@ -608,3 +608,9 @@ html,body{overflow-x:clip}
 .panel-real .rp-slot.dim{opacity:.35}
 .panel-real .rp-label{cursor:pointer}
 .panel-area.real .panel-caption .check{letter-spacing:0;text-transform:none;font-size:13px;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+/* Vue réaliste : pleine largeur quand les désignations sont affichées */
+.workspace>.panel-area.real.wide{grid-column:1/-1}
+.panel-real.with-labels .rp-label{font-family:inherit}
+.panel-real .rp-target{fill:#7cc58a;fill-opacity:.3;stroke:#2f7048;stroke-width:2;stroke-dasharray:5 3;cursor:copy;animation:pa-pulse 1.4s ease-in-out infinite}
+.plan-art .panel-caption{margin-bottom:6px}
+.workspace>.span-all{grid-column:1/-1}

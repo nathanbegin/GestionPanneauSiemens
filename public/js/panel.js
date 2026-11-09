@@ -32,8 +32,8 @@ export async function panelView({id,tab='panel',ctx}){
  const pref=k=>{try{return localStorage.getItem(k);}catch{return null;}};
  const setPref=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
  state.view=pref('mp_panel_view')==='reel'?'reel':'schema';
- // Désignations à côté du panneau : par défaut seulement sur les écrans assez larges.
- state.realLabels=pref('mp_panel_real_labels')?pref('mp_panel_real_labels')!=='0':window.innerWidth>=700;
+ // Désignations à côté du panneau réaliste : désactivées par défaut (la liste des circuits les montre déjà).
+ state.realLabels=pref('mp_panel_real_labels')==='1';
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
 
  const root=h('div',{class:'container'});
@@ -120,7 +120,7 @@ export async function panelView({id,tab='panel',ctx}){
  function realCabinet(){
   const filtering=!!(state.q||state.status||state.tag);
   const labels=h('label',{class:'check small'},h('input',{type:'checkbox',checked:state.realLabels,onchange:e=>{state.realLabels=e.target.checked;setPref('mp_panel_real_labels',e.target.checked?'1':'0');renderBody();}}),'Désignations');
-  return h('section',{class:'panel-area real','aria-label':'Vue réaliste du panneau'},
+  return h('section',{class:'panel-area real'+(state.realLabels?' wide':''),'aria-label':'Vue réaliste du panneau'},
    h('div',{class:'panel-caption'},viewSwitch(),labels),
    h('div',{class:'real-wrap'},panelReal({panel,labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit})),
    h('p',{class:'panel-tip',text:state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche. DDFT : bouton TEST blanc et fil témoin ; anti-arc : bouton TEST bleu.'}));
@@ -163,7 +163,8 @@ export async function panelView({id,tab='panel',ctx}){
  function renderBody(){
   if(state.tab==='panel'){
    const listBox=h('div',{class:'circuit-list'});
-   const cabBox=h('div');
+   // Vue réaliste avec désignations : le panneau occupe toute la largeur, la liste passe dessous.
+   const cabBox=h('div',{class:state.view==='reel'&&state.realLabels?'span-all':''});
    const refresh=()=>{cabBox.replaceChildren(cabinet());circuitList(listBox);};
    body.replaceChildren(h('div',{class:'workspace'},cabBox,h('section',{'aria-label':'Liste des circuits'},bulkBar(),filters(refresh),listBox,legend())));
    refresh();
@@ -269,12 +270,14 @@ export async function panelView({id,tab='panel',ctx}){
   // Panneau réaliste + placement depuis la palette.
   const free=c=>isEmptySlot(c)||(c.status==='Libre'&&!c.label&&!c.notes);
   const targets=state.place?validStarts(panel,state.place,free):null;
-  const art=panelArt({panel,breakersByCat:lib?.byCat||new Map(),highlight:targets,
+  // Même représentation que l'onglet Panneau (schéma ou réaliste), avec placement depuis la palette.
+  const artOpts={panel,breakersByCat:lib?.byCat||new Map(),highlight:targets,
    onCircuit:id=>{if(state.place)return toast('Touchez une position en surbrillance pour placer le disjoncteur, ou terminez le placement.');openCircuit(id);},
    onPosition:async pos=>{
     try{const circuits=placeBreaker(panel.circuits,pos,{...state.place,cat:state.place.cat},panel.positions);await persist({circuits});toast(`${state.place.cat} placé en position ${pos}.`);renderHead();renderBody();}
     catch(e){toast(e.message,7000);}
-   }});
+   }};
+  const art=h('div',{class:'plan-art'},h('div',{class:'panel-caption'},viewSwitch()),state.view==='reel'?h('div',{class:'real-wrap'},panelReal({...artOpts,labels:false})):panelArt(artOpts));
   const banner=state.place&&h('div',{class:'place-banner'},h('span',{},'Placement : ',h('b',{text:state.place.cat}),` · ${state.place.label} — ${targets.size?'touchez une position en surbrillance.':'aucun espace libre suffisant.'}`),h('button',{type:'button',class:'sm',onclick:()=>{state.place=null;renderBody();}},'Terminer'));
   const cabBox=h('div',{class:'stack'},banner,art);
   const palette=lib?breakerPalette({lib,det:panel.details||{},selected:state.place?.cat,onSelect:(b,issues)=>{
