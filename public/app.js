@@ -1,5 +1,5 @@
 import {blank,validate,normalize,designation,tagGroups,allTags,fold,searchable} from './model.js';
-const $=id=>document.getElementById(id),cacheKey='siemens-eq-v2';
+const APP_VERSION='1.10.0';const $=id=>document.getElementById(id),cacheKey='siemens-eq-v2';
 let circuits=blank(),revision=0,key='',connected=false,dirty=false,selected='',busy=false;
 try{const cached=JSON.parse(localStorage.getItem(cacheKey)||localStorage.getItem('siemens-eq-v1'));if(cached){circuits=normalize(cached.circuits);dirty=!!cached.dirty;revision=cached.revision||0;}}catch{}
 let selectedTag='',activeUid='siemens-eq',activePanelName='Panneau principal · Siemens EQ',panelList=[{uid:'siemens-eq',name:activePanelName}];
@@ -116,5 +116,24 @@ $('panelDelete').onclick=async()=>{
  try{const r=await fetch('/api/panels-manager?uid='+encodeURIComponent(id),{method:'DELETE',headers:{Authorization:'Bearer '+key}});const data=await r.json();if(!r.ok)throw Error(data.error);localStorage.removeItem(panelCache(id));await refreshPanels();await selectPanel('siemens-eq');toast('Panneau supprimé.');
  }catch(err){toast(err.message);}
 };
+
+const upd={latest:'',busy:false};
+const newer=(a,b)=>{const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return(x[i]||0)>(y[i]||0);}return false;};
+async function checkUpdate(){
+ $('updateCurrent').textContent='v'+APP_VERSION;$('updateStatus').textContent='Vérification…';$('updateApply').hidden=true;
+ try{const r=await fetch('/version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error();const v=(await r.json()).version;if(!/^\d+\.\d+\.\d+$/.test(v))throw Error();
+  upd.latest=v;$('updateLatest').textContent='v'+v;const old=newer(v,APP_VERSION);$('updateBadge').hidden=!old;
+  $('updateStatus').textContent=old?'Une nouvelle version est disponible. Vos données locales seront conservées.':'L’application est à jour.';$('updateApply').hidden=!old;
+ }catch{$('updateLatest').textContent='—';$('updateStatus').textContent='Impossible de vérifier (hors ligne ?).';}
+}
+async function applyUpdate(){
+ if(upd.busy)return;if(dirty&&!confirm('Des modifications locales ne sont pas synchronisées. Elles sont conservées sur cet appareil. Continuer la mise à jour ?'))return;
+ upd.busy=true;$('updateStatus').textContent='Mise à jour en cours…';
+ try{if('serviceWorker' in navigator)for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();if(window.caches)for(const k of await caches.keys())await caches.delete(k);}catch{}
+ const u=new URL(location.href);u.searchParams.set('v',upd.latest||Date.now());location.replace(u.toString());
+}
+$('updateOpen').onclick=()=>{$('updateDialog').showModal();checkUpdate();};
+$('updateClose').onclick=()=>$('updateDialog').close();$('updateCheck').onclick=checkUpdate;$('updateApply').onclick=applyUpdate;
+fetch('/version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(d=>{if(/^\d+\.\d+\.\d+$/.test(d.version)&&newer(d.version,APP_VERSION))$('updateBadge').hidden=false;}).catch(()=>{});
 
 render();
