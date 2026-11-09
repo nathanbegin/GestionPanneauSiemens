@@ -59,7 +59,7 @@ export function updateCard(){
   finally{check.disabled=false;}
  }
  const card=h('section',{class:'card form-card',id:'miseajour'},h('fieldset',{class:'form-section'},h('legend',{text:'Mise à jour de l’application'}),
-  h('dl',{class:'facts'},h('dt',{text:'Version installée'}),current,h('dt',{text:'Dernière version'}),newest),status),
+  h('p',{class:'small muted',text:'Test de mise à jour : si vous lisez ceci, la version 2.7.1 est installée.'}),h('dl',{class:'facts'},h('dt',{text:'Version installée'}),current,h('dt',{text:'Dernière version'}),newest),status),
   h('div',{class:'form-actions'},check,apply));
  run(false);
  return card;
