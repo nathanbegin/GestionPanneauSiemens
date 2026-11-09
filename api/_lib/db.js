@@ -76,6 +76,8 @@ async function ensureSchema(sql){
  await sql`CREATE TABLE IF NOT EXISTS app_team_members(user_id uuid PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE, owner_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, status text NOT NULL DEFAULT 'active', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
  await sql`CREATE INDEX IF NOT EXISTS app_team_members_owner ON app_team_members(owner_id, status)`;
  await sql`CREATE TABLE IF NOT EXISTS app_team_invites(id text PRIMARY KEY, owner_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, email text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, used_by uuid, used_at timestamptz, revoked boolean NOT NULL DEFAULT false)`;
+ await sql`CREATE TABLE IF NOT EXISTS app_shares(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), owner_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, team_owner uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, site_id uuid REFERENCES app_sites(id) ON DELETE CASCADE, panel_id uuid REFERENCES app_panels(id) ON DELETE CASCADE, target_user uuid REFERENCES app_users(id) ON DELETE CASCADE, can_edit boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now())`;
+ await sql`CREATE INDEX IF NOT EXISTS app_shares_team ON app_shares(team_owner)`;
  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_public boolean NOT NULL DEFAULT false`;
  await sql`CREATE TABLE IF NOT EXISTS app_settings(key text PRIMARY KEY, value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text NOT NULL DEFAULT '')`;
  const {seedPlans}=await import('./plans.js');

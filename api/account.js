@@ -10,6 +10,7 @@ import {adminEmails} from './_lib/auth.js';
 import {PDFDocument} from 'pdf-lib';
 import {loadPdfSettings} from './_lib/footers.js';
 import {teamAction} from './_lib/team.js';
+import {shareAction} from './_lib/shares.js';
 
 const s=(v,max)=>String(v??'').trim().slice(0,max);
 function cleanProfile(p={}){
@@ -22,6 +23,7 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
  const user=await requireUser(req,sql);
  const action=String(req.query?.action||'');
  // Équipes (invitations, annuaire, demandes, gestion).
+ if(['team-shares','team-share','team-unshare'].includes(action)){const r=await shareAction(sql,req,res,user,action,req.method==='GET'?{}:body(req));if(r!==false)return r;}
  if(action.startsWith('team')){const r=await teamAction(sql,req,res,user,action,req.method==='GET'?{}:body(req));if(r!==false)return r;}
  // Image de marque des PDF (logo, couleurs, pied de page).
  const canBrand=async()=>adminEmails().includes(user.email)||!!(await entitlement(sql,user.id)).plan.features?.branding;

@@ -42,8 +42,13 @@ export async function teamAction(sql,req,res,user,action,data){
   if(e.team?.role==='owner'){
    const members=await sql`SELECT m.user_id,m.status,m.created_at,u.name,u.email FROM app_team_members m JOIN app_users u ON u.id=m.user_id WHERE m.owner_id=${user.id} ORDER BY m.status,m.created_at`;
    const invites=await sql`SELECT id,email,created_at,expires_at FROM app_team_invites WHERE owner_id=${user.id} AND used_by IS NULL AND NOT revoked AND expires_at>now() ORDER BY created_at DESC`;
-   return res.status(200).json({role:'owner',plan:e.plan.name,seats:e.seats,used:await seatsUsed(sql,user.id),public:!!user.team_public,company:ownerName(user),
-    members:members.filter(m=>m.status==='active').map(m=>({id:m.user_id,name:m.name,email:m.email,since:m.created_at})),
+   // Utilisation par personne : panneaux actifs et panneaux comptés dans la période du quota.
+   const ids=[user.id,...members.filter(m=>m.status==='active').map(m=>m.user_id)];
+   const act=await sql`SELECT user_id,count(*)::int AS n FROM app_panels WHERE user_id=ANY(${ids}::uuid[]) GROUP BY user_id`;
+   const per=e.periodStart?await sql`SELECT user_id,count(*)::int AS n FROM app_panel_events WHERE user_id=ANY(${ids}::uuid[]) AND source='plan' AND created_at>=${e.periodStart} GROUP BY user_id`:[];
+   const usage=id=>({panels:act.find(r=>r.user_id===id)?.n||0,period:per.find(r=>r.user_id===id)?.n||0});
+   return res.status(200).json({role:'owner',plan:e.plan.name,seats:e.seats,quota:{used:e.used,limit:e.limit,type:e.plan.quotaType,since:e.periodStart},ownerUsage:usage(user.id),ownerName:user.name,used:await seatsUsed(sql,user.id),public:!!user.team_public,company:ownerName(user),
+    members:members.filter(m=>m.status==='active').map(m=>({id:m.user_id,name:m.name,email:m.email,since:m.created_at,...usage(m.user_id)})),
     requests:members.filter(m=>m.status==='pending').map(m=>({id:m.user_id,name:m.name,email:m.email,since:m.created_at})),
     invites:invites.map(i=>({id:i.id.slice(0,10),email:i.email,expiresAt:i.expires_at}))});
   }

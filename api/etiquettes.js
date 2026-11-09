@@ -3,6 +3,7 @@
 import {createHash,timingSafeEqual} from 'node:crypto';
 import {normalize,panelTitle,MAX_POSITIONS} from '../public/model.js';
 import {getSql} from './_lib/db.js';
+import {panelAccess} from './_lib/shares.js';
 import {route,body,HttpError,isUuid} from './_lib/http.js';
 import {requireUser} from './_lib/auth.js';
 
@@ -31,7 +32,7 @@ export default route(['POST'],async(req,res)=>{
   if(!isUuid(data.panelId))throw new HttpError(400,'Panneau invalide.');
   const sql=await getSql();
   const user=await requireUser(req,sql);
-  const [p]=await sql`SELECT id,name,tag,positions,details,circuits FROM app_panels WHERE id=${data.panelId} AND user_id=${user.id}`;
+  const p=(await panelAccess(sql,user.id,String(data.panelId||'')))?.panel;
   if(!p)throw new HttpError(404,'Panneau introuvable.');
   const payload={id:p.id.toLowerCase(),schema:2,panel:panelTitle(p).slice(0,100),mainAmps:p.details?.mainAmps||null,visiblePositions:p.positions,circuits:p.circuits};
   return res.status(200).json(await send(payload,zebraKey));

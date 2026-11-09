@@ -10,6 +10,7 @@ import {adminEmails} from './_lib/auth.js';
 import {APP_VERSION,panelTitle} from '../public/model.js';
 import {appUrl} from './_lib/mail.js';
 import {loadPdfSettings,resolveFooter} from './_lib/footers.js';
+import {siteAccess,panelAccess} from './_lib/shares.js';
 
 const KINDS=['report','door','labels','loads','calc'],FORMATS=['letter','legal'];
 function params(src){
@@ -44,14 +45,16 @@ export default route(['GET','POST'],async(req,res)=>{
  if(!user)throw new HttpError(404,'Compte introuvable.');
  let siteRow,rows;
  if(p.panel){
-  const [panel]=await sql`SELECT * FROM app_panels WHERE id=${p.panel} AND user_id=${userId}`;
+  const panel=(await panelAccess(sql,userId,p.panel))?.panel;
   if(!panel)throw new HttpError(404,'Panneau introuvable.');
   [siteRow]=await sql`SELECT * FROM app_sites WHERE id=${panel.site_id}`;
   rows=[panel];
  }else{
-  [siteRow]=await sql`SELECT * FROM app_sites WHERE id=${p.site} AND user_id=${userId}`;
+  const sa=await siteAccess(sql,userId,p.site);
+  siteRow=sa?.site;
   if(!siteRow)throw new HttpError(404,'Site introuvable.');
   rows=await sql`SELECT * FROM app_panels WHERE site_id=${p.site} ORDER BY created_at`;
+  if(sa.role==='panels')rows=rows.filter(r=>sa.panelIds.includes(r.id));
   if(!rows.length)throw new HttpError(400,'Ce site ne contient encore aucun panneau.');
  }
  const site=siteOut(siteRow);

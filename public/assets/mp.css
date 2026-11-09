@@ -619,3 +619,4 @@ html,body{overflow-x:clip}
 .team-result{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .invite-link{word-break:break-all;background:#fff;padding:6px 8px;border-radius:6px;font-size:12px}
 .container.narrow{max-width:640px}
+.badge.shared{background:#e5eefb;color:#1f4f8f;margin:4px 0}

@@ -7,6 +7,7 @@ import {library,findPanel,panelSnapshot} from './_lib/library.js';
 import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
+import {siteAccess,panelAccess,need} from './_lib/shares.js';
 import {scanPanel,aiAllowance,aiConfigured,aiModel,loadAiSettings} from './_lib/ai.js';
 import {scanToPanel} from '../public/aiscan.js';
 import {rateLimit,recordAttempt} from './_lib/auth.js';
@@ -76,8 +77,10 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  if(req.method==='POST'){
   const data=body(req);
   if(!isUuid(data.siteId))throw new HttpError(400,'Site manquant.');
-  const [site]=await sql`SELECT id FROM app_sites WHERE id=${data.siteId} AND user_id=${user.id}`;
-  if(!site)throw new HttpError(404,'Site introuvable.');
+  // Panneau ajouté dans son site ou dans un site partagé en modification (il appartient au propriétaire du site).
+  const sa=await siteAccess(sql,user.id,data.siteId);
+  if(!sa||!['owner','edit'].includes(sa.role))throw new HttpError(sa?403:404,sa?'Ce site vous est partagé en lecture seule.':'Site introuvable.');
+  const site=sa.site,ownerId=site.user_id;
   const [{n}]=await sql`SELECT count(*)::int AS n FROM app_panels WHERE site_id=${site.id}`;
   if(n>=50)throw new HttpError(400,'Limite de 50 panneaux par site atteinte.');
   const meta=check(()=>cleanPanelMeta(data));
@@ -86,7 +89,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   let positions=checkPositions(data.positions??32),circuits;
   if(data.copyFrom){
    if(!isUuid(data.copyFrom))throw new HttpError(400,'Panneau source invalide.');
-   const [src]=await sql`SELECT positions,circuits FROM app_panels WHERE id=${data.copyFrom} AND user_id=${user.id}`;
+   const src=(await panelAccess(sql,user.id,data.copyFrom))?.panel;
    if(!src)throw new HttpError(404,'Panneau source introuvable.');
    positions=src.positions;circuits=src.circuits;
   }else if(Array.isArray(data.circuits)){
@@ -96,14 +99,15 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
    circuits=check(()=>resize(circuits,positions));
   }else circuits=blank(positions);
   const panelId=newId();
-  await consumePanelQuota(sql,user.id,panelId);
-  const [row]=await sql`INSERT INTO app_panels(id,user_id,site_id,name,tag,kind,location,positions,details,circuits) VALUES(${panelId},${user.id},${site.id},${meta.name},${meta.tag},${meta.kind},${meta.location},${positions},${JSON.stringify(meta.details)}::jsonb,${JSON.stringify(circuits)}::jsonb) RETURNING *`;
+  await consumePanelQuota(sql,ownerId,panelId);
+  const [row]=await sql`INSERT INTO app_panels(id,user_id,site_id,name,tag,kind,location,positions,details,circuits) VALUES(${panelId},${ownerId},${site.id},${meta.name},${meta.tag},${meta.kind},${meta.location},${positions},${JSON.stringify(meta.details)}::jsonb,${JSON.stringify(circuits)}::jsonb) RETURNING *`;
   await sql`UPDATE app_sites SET updated_at=now() WHERE id=${site.id}`;
   return res.status(201).json({panel:panelOut(row)});
  }
  if(!id)throw new HttpError(400,'Panneau manquant.');
- const [row]=await sql`SELECT * FROM app_panels WHERE id=${id} AND user_id=${user.id}`;
- if(!row)throw new HttpError(404,'Panneau introuvable.');
+ const pa=need(await panelAccess(sql,user.id,id),req.method==='PUT');
+ if(req.method==='DELETE'&&pa.role!=='owner')throw new HttpError(403,'Seul le propriétaire peut supprimer ce panneau.');
+ const row=pa.panel;
  if(req.method==='GET'){
   const [site]=await sql`SELECT * FROM app_sites WHERE id=${row.site_id}`;
   const all=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${row.site_id} ORDER BY created_at`;
@@ -111,10 +115,10 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   // Sous-panneaux alimentés directement ou indirectement par ce panneau (pour le bilan de charge).
   const children=[],queue=[row.id],seen=new Set([row.id]);
   while(queue.length){const parent=queue.shift();for(const p of all)if(p.details?.fedFrom===parent&&!seen.has(p.id)){seen.add(p.id);queue.push(p.id);children.push({id:p.id,name:p.name,tag:p.tag,kind:p.kind,circuits:p.circuits});}}
-  return res.status(200).json({panel:panelOut(row),site:siteOut(site),siblings,children});
+  return res.status(200).json({panel:panelOut(row),site:siteOut(site),siblings,children,access:pa.role,sharedBy:pa.by||null});
  }
  if(req.method==='DELETE'){
-  await sql`DELETE FROM app_panels WHERE id=${id} AND user_id=${user.id}`;
+  await sql`DELETE FROM app_panels WHERE id=${id} AND user_id=${row.user_id}`;
   // Les panneaux qui étaient alimentés par celui-ci perdent ce lien.
   await sql`UPDATE app_panels SET details=jsonb_set(details,'{fedFrom}','""'::jsonb) WHERE site_id=${row.site_id} AND details->>'fedFrom'=${id}`;
   return res.status(200).json({ok:true});
@@ -133,7 +137,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
    const parentOf=new Map(sitePanels.map(p=>[p.id,p.details?.fedFrom||'']));
    for(let cur=fedFrom,i=0;cur&&i<60;cur=parentOf.get(cur),i++)if(cur===id)throw new HttpError(400,'Liaison impossible : elle créerait une boucle d’alimentation.');
   }
-  const [u]=await sql`UPDATE app_panels SET details=details||${JSON.stringify({fedFrom,fedFromCircuit:fedFrom?fedFromCircuit:''})}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND user_id=${user.id} RETURNING *`;
+  const [u]=await sql`UPDATE app_panels SET details=details||${JSON.stringify({fedFrom,fedFromCircuit:fedFrom?fedFromCircuit:''})}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} RETURNING *`;
   return res.status(200).json({panel:panelOut(u)});
  }
  if(!Number.isInteger(data.revision))throw new HttpError(400,'Révision manquante.');
@@ -141,7 +145,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  if(data.meta){const m=check(()=>cleanPanelMeta(data.meta));await checkFedFrom(sql,m,row.site_id,id);await applyModel(sql,user,m,row.details);({name,tag,kind,location,details}=m);}
  if(data.circuits!==undefined)circuits=check(()=>validate(normalize(data.circuits,{positions}),{positions}));
  if(data.positions!==undefined&&data.positions!==positions){positions=checkPositions(data.positions);circuits=check(()=>resize(circuits,positions));}
- const [u]=await sql`UPDATE app_panels SET name=${name},tag=${tag},kind=${kind},location=${location},details=${JSON.stringify(details)}::jsonb,positions=${positions},circuits=${JSON.stringify(circuits)}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND user_id=${user.id} AND revision=${data.revision} RETURNING *`;
+ const [u]=await sql`UPDATE app_panels SET name=${name},tag=${tag},kind=${kind},location=${location},details=${JSON.stringify(details)}::jsonb,positions=${positions},circuits=${JSON.stringify(circuits)}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND revision=${data.revision} RETURNING *`;
  if(!u)throw new HttpError(409,'Ce panneau a été modifié ailleurs (autre appareil ou onglet). Rechargez la page pour voir la dernière version.',{conflict:true});
  await sql`UPDATE app_sites SET updated_at=now() WHERE id=${row.site_id}`;
  return res.status(200).json({panel:panelOut(u)});

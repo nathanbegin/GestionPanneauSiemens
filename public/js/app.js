@@ -3,7 +3,7 @@ import {brandingCard} from './branding.js';
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
-import {teamView,joinInviteView} from './team.js';
+import {teamView,joinInviteView,shareDialog} from './team.js';
 import {h,toast,confirmDialog,fmtRelative,field} from './dom.js';
 import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
@@ -115,7 +115,7 @@ async function sitesView(){
  return h('div',{class:'container'},
   h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`Bonjour ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
   h('div',{class:'cards'},...sites.map(s=>h('a',{class:'card site-card',href:'#/sites/'+s.id},
-   h('div',{},h('h2',{text:s.name}),h('div',{class:'addr',text:siteAddress(s)||'Adresse à préciser'}),s.client&&h('div',{class:'addr',text:'Client : '+s.client})),
+   h('div',{},h('h2',{text:s.name}),s.shared&&h('span',{class:'badge shared',text:`👥 Partagé par ${s.shared.by}`}),h('div',{class:'addr',text:siteAddress(s)||'Adresse à préciser'}),s.client&&h('div',{class:'addr',text:'Client : '+s.client})),
    h('div',{class:'chips'},s.panels.length?s.panels.map(p=>h('span',{class:'badge '+(p.progress===100?'ok':''),text:`${p.tag||p.name} · ${p.progress} %`})):h('span',{class:'badge warn',text:'Aucun panneau'})),
    h('div',{class:'small muted',text:'Modifié '+fmtRelative(s.updatedAt)}))),
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site')));
@@ -147,7 +147,7 @@ async function siteView(id){
  return h('div',{class:'container'},
   h('div',{class:'page-head'},
    h('div',{},h('div',{class:'eyebrow',text:'Site'}),h('h1',{text:site.name}),h('div',{class:'sub',text:siteAddress(site)||'Adresse à préciser'}),site.client&&h('div',{class:'sub',text:'Client : '+site.client})),
-   h('div',{class:'page-actions'},h('button',{type:'button',onclick:edit},'Modifier'),panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',onclick:addGuided},'🧭 Mode guidé'),h('button',{type:'button',onclick:addByPhoto},'📷 Ajouter par photo (IA)'),h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
+   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',onclick:addGuided},'🧭 Mode guidé'),h('button',{type:'button',onclick:addByPhoto},'📷 Ajouter par photo (IA)'),h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
     panels.length?h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'))
@@ -155,7 +155,7 @@ async function siteView(id){
    h('aside',{class:'stack'},
     panels.length>0&&h('div',{class:'card side-card'},h('h3',{text:'Hiérarchie d’alimentation'}),tree(panels)),
     h('div',{class:'card side-card'},h('h3',{text:'Informations'}),h('dl',{class:'facts'},h('dt',{text:'Adresse'}),h('dd',{text:siteAddress(site)||'—'}),h('dt',{text:'Client'}),h('dd',{text:site.client||'—'}),h('dt',{text:'Panneaux'}),h('dd',{text:String(panels.length)}),h('dt',{text:'Modifié'}),h('dd',{text:fmtRelative(site.updatedAt)})),site.notes&&h('p',{class:'small muted mt',text:site.notes})),
-    h('button',{type:'button',class:'danger',onclick:remove},'Supprimer ce site'))));
+    site.shared?null:h('button',{type:'button',class:'danger',onclick:remove},'Supprimer ce site'))));
 }
 
 // ---------- Compte ----------

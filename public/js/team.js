@@ -1,5 +1,5 @@
 // Équipe : gestion par le propriétaire (forfait Électricien Équipe), adhésion par lien ou par l'annuaire.
-import {h,field,toast,confirmDialog} from './dom.js';
+import {h,field,toast,confirmDialog,dialog,select} from './dom.js';
 import {api} from './api.js';
 
 const fmt=d=>new Date(d).toLocaleDateString('fr-CA',{dateStyle:'medium'});
@@ -63,13 +63,15 @@ function ownerPanel(d,reload,memo={}){
  return h('div',{class:'stack'},
   h('div',{class:'card form-card'},
    h('div',{class:'row-between'},h('h2',{text:d.company}),h('span',{class:'badge '+(full?'warn':'ok'),text:`${d.used} / ${d.seats} places`})),
-   h('p',{class:'small muted',text:`Forfait ${d.plan} : vous et vos membres partagez ses fonctions et son quota de panneaux. Chacun garde ses propres sites.`}),
+   h('p',{class:'small muted',text:`Forfait ${d.plan} : vous et vos membres partagez ses fonctions et son quota de panneaux. Chacun garde ses sites et peut les partager avec l’équipe.`}),
+   quotaBlock(d),
    h('label',{class:'check'},h('input',{type:'checkbox',checked:d.public,onchange:async e=>{await api('/api/account?action=team-public',{method:'POST',body:{public:e.target.checked}});toast(e.target.checked?'Votre entreprise est visible dans l’annuaire.':'Votre entreprise n’apparaît plus dans l’annuaire.');}}),
     ' Visible dans l’annuaire (vos employés peuvent vous trouver et demander à rejoindre l’équipe)')),
   d.requests.length?h('div',{class:'card form-card'},h('h2',{text:`Demandes à traiter (${d.requests.length})`}),...d.requests.map(r=>h('div',{class:'row-between team-row'},h('div',{},h('b',{text:r.name}),h('div',{class:'small muted',text:`${r.email} · ${fmt(r.since)}`})),
    h('div',{class:'page-actions'},h('button',{type:'button',class:'ghost sm',onclick:()=>respond(r.id,false)},'Refuser'),h('button',{type:'button',class:'primary sm',disabled:full,onclick:()=>respond(r.id,true)},'Accepter'))))):null,
   h('div',{class:'card form-card'},h('h2',{text:`Membres (${d.members.length})`}),
-   d.members.length?d.members.map(m=>h('div',{class:'row-between team-row'},h('div',{},h('b',{text:m.name}),h('div',{class:'small muted',text:`${m.email} · depuis le ${fmt(m.since)}`})),
+   h('div',{class:'row-between team-row'},h('div',{},h('b',{text:`${d.ownerName} (propriétaire)`}),h('div',{class:'small muted',text:usageText(d.ownerUsage,d.quota)}))),
+   d.members.length?d.members.map(m=>h('div',{class:'row-between team-row'},h('div',{},h('b',{text:m.name}),h('div',{class:'small muted',text:`${m.email} · ${usageText(m,d.quota)} · depuis le ${fmt(m.since)}`})),
     h('button',{type:'button',class:'ghost sm',onclick:async()=>{if(!await confirmDialog(`Retirer ${m.name} de l’équipe ? Ses sites lui restent ; il revient au forfait gratuit.`,{title:'Retirer un membre',confirm:'Retirer',danger:true}))return;await api('/api/account?action=team-remove',{method:'POST',body:{userId:m.id}});toast('Membre retiré.');reload();}},'Retirer'))):h('p',{class:'small muted',text:'Aucun membre pour l’instant.'})),
   h('div',{class:'card form-card'},h('h2',{text:'Inviter un membre'}),
    full?h('p',{class:'issue warn',text:'Toutes les places de votre forfait sont occupées.'}):h('div',{class:'inline-form'},email,h('button',{type:'button',class:'primary',onclick:invite},'Créer une invitation')),
@@ -95,4 +97,34 @@ export function doubleBilling(o){
  if(o.cancelAtPeriodEnd)return h('div',{class:'notice info'},`Votre abonnement personnel ${o.plan} est annulé : il ne sera pas renouvelé.`);
  return h('div',{class:'notice'},h('b',{text:'Évitez de payer en double : '}),`votre abonnement personnel ${o.plan} est toujours actif, alors que vous profitez maintenant du forfait de votre équipe. `,
   o.hasStripe?h('a',{href:'#/abonnement',text:'Annuler mon abonnement personnel'}):'Contactez-nous pour l’annuler.');
+}
+
+// ---------- Partager un site ou un panneau avec l'équipe ----------
+export async function shareDialog({siteId,panelId,title}){
+ const q=siteId?'siteId='+siteId:'panelId='+panelId;
+ const body=h('div',{class:'stack'},h('p',{class:'muted',text:'Chargement…'}));
+ const d=dialog({title:'Partager avec mon équipe',eyebrow:title,body:[body],actions:[{label:'Fermer',kind:'primary'}]});
+ const load=async()=>{
+  const r=await api('/api/account?action=team-shares&'+q).catch(e=>({error:e.message}));
+  if(r.error)return body.replaceChildren(h('p',{class:'error',text:r.error}));
+  if(!r.team)return body.replaceChildren(h('p',{class:'muted',text:'Le partage est réservé aux membres d’une équipe (forfait Électricien Équipe). '}),h('a',{href:'#/equipe',onclick:()=>d.close(),text:'Voir Mon équipe'}));
+  const target=select('target',[['team','Toute l’équipe'],...r.members.map(m=>[m.id,m.name])],'team');
+  const right=select('right',[['view','Lecture seule'],['edit','Modification']],'edit');
+  body.replaceChildren(
+   h('p',{class:'small muted',text:siteId?'Le site et tous ses panneaux (actuels et futurs) seront visibles par les personnes choisies. Vous restez propriétaire ; eux ne peuvent pas le supprimer.':'Seul ce panneau sera visible par les personnes choisies. Vous restez propriétaire.'}),
+   r.shares.length?h('div',{},h('h3',{text:'Partagé avec'}),...r.shares.map(s=>h('div',{class:'row-between team-row'},h('span',{},h('b',{text:s.name}),' · ',s.canEdit?'modification':'lecture seule'),
+    h('button',{type:'button',class:'ghost sm',onclick:async()=>{await api('/api/account?action=team-unshare',{method:'POST',body:{id:s.id}});toast('Partage retiré.');load();}},'Retirer')))):h('p',{class:'small',text:'Pas encore partagé.'}),
+   h('div',{class:'fields'},field('Avec',target),field('Droit',right)),
+   h('div',{class:'form-actions'},h('button',{type:'button',class:'primary',onclick:async()=>{try{await api('/api/account?action=team-share',{method:'POST',body:{siteId,panelId,target:target.value,canEdit:right.value==='edit'}});toast('Partagé.');load();}catch(e){toast(e.message,6000);}}},'Partager')));
+ };
+ load();
+}
+
+const periodWord=q=>q?.type==='monthly'?'ce mois-ci':q?.type==='yearly'?'cette année':'';
+function usageText(u,q){return `${u?.panels||0} panneau(x) actif(s)`+(periodWord(q)?` · ${u?.period||0} créé(s) ${periodWord(q)}`:'');}
+function quotaBlock(d){
+ const q=d.quota||{};if(q.limit==null)return h('p',{class:'small',text:`Quota : illimité · ${q.used||0} panneau(x) ${q.type==='active'?'actif(s)':'créé(s) '+periodWord(q)} pour l’équipe.`});
+ const pct=Math.min(100,Math.round((q.used||0)/q.limit*100));
+ return h('div',{class:'mt'},h('div',{class:'row-between small'},h('b',{text:`Quota de l’équipe : ${q.used} / ${q.limit} panneaux ${q.type==='active'?'actifs':periodWord(q)}`}),h('span',{text:pct+' %'})),
+  h('div',{class:'progress'+(pct>=100?' over':pct>80?' high':'')},h('i',{style:{width:pct+'%'}})));
 }

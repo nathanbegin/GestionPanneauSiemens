@@ -14,6 +14,7 @@ import {assignDialog} from './assign.js';
 import {linkedChild} from './feeds.js';
 import {breakerUnits} from '../units.js';
 import {panelDialog} from './forms.js';
+import {shareDialog} from './team.js';
 
 const statusClass=c=>c.vacant?'free vacant':c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
 const shortText=c=>c.vacant?'Espace inutilisé':c.status==='Libre'?'Libre':c.label||'';
@@ -64,13 +65,15 @@ export async function panelView({id,tab='panel',ctx}){
  function renderHead(){
   const s=stats(panel.circuits),det=panel.details||{};
   const fed=siblings.find(x=>x.id===det.fedFrom);
-  head.replaceChildren(h('div',{class:'page-head'},
+  const ro=data.access==='view'?h('p',{class:'notice info',text:`Panneau partagé en lecture seule par ${data.sharedBy} : vous pouvez le consulter et générer ses documents, mais pas le modifier.`}):null;
+  head.replaceChildren(ro||'',h('div',{class:'page-head'},
    h('div',{},
     h('div',{class:'panel-hero'},panel.tag&&h('span',{class:'badge tag',text:panel.tag}),h('h1',{text:panel.name})),
     h('div',{class:'sub'},[panel.kind,panel.location||'Emplacement à préciser',det.building].filter(Boolean).join(' · ')),
     h('div',{class:'progress-line'},h('div',{class:'progress','aria-hidden':'true'},h('i',{style:{width:s.progress+'%'}})),h('span',{text:`${s.identified} identifiés · ${s.free} libres · ${s.toConfirm} à confirmer`})),
     fed&&h('div',{class:'sub small'},'Alimenté par ',h('a',{href:'#/panneaux/'+fed.id,text:panelTitle(fed)}),det.fedFromCircuit?` (circuit ${det.fedFromCircuit})`:'')),
    h('div',{class:'page-actions'},saveState,
+    data.access&&data.access!=='owner'?h('span',{class:'badge shared',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})},'👥 Partager'),
     h('button',{type:'button',onclick:()=>doc({kind:'door'})},'📄 Aide-mémoire PDF'),
     h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes'))));
  }
