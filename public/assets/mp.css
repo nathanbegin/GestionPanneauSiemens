@@ -625,3 +625,11 @@ html,body{overflow-x:clip}
 [data-update] .menu .update-dot{display:inline-block}
 [data-update] .user-menu>button{position:relative}
 [data-update] .user-menu>button::after{content:"";position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:50%;background:#c9944b;border:2px solid #fff}
+
+/* Grands écrans : l'application occupe presque toute la largeur et les panneaux sont illustrés plus grand. */
+body.app .container{max-width:min(1760px,96vw)}
+@media (min-width:1300px){
+ .workspace .panel-art{max-width:900px}
+ .workspace .cabinet{max-width:720px}
+ .form-card{max-width:1100px}
+}
