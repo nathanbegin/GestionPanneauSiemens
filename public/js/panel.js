@@ -34,7 +34,7 @@ export async function panelView({id,tab='panel',ctx}){
  const setPref=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
  state.view=pref('mp_panel_view')==='reel'?'reel':'schema';
  // Désignations à côté du panneau réaliste : désactivées par défaut (la liste des circuits les montre déjà).
- state.realLabels=pref('mp_panel_real_labels')==='1';
+ state.realLabels=pref('mp_panel_real_labels')==='1';state.rzoom=pref('mp_panel_zoom')==='circuits'?'circuits':'full';state.rmult=[1,1.25,1.5,2,3].includes(Number(pref('mp_panel_mult')))?Number(pref('mp_panel_mult')):1;
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
 
  const root=h('div',{class:'container'});
@@ -120,12 +120,27 @@ export async function panelView({id,tab='panel',ctx}){
    h('button',{type:'button','aria-pressed':String(state.view==='schema'),class:state.view==='schema'?'on':'',onclick:()=>{state.view='schema';setPref('mp_panel_view','schema');renderBody();}},'Schéma'),
    h('button',{type:'button','aria-pressed':String(state.view==='reel'),class:state.view==='reel'?'on':'',onclick:()=>{state.view='reel';setPref('mp_panel_view','reel');renderBody();}},'Réaliste'));
  }
+
+ const MULTS=[1,1.25,1.5,2,3];
+ function sized(svg){if(state.rmult>1){svg.style.width=state.rmult*100+'%';svg.style.maxWidth='none';svg.style.maxHeight='none';svg.style.margin='0';}return svg;}
+ function zoomControls(){
+  const setZ=v=>{state.rzoom=v;setPref('mp_panel_zoom',v);renderBody();};
+  const setM=d=>{const i=Math.min(MULTS.length-1,Math.max(0,MULTS.indexOf(state.rmult)+d));state.rmult=MULTS[i];setPref('mp_panel_mult',String(state.rmult));renderBody();};
+  return h('div',{class:'zoom-bar'},
+   h('div',{class:'view-switch',role:'group','aria-label':'Cadrage du panneau'},
+    h('button',{type:'button','aria-pressed':String(state.rzoom==='full'),class:state.rzoom==='full'?'on':'',onclick:()=>setZ('full')},'Entier'),
+    h('button',{type:'button','aria-pressed':String(state.rzoom==='circuits'),class:state.rzoom==='circuits'?'on':'',title:'Agrandir sur la zone des circuits',onclick:()=>setZ('circuits')},'Circuits')),
+   h('div',{class:'view-switch',role:'group','aria-label':'Zoom'},
+    h('button',{type:'button','aria-label':'Réduire le zoom',disabled:state.rmult===MULTS[0],onclick:()=>setM(-1)},'−'),
+    h('button',{type:'button','aria-label':'Réinitialiser le zoom',title:'Réinitialiser',onclick:()=>{state.rmult=1;setPref('mp_panel_mult','1');renderBody();}},'×'+String(state.rmult).replace('.',',')),
+    h('button',{type:'button','aria-label':'Augmenter le zoom',disabled:state.rmult===MULTS.at(-1),onclick:()=>setM(1)},'+')));
+ }
  function realCabinet(){
   const filtering=!!(state.q||state.status||state.tag);
   const labels=h('label',{class:'check small'},h('input',{type:'checkbox',checked:state.realLabels,onchange:e=>{state.realLabels=e.target.checked;setPref('mp_panel_real_labels',e.target.checked?'1':'0');renderBody();}}),'Désignations');
   return h('section',{class:'panel-area real'+(state.realLabels?' wide':''),'aria-label':'Vue réaliste du panneau'},
-   h('div',{class:'panel-caption'},viewSwitch(),labels),
-   h('div',{class:'real-wrap'},panelReal({panel,labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit})),
+   h('div',{class:'panel-caption'},viewSwitch(),zoomControls(),labels),
+   h('div',{class:'real-wrap'},sized(panelReal({panel,crop:state.rzoom==='circuits',labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit}))),
    h('p',{class:'panel-tip',text:state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche. DDFT : bouton TEST blanc et fil témoin ; anti-arc : bouton TEST bleu.'}));
  }
  function cabinet(){

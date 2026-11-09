@@ -641,3 +641,5 @@ body.app .container{max-width:min(1760px,96vw)}
  .workspace .panel-area.real .panel-real{max-height:calc(100vh - 240px);margin:0 auto}
  .workspace>.span-all .panel-area.real .panel-real{max-height:none}
 }
+.zoom-bar{display:inline-flex;gap:8px;flex-wrap:wrap;align-items:center}
+.view-switch button:disabled{opacity:.4}

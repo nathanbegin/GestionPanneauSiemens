@@ -31,7 +31,7 @@ const BW=38; // largeur du bloc d'identification (calibre, référence, bouton T
  * opts : {panel, labels:boolean (désignations de part et d'autre), match?(c)→bool (filtre), selected?:Set<id>,
  *         highlight?:Set<position> (positions de départ proposées), onCircuit(id), onPosition(position)}
  */
-export function panelReal({panel,labels=false,match=null,selected=null,highlight=null,onCircuit,onPosition}){
+export function panelReal({panel,labels=false,match=null,selected=null,highlight=null,crop=false,onCircuit,onPosition}){
  const det=panel.details||{};
  const fam=familyOf(det.family);
  const brand=(fam.brand||det.brand||'').trim();
@@ -42,7 +42,7 @@ export function panelReal({panel,labels=false,match=null,selected=null,highlight
  // Cadrage serré autour du boîtier ; colonnes de désignations de part et d'autre si demandées.
  const left=labels?-115:72,width=labels?830:456;
  const body=det.family&&fam.body?fam.body:'#1b2127';
- const svg=s('svg',{xmlns:NS,viewBox:`${left} 0 ${width} ${total}`,class:'panel-real'+(labels?' with-labels':''),role:'img','aria-label':`Panneau ${brand} ${det.mainAmps?det.mainAmps+' A':''}, ${panel.positions} positions, vue réaliste`});
+ const svg=s('svg',{xmlns:NS,viewBox:crop?`${left} ${Y0-18} ${width} ${rows*P+36}`:`${left} 0 ${width} ${total}`,class:'panel-real'+(labels?' with-labels':''),role:'img','aria-label':`Panneau ${brand} ${det.mainAmps?det.mainAmps+' A':''}, ${panel.positions} positions, vue réaliste`});
  svg.append(s('defs',{},
   grad('rpSteel',[0,'#d1dbe0'],[.19,'#a5b1ba'],[.43,'#bfcbd1'],[.72,'#8e9ba5'],[1,'#c1ccd3'],{x2:1,y2:1}),
   grad('rpTrim',[0,'#7b8893'],[.1,'#d4dee3'],[.45,'#a8b6bf'],[.9,'#ebf1f2'],[1,'#8999a2'],{x2:1,y2:.16}),
