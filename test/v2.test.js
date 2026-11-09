@@ -62,3 +62,13 @@ test('pieds de page des PDF',()=>{
  assert.equal(resolveFooter({footer:'perso'},s).footer,'perso');
  assert.throws(()=>cleanPdfSettings({footers:[{id:'a',label:'x',text:'y'},{id:'a',label:'z',text:'w'}]}));
 });
+
+import {readFileSync as rf} from 'node:fs';
+import {APP_VERSION as APPV} from '../public/model.js';
+import {isNewer} from '../public/js/update.js';
+test('une seule version : package, version.json et cache du service worker suivent APP_VERSION',()=>{
+ assert.equal(JSON.parse(rf('package.json','utf8')).version,APPV);
+ assert.equal(JSON.parse(rf('public/version.json','utf8')).version,APPV);
+ assert.match(rf('public/sw.js','utf8'),new RegExp("CACHE='mon-panneau-v"+APPV.replace(/\./g,'\\.')+"'"));
+});
+test('comparaison de versions',()=>{assert.ok(isNewer('2.7.0','2.6.9'));assert.ok(isNewer('2.10.0','2.9.0'));assert.ok(!isNewer('2.7.0','2.7.0'));assert.ok(!isNewer('2.6.0','2.7.0'));});

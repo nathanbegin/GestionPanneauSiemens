@@ -10,6 +10,7 @@ import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
 import {siteDialog,panelDialog,siteFields,formData} from './forms.js';
 import {panelView} from './panel.js';
 import {billingView} from './billing.js';
+import {updateCard,checkUpdateQuietly} from './update.js';
 import {adminView} from './admin.js';
 
 const view=document.getElementById('view'),topbar=document.getElementById('topbar');
@@ -28,6 +29,7 @@ function crumbs(items){
    h('div',{class:'who'},h('b',{text:state.user.name}),state.user.email),
    h('a',{href:'#/sites',role:'menuitem'},'🏠 Mes sites'),
    h('a',{href:'#/compte',role:'menuitem'},'👤 Mon compte'),
+   h('a',{href:'#/compte',role:'menuitem',onclick:()=>setTimeout(()=>document.getElementById('miseajour')?.scrollIntoView({behavior:'smooth'}),150)},'🔄 Mise à jour',h('i',{class:'update-dot','aria-label':'Nouvelle version disponible'})),
    h('a',{href:'#/abonnement',role:'menuitem'},'⭐ Mon abonnement'),
    h('a',{href:'#/equipe',role:'menuitem'},'👥 Mon équipe'),
    state.user.isAdmin&&h('a',{href:'#/admin',role:'menuitem'},'🛠 Administration'),
@@ -200,7 +202,7 @@ function accountView(){
  del.addEventListener('submit',async ev=>{ev.preventDefault();e4.textContent='';if(!await confirmDialog('Supprimer définitivement votre compte et toutes vos données ?',{title:'Dernière confirmation',confirm:'Supprimer mon compte',danger:true}))return;try{await api('/api/account',{method:'DELETE',body:formData(del)});setToken('');state.user=null;toast('Compte supprimé.');location.hash='#/inscription';}catch(x){e4.textContent=x.message;}});
 
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Paramètres'}),h('h1',{text:'Mon compte'}))),
-  h('div',{class:'stack'},profile,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Mon Panneau v${APP_VERSION}`})));
+  h('div',{class:'stack'},updateCard(),profile,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Mon Panneau v${APP_VERSION}`})));
 }
 
 // ---------- Routeur ----------
@@ -253,4 +255,5 @@ async function boot(){
  route();
 }
 if('serviceWorker' in navigator&&!NATIVE)navigator.serviceWorker.register('sw.js').catch(()=>{});
+checkUpdateQuietly();
 boot();
