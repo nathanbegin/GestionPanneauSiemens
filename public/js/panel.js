@@ -167,7 +167,7 @@ export async function panelView({id,tab='panel',ctx}){
   if(state.tab==='panel'){
    const listBox=h('div',{class:'circuit-list'});
    // Vue réaliste avec désignations : le panneau occupe toute la largeur, la liste passe dessous.
-   const cabBox=h('div',{class:state.view==='reel'&&state.realLabels?'span-all':''});
+   const cabBox=h('div',{class:'sticky-col'+(state.view==='reel'&&state.realLabels?' span-all':'')});
    const refresh=()=>{cabBox.replaceChildren(cabinet());circuitList(listBox);};
    body.replaceChildren(h('div',{class:'workspace'},cabBox,h('section',{'aria-label':'Liste des circuits'},bulkBar(),filters(refresh),listBox,legend())));
    refresh();
@@ -282,7 +282,7 @@ export async function panelView({id,tab='panel',ctx}){
    }};
   const art=h('div',{class:'plan-art'},h('div',{class:'panel-caption'},viewSwitch()),state.view==='reel'?h('div',{class:'real-wrap'},panelReal({...artOpts,labels:false})):panelArt(artOpts));
   const banner=state.place&&h('div',{class:'place-banner'},h('span',{},'Placement : ',h('b',{text:state.place.cat}),` · ${state.place.label} — ${targets.size?'touchez une position en surbrillance.':'aucun espace libre suffisant.'}`),h('button',{type:'button',class:'sm',onclick:()=>{state.place=null;renderBody();}},'Terminer'));
-  const cabBox=h('div',{class:'stack'},banner,art);
+  const cabBox=h('div',{class:'stack sticky-col'},banner,art);
   const palette=lib?breakerPalette({lib,det:panel.details||{},selected:state.place?.cat,onSelect:(b,issues)=>{
    if(!b){toast(issues.map(i=>i.text).join(' ')||'Ce produit ne peut pas être placé.',7000);return;}
    const warn=issues.filter(i=>i.level==='warn');if(warn.length)toast(warn.map(i=>i.text).join(' '),7000);

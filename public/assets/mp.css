@@ -636,6 +636,8 @@ body.app .container{max-width:min(1760px,96vw)}
 
 /* Bureau : le panneau reste visible en entier pendant que la liste de droite défile. */
 @media (min-width:981px){
- .workspace>.panel-area:not(.wide){position:sticky;top:76px;max-height:calc(100vh - 88px);overflow:auto}
- .workspace>.panel-area.real .panel-real{max-height:calc(100vh - 240px);margin:0 auto}
+ .workspace>.sticky-col{position:sticky;top:76px;max-height:calc(100vh - 88px);overflow:auto}
+ .workspace>.sticky-col.span-all{position:static;max-height:none;overflow:visible}
+ .workspace .panel-area.real .panel-real{max-height:calc(100vh - 240px);margin:0 auto}
+ .workspace>.span-all .panel-area.real .panel-real{max-height:none}
 }
