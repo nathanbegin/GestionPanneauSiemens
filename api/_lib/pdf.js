@@ -139,6 +139,7 @@ function preparedBy(user){
 
 function footers(d,label){
  const pages=d.pdf.getPages();
+ if(d.brand?.legal)label=d.brand.legal; // mention par défaut définie dans la console
  if(d.brand?.footer)label=d.brand.footer+'  ·  '+label;
  pages.forEach((p,i)=>{
   p.drawLine({start:{x:M,y:M+8},end:{x:d.W-M,y:M+8},color:d.C.line,thickness:.6});

@@ -26,8 +26,8 @@ export function resizeLogo(file){
 
 export function brandingCard(){
  const card=h('div',{class:'card form-card'},h('p',{class:'muted',text:'Chargement de la personnalisation…'}));
- api('/api/account?action=branding').then(({branding,allowed})=>render(branding||{},allowed)).catch(e=>card.replaceChildren(h('p',{class:'error',text:e.message})));
- function render(b,allowed){
+ api('/api/account?action=branding').then(({branding,allowed,footers,legal})=>render(branding||{},allowed,footers||[],legal)).catch(e=>card.replaceChildren(h('p',{class:'error',text:e.message})));
+ function render(b,allowed,models=[],legal=''){
   if(!allowed){
    card.replaceChildren(h('fieldset',{class:'form-section'},h('legend',{text:'Documents à l’image de votre entreprise'}),
     h('p',{class:'muted',text:'Ajoutez votre logo, vos couleurs et un pied de page à tous les PDF (rapports, aide-mémoire, bilans, notes de calcul, étiquettes).'}),
@@ -38,6 +38,9 @@ export function brandingCard(){
   const primary=h('input',{type:'color',name:'primary',value:b.primary||DEFAULTS.primary});
   const accent=h('input',{type:'color',name:'accent',value:b.accent||DEFAULTS.accent});
   const footer=h('input',{name:'footer',maxlength:140,value:b.footer||'',placeholder:'Ex. Merci de votre confiance — Électricité Exemple inc.'});
+  const model=h('select',{name:'footerId'},new Option('Texte personnalisé (ci-dessous)',''),...models.map(m=>new Option(m.label,m.id)));model.value=b.footerId||'';
+  const sync=()=>{footer.disabled=!!model.value;footer.placeholder=model.value?models.find(m=>m.id===model.value)?.text||'':'Ex. Merci de votre confiance — Électricité Exemple inc.';};
+  model.addEventListener('change',sync);queueMicrotask(sync);
   const file=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp,image/svg+xml',class:'sr-only',id:'brandLogo'});
   const err=h('p',{class:'error',role:'alert'});
   // Aperçu de l'en-tête des PDF.
@@ -63,6 +66,7 @@ export function brandingCard(){
      h('div',{class:'f'},h('span',{},'Logo'),h('div',{class:'page-actions'},h('label',{class:'btn',for:'brandLogo'},'Choisir une image…'),file,removeBtn),h('span',{class:'hint',text:'PNG avec fond transparent idéalement. Redimensionné automatiquement.'})),
      field('Couleur principale (en-tête)',primary),
      field('Couleur d’accent',accent,{hint:'Barre et sur-titres de l’en-tête.'}),
+     models.length?field('Modèle de pied de page',model,{full:true,hint:legal?'Suivi de la mention : '+legal:''}):null,
      field('Pied de page',footer,{full:true}))),
    err,
    h('div',{class:'form-actions'},
@@ -72,7 +76,7 @@ export function brandingCard(){
    ev.preventDefault();err.textContent='';
    try{
     const custom=primary.value!==DEFAULTS.primary||accent.value!==DEFAULTS.accent;
-    await api('/api/account?action=branding',{method:'PUT',body:{primary:custom?primary.value:'',accent:custom?accent.value:'',footer:footer.value,logo}});
+    await api('/api/account?action=branding',{method:'PUT',body:{primary:custom?primary.value:'',accent:custom?accent.value:'',footer:footer.value,footerId:model.value,logo}});
     toast('Personnalisation enregistrée : elle s’applique aux prochains PDF.');
    }catch(e){err.textContent=e.message;}
   });

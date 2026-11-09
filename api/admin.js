@@ -7,6 +7,7 @@ import {planOut,packOut,subOut,entitlement,grantCredits,QUOTA_TYPES,AUDIENCES,LI
 import {stripeKeyType,STRIPE_VERSION} from './_lib/stripe.js';
 import {stripe,stripeConfigured,stripeMode,syncPlanPrices,syncPackPrice,upsertSubscription} from './_lib/stripe.js';
 import {FEEDBACK_STATUSES} from '../public/model.js';
+import {loadPdfSettings,cleanPdfSettings} from './_lib/footers.js';
 import {loadAiSettings,cleanAiSettings,aiModels,aiSource,imageDetail,modelOrder,deniedModels,aiConfigured,testModel,AI_CATALOG,IMAGE_DETAILS,DEFAULT_MODELS} from './_lib/ai.js';
 
 const int=(v,{min=0,max=1e7,nullable=false}={})=>{if(nullable&&(v===''||v==null))return null;const n=Number(v);if(!Number.isInteger(n)||n<min||n>max)throw new HttpError(400,'Valeur numérique invalide : '+v);return n;};
@@ -65,6 +66,7 @@ export default route(['GET','POST'],async(req,res)=>{
    return res.status(200).json({configured:aiConfigured(),settings,source:aiSource(settings),models:aiModels(settings),order:modelOrder(settings),detail:imageDetail(settings),denied:deniedModels(),
     envModel:process.env.OPENAI_MODEL||'',defaults:DEFAULT_MODELS,catalog:AI_CATALOG,details:IMAGE_DETAILS,usage});
   }
+  if(action==='pdf')return res.status(200).json(await loadPdfSettings(sql));
   if(action==='feedback'){
    const status=text(q.status,20);
    const rows=await sql`SELECT id,user_id,email,name,category,message,page,app_version,client,status,admin_note,created_at,updated_at FROM app_feedback WHERE (${status}='' OR status=${status}) ORDER BY created_at DESC LIMIT 300`;
@@ -75,6 +77,12 @@ export default route(['GET','POST'],async(req,res)=>{
   throw new HttpError(404,'Action inconnue.');
  }
  const d=body(req);
+ if(action==='pdf'){
+  const clean=cleanPdfSettings(d);
+  await sql`INSERT INTO app_settings(key,value,updated_by) VALUES('pdf',${JSON.stringify(clean)}::jsonb,${admin.email}) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now(),updated_by=EXCLUDED.updated_by`;
+  await audit(sql,admin,'pdf-settings','pdf',{footers:clean.footers.length});
+  return res.status(200).json(clean);
+ }
  if(action==='feedback-update'){
   const id=int(d.id,{min:1,max:1e12});
   const status=text(d.status,20);if(!FEEDBACK_STATUSES[status])throw new HttpError(400,'Statut invalide.');

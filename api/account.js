@@ -8,6 +8,7 @@ import {decodeLogo} from './_lib/pdf.js';
 import {entitlement} from './_lib/plans.js';
 import {adminEmails} from './_lib/auth.js';
 import {PDFDocument} from 'pdf-lib';
+import {loadPdfSettings} from './_lib/footers.js';
 
 const s=(v,max)=>String(v??'').trim().slice(0,max);
 function cleanProfile(p={}){
@@ -21,13 +22,14 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
  const action=String(req.query?.action||'');
  // Image de marque des PDF (logo, couleurs, pied de page).
  const canBrand=async()=>adminEmails().includes(user.email)||!!(await entitlement(sql,user.id)).plan.features?.branding;
- if(req.method==='GET'&&action==='branding')return res.status(200).json({branding:user.branding||{},allowed:await canBrand()});
+ if(req.method==='GET'&&action==='branding'){const ps=await loadPdfSettings(sql);return res.status(200).json({branding:user.branding||{},allowed:await canBrand(),footers:(ps.footers||[]).map(({id,label,text})=>({id,label,text})),legal:ps.legal||''});}
  if(req.method==='GET')return res.status(200).json({user:publicUser(user)});
  const data=body(req);
  if(req.method==='PUT'&&action==='branding'){
   if(!await canBrand())throw new HttpError(402,'La personnalisation des documents est incluse dans les forfaits Électricien.',{quota:true});
   const color=v=>{const c=String(v||'').trim();if(!c)return '';if(!/^#[0-9a-fA-F]{6}$/.test(c))throw new HttpError(400,'Couleur invalide (format #RRVVBB).');return c.toLowerCase();};
-  const branding={primary:color(data.primary),accent:color(data.accent),footer:s(data.footer,140)};
+  const branding={primary:color(data.primary),accent:color(data.accent),footer:s(data.footer,140),footerId:s(data.footerId,40)};
+  if(branding.footerId){const ps=await loadPdfSettings(sql);if(!(ps.footers||[]).some(f=>f.id===branding.footerId))throw new HttpError(400,'Modèle de pied de page introuvable.');}
   if(data.logo){
    let l;try{l=decodeLogo(data.logo);}catch(e){throw new HttpError(400,e.message);}
    if(!l)throw new HttpError(400,'Le logo doit être une image PNG ou JPEG.');

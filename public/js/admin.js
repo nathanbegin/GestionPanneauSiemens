@@ -3,7 +3,7 @@ import {h,toast,money,fmtDate,fmtRelative,field,select,dialog,confirmDialog} fro
 import {api} from './api.js';
 
 const STATUS={active:'Actif',trialing:'Essai',past_due:'Paiement en retard',canceled:'Annulé',comp:'Offert',gratuit:'Gratuit'};
-const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['suggestions','Suggestions'],['ia','Intelligence artificielle'],['journal','Journal']];
+const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['suggestions','Suggestions'],['ia','Intelligence artificielle'],['documents','Documents PDF'],['journal','Journal']];
 const centsInput=(name,cents)=>h('input',{name,type:'number',step:'0.01',min:0,value:cents==null?'':(cents/100).toFixed(2),inputmode:'decimal'});
 const toCents=v=>v===''||v==null?null:Math.round(Number(String(v).replace(',','.'))*100);
 
@@ -17,6 +17,7 @@ export async function adminView({ctx,tab='tableau',id}){
  else if(tab==='journal')content=await journal();
  else if(tab==='ia')content=await aiSettings();
  else if(tab==='suggestions')content=await suggestions();
+ else if(tab==='documents')content=await pdfSettings();
  else content=await overview();
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Console'}),h('h1',{text:'Administration'}))),nav,content);
 }
@@ -226,4 +227,22 @@ async function suggestions(){
  }
  await load();
  return box;
+}
+
+// ---------- Documents PDF : mention par défaut et modèles de pied de page ----------
+async function pdfSettings(){
+ const d=await api('/api/admin?action=pdf');
+ const legal=h('textarea',{rows:2,maxlength:240,placeholder:'Vide : mention propre à chaque document (ex. « Répertoire indicatif établi à partir d’un relevé visuel… »)'});legal.value=d.legal||'';
+ let list=(d.footers||[]).map(f=>({...f}));
+ const box=h('div',{class:'stack'});const err=h('p',{class:'error',role:'alert'});
+ const draw=()=>box.replaceChildren(...list.map((f,i)=>h('div',{class:'card side-card fb-actions'},
+  h('input',{value:f.label,maxlength:60,placeholder:'Nom du modèle (ex. Garantie 1 an)',oninput:e=>f.label=e.target.value}),
+  h('input',{value:f.text,maxlength:200,placeholder:'Texte imprimé en pied de page',oninput:e=>f.text=e.target.value}),
+  h('button',{type:'button',class:'ghost sm',onclick:()=>{list.splice(i,1);draw();}},'Retirer'))),
+  h('button',{type:'button',class:'sm',onclick:()=>{list.push({id:'modele-'+Date.now().toString(36),label:'',text:''});draw();}},'+ Ajouter un modèle'));
+ draw();
+ return h('div',{class:'card form-card'},h('h2',{text:'Pieds de page des PDF'}),
+  h('p',{class:'small muted',text:'Chaque PDF se termine par : [texte de l’entreprise] · [mention]. La mention par défaut s’applique à tous les documents de tous les comptes. Les modèles sont proposés aux entrepreneurs (forfaits avec personnalisation) dans Mon compte → Documents à l’image de votre entreprise ; ils peuvent aussi écrire leur propre texte.'}),
+  field('Mention par défaut (tous les PDF)',legal,{full:true}),h('h3',{text:'Modèles proposés aux entrepreneurs'}),box,err,
+  h('div',{class:'form-actions'},h('button',{type:'button',class:'primary',onclick:async()=>{err.textContent='';try{const r=await api('/api/admin?action=pdf',{method:'POST',body:{legal:legal.value,footers:list}});list=r.footers.map(f=>({...f}));draw();toast('Pieds de page enregistrés.');}catch(e){err.textContent=e.message;}}},'Enregistrer')));
 }

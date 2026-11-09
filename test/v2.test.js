@@ -53,3 +53,12 @@ test('image de marque des PDF',()=>{
  assert.throws(()=>decodeLogo('data:image/png;base64,'+Buffer.from('nope').toString('base64')));
  const png=Buffer.from('89504e470d0a1a0a','hex');assert.equal(decodeLogo('data:image/png;base64,'+png.toString('base64')).type,'png');
 });
+
+import {cleanPdfSettings,resolveFooter} from '../api/_lib/footers.js';
+test('pieds de page des PDF',()=>{
+ const s=cleanPdfSettings({legal:' Mention ',footers:[{id:'g1',label:'Garantie',text:'Garantie 1 an'},{label:'',text:'x'}]});
+ assert.equal(s.legal,'Mention');assert.equal(s.footers.length,1);
+ assert.deepEqual(resolveFooter({footerId:'g1',footer:'perso'},s),{footer:'Garantie 1 an',legal:'Mention'});
+ assert.equal(resolveFooter({footer:'perso'},s).footer,'perso');
+ assert.throws(()=>cleanPdfSettings({footers:[{id:'a',label:'x',text:'y'},{id:'a',label:'z',text:'w'}]}));
+});

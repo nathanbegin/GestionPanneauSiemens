@@ -9,6 +9,7 @@ import {entitlement} from './_lib/plans.js';
 import {adminEmails} from './_lib/auth.js';
 import {APP_VERSION,panelTitle} from '../public/model.js';
 import {appUrl} from './_lib/mail.js';
+import {loadPdfSettings,resolveFooter} from './_lib/footers.js';
 
 const KINDS=['report','door','labels','loads','calc'],FORMATS=['letter','legal'];
 function params(src){
@@ -64,6 +65,9 @@ export default route(['GET','POST'],async(req,res)=>{
  // Image de marque de l'entreprise : forfaits avec la fonction « branding » (et administrateurs).
  let brand=null;
  if(user.branding&&Object.keys(user.branding).length){const e=await entitlement(sql,userId);if(e.plan.features?.branding||adminEmails().includes(user.email))brand=user.branding;}
+ // Pied de page : mention de la console pour tous ; modèle ou texte de l'entreprise si personnalisation permise.
+ const pdfSet=await loadPdfSettings(sql);const foot=resolveFooter(brand||{},pdfSet);
+ brand={...(brand||{}),footer:brand?foot.footer:'',legal:foot.legal};
  let children=[];
  if(p.kind==='loads'||p.kind==='calc'){const sitePanels=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${siteRow.id}`;const q=[rows[0].id],seen=new Set(q);while(q.length){const parent=q.shift();for(const x of sitePanels)if(x.details?.fedFrom===parent&&!seen.has(x.id)){seen.add(x.id);q.push(x.id);children.push(x);}}}
  const bytes=p.kind==='calc'?await buildCalcNote({user,site,...panels[0],children,version:APP_VERSION,brand}):p.kind==='loads'?await buildLoads({user,site,...panels[0],children,version:APP_VERSION,brand}):p.kind==='labels'
