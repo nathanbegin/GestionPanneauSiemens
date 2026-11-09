@@ -25,8 +25,6 @@ async function assertCanJoin(sql,user,owner){
  const [cur]=await sql`SELECT owner_id,status FROM app_team_members WHERE user_id=${user.id}`;
  if(cur?.status==='active'&&cur.owner_id!==owner.id)throw new HttpError(409,'Vous faites déjà partie d’une autre équipe. Quittez-la d’abord.');
  if(cur?.status==='active')throw new HttpError(409,'Vous faites déjà partie de cette équipe.');
- const [sub]=await sql`SELECT status,plan_id FROM app_subscriptions WHERE user_id=${user.id}`;
- if(sub&&LIVE.includes(sub.status)&&sub.plan_id!=='gratuit')throw new HttpError(409,'Vous avez votre propre forfait. Annulez-le avant de rejoindre une équipe, ou contactez-nous.');
  const [{n}]=await sql`SELECT count(*)::int AS n FROM app_team_members WHERE owner_id=${user.id} AND status='active'`;
  if(n)throw new HttpError(409,'Vous avez déjà votre propre équipe.');
 }
@@ -51,7 +49,7 @@ export async function teamAction(sql,req,res,user,action,data){
   }
   if(mine){
    const [o]=await sql`SELECT id,name,email,profile FROM app_users WHERE id=${mine.owner_id}`;
-   return res.status(200).json({role:mine.status==='active'?'member':'pending',owner:o?{id:o.id,name:ownerName(o),contact:o.profile?.proEmail||o.email}:null,plan:e.team?.role==='member'?e.plan.name:null});
+   return res.status(200).json({role:mine.status==='active'?'member':'pending',owner:o?{id:o.id,name:ownerName(o),contact:o.profile?.proEmail||o.email}:null,plan:e.team?.role==='member'?e.plan.name:null,ownSubscription:e.ownSubscription||null});
   }
   return res.status(200).json({role:'none',plan:e.plan.name,canOwn:false});
  }
@@ -111,7 +109,8 @@ export async function teamAction(sql,req,res,user,action,data){
   const [u]=await sql`UPDATE app_team_invites SET used_by=${user.id},used_at=now() WHERE id=${i.id} AND used_by IS NULL RETURNING id`;
   if(!u)throw new HttpError(409,'Invitation déjà utilisée.');
   await sql`INSERT INTO app_team_members(user_id,owner_id,status) VALUES(${user.id},${owner.id},'active') ON CONFLICT (user_id) DO UPDATE SET owner_id=EXCLUDED.owner_id,status='active',updated_at=now()`;
-  return res.status(200).json({ok:true,owner:ownerName(owner)});
+  const [s]=await sql`SELECT plan_id,status,source FROM app_subscriptions WHERE user_id=${user.id}`;
+  return res.status(200).json({ok:true,owner:ownerName(owner),ownSubscription:!!(s&&LIVE.includes(s.status)&&s.plan_id!=='gratuit'&&s.source!=='promo')});
  }
  if(req.method==='GET'&&action==='team-search'){
   await rateLimit(sql,'tsearch:'+user.id,60,10);await recordAttempt(sql,'tsearch:'+user.id);

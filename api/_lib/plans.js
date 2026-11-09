@@ -72,7 +72,8 @@ async function ownEntitlement(sql,userId,ids){
 }
 export async function entitlement(sql,userId){
  const own=await ownEntitlement(sql,userId);
- if(own.live&&own.plan.id!==FREE_PLAN)return {...own,team:own.plan.features?.team?{role:'owner',ownerId:userId}:null};
+ const ownPaid=own.live&&own.plan.id!==FREE_PLAN&&own.subscription?.source!=='promo';
+ if(own.live&&own.plan.features?.team&&own.teamSize>1)return {...own,team:{role:'owner',ownerId:userId}};
  const [m]=await sql`SELECT owner_id FROM app_team_members WHERE user_id=${userId} AND status='active'`;
  if(m){
   const ids=await teamIds(sql,m.owner_id);
@@ -80,10 +81,12 @@ export async function entitlement(sql,userId){
   if(owner.live&&owner.plan.features?.team){
    const [{n:sites}]=await sql`SELECT count(*)::int AS n FROM app_sites WHERE user_id=${userId}`;
    return {...owner,subscription:null,sites,credits:own.credits,canCreatePanel:owner.limit==null||owner.used<owner.limit||own.credits>0,
-    canCreateSite:owner.plan.siteLimit==null||sites<owner.plan.siteLimit,team:{role:'member',ownerId:m.owner_id}};
+    canCreateSite:owner.plan.siteLimit==null||sites<owner.plan.siteLimit,team:{role:'member',ownerId:m.owner_id},
+    // Abonnement personnel encore actif : l'équipe a priorité ; on propose de l'annuler pour éviter la double facturation.
+    ownSubscription:ownPaid?{plan:own.plan.name,status:own.subscription.status,hasStripe:own.subscription.hasStripe,cancelAtPeriodEnd:own.subscription.cancelAtPeriodEnd}:null};
   }
  }
- return {...own,team:null};
+ return {...own,team:own.live&&own.plan.features?.team?{role:'owner',ownerId:userId}:null};
 }
 export const subOut=s=>({planId:s.plan_id,status:s.status,interval:s.interval,source:s.source,currentPeriodStart:s.current_period_start,currentPeriodEnd:s.current_period_end,cancelAtPeriodEnd:s.cancel_at_period_end,limitOverride:s.limit_override,note:s.note,hasStripe:!!s.stripe_subscription});
 

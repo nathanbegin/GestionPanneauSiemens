@@ -62,7 +62,7 @@ export async function billingView({ctx,sub,a,b}){
  // Lien direct depuis /tarifs : #/abonnement/choisir/:plan/:interval
  if(sub==='choisir'&&a){const p=catalog.plans.find(x=>x.id===a);if(p&&p.id!==me.plan.id&&catalog.billing)setTimeout(()=>choose(p,b==='year'?'year':'month'),0);history.replaceState(null,'','#/abonnement');}
  // Équipe : membre (forfait du propriétaire) ou invitation à rejoindre l'équipe de son électricien.
- const teamCard=me.team?.role==='member'?h('div',{class:'notice info'},'Vous profitez du forfait de votre équipe. ',h('a',{href:'#/equipe',text:'Voir mon équipe'})):
+ const teamCard=me.team?.role==='member'?h('div',{class:'stack'},h('div',{class:'notice info'},'Vous profitez du forfait de votre équipe. ',h('a',{href:'#/equipe',text:'Voir mon équipe'})),me.ownSubscription&&!me.ownSubscription.cancelAtPeriodEnd?h('div',{class:'notice'},h('b',{text:'Évitez de payer en double : '}),`votre abonnement personnel ${me.ownSubscription.plan} est toujours actif. `,me.ownSubscription.hasStripe?h('button',{type:'button',class:'sm',onclick:manage},'Annuler mon abonnement personnel'):'Contactez-nous pour l’annuler.'):null):
   me.team?.role==='owner'?h('div',{class:'notice info'},`Forfait d’équipe : ${me.teamSize} / ${me.seats} places utilisées. `,h('a',{href:'#/equipe',text:'Gérer mon équipe et inviter des membres'})):
   (!me.live||me.plan.id==='gratuit')?h('div',{class:'notice info'},'Vous travaillez pour un électricien qui a le forfait Électricien Équipe ? ',h('a',{href:'#/equipe',text:'Rejoindre son équipe (lien d’invitation ou recherche)'}),' — sans payer d’abonnement.'):null;
  return h('div',{class:'container stack'},teamCard,

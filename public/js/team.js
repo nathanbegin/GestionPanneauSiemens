@@ -16,6 +16,7 @@ export async function teamView({ctx}){
   if(d.role==='member')return root.replaceChildren(head,h('div',{class:'card form-card stack'},
    h('h2',{text:d.owner?.name||'Équipe'}),h('p',{},'Vous faites partie de cette équipe et profitez de son forfait ',h('b',{text:d.plan||''}),'.'),
    h('p',{class:'small muted',text:`Contact : ${d.owner?.contact||'—'}. Vos sites et panneaux restent les vôtres.`}),
+   d.ownSubscription?doubleBilling(d.ownSubscription):null,
    h('div',{class:'form-actions'},h('button',{type:'button',class:'danger',onclick:async()=>{if(!await confirmDialog('Quitter cette équipe ? Vous reviendrez à votre propre forfait (gratuit si vous n’en avez pas).',{title:'Quitter l’équipe',confirm:'Quitter',danger:true}))return;await api('/api/account?action=team-leave',{method:'POST',body:{}});toast('Vous avez quitté l’équipe.');load();}},'Quitter l’équipe'))));
   root.replaceChildren(head,
    d.role==='pending'?h('div',{class:'notice info'},'Demande envoyée à ',h('b',{text:d.owner?.name||'l’électricien'}),' : vous serez ajouté dès qu’elle sera acceptée. ',
@@ -84,7 +85,14 @@ export async function joinInviteView({ctx,token}){
  try{
   const i=await api('/api/account?action=team-invite&token='+encodeURIComponent(token));
   box.append(h('h2',{text:`Rejoindre l’équipe de ${i.owner}`}),h('p',{class:'muted',text:`${i.by} vous invite à rejoindre son équipe. Vous profiterez de son forfait Électricien Équipe ; vos sites et panneaux restent les vôtres.`}),
-   h('div',{class:'form-actions'},h('a',{class:'btn ghost',href:'#/sites'},'Plus tard'),h('button',{type:'button',class:'primary',onclick:async e=>{e.target.disabled=true;try{const r=await api('/api/account?action=team-join',{method:'POST',body:{token}});toast(`Bienvenue dans l’équipe ${r.owner} !`,6000);location.hash='#/equipe';}catch(x){toast(x.message,7000);e.target.disabled=false;}}},'Rejoindre l’équipe')));
+   h('div',{class:'form-actions'},h('a',{class:'btn ghost',href:'#/sites'},'Plus tard'),h('button',{type:'button',class:'primary',onclick:async e=>{e.target.disabled=true;try{const r=await api('/api/account?action=team-join',{method:'POST',body:{token}});toast(r.ownSubscription?`Bienvenue dans l’équipe ${r.owner} ! Pensez à annuler votre abonnement personnel pour ne pas payer en double.`:`Bienvenue dans l’équipe ${r.owner} !`,8000);location.hash='#/equipe';}catch(x){toast(x.message,7000);e.target.disabled=false;}}},'Rejoindre l’équipe')));
  }catch(x){box.append(h('h2',{text:'Invitation'}),h('p',{class:'error',text:x.message}),h('a',{class:'btn',href:'#/equipe'},'Chercher mon électricien'));}
  return h('div',{class:'container narrow'},box);
+}
+
+// Abonnement personnel encore actif alors que le membre profite du forfait de l'équipe.
+export function doubleBilling(o){
+ if(o.cancelAtPeriodEnd)return h('div',{class:'notice info'},`Votre abonnement personnel ${o.plan} est annulé : il ne sera pas renouvelé.`);
+ return h('div',{class:'notice'},h('b',{text:'Évitez de payer en double : '}),`votre abonnement personnel ${o.plan} est toujours actif, alors que vous profitez maintenant du forfait de votre équipe. `,
+  o.hasStripe?h('a',{href:'#/abonnement',text:'Annuler mon abonnement personnel'}):'Contactez-nous pour l’annuler.');
 }
