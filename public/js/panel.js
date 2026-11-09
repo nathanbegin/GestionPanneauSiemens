@@ -295,7 +295,7 @@ export async function panelView({id,tab='panel',ctx}){
     try{const circuits=placeBreaker(panel.circuits,pos,{...state.place,cat:state.place.cat},panel.positions);await persist({circuits});toast(`${state.place.cat} placé en position ${pos}.`);renderHead();renderBody();}
     catch(e){toast(e.message,7000);}
    }};
-  const art=h('div',{class:'plan-art'},h('div',{class:'panel-caption'},viewSwitch()),state.view==='reel'?h('div',{class:'real-wrap'},panelReal({...artOpts,labels:false})):panelArt(artOpts));
+  const art=h('div',{class:'plan-art'},h('div',{class:'panel-caption'},viewSwitch(),state.view==='reel'&&zoomControls()),state.view==='reel'?h('div',{class:'real-wrap'},sized(panelReal({...artOpts,labels:false,crop:state.rzoom==='circuits'}))):panelArt(artOpts));
   const banner=state.place&&h('div',{class:'place-banner'},h('span',{},'Placement : ',h('b',{text:state.place.cat}),` · ${state.place.label} — ${targets.size?'touchez une position en surbrillance.':'aucun espace libre suffisant.'}`),h('button',{type:'button',class:'sm',onclick:()=>{state.place=null;renderBody();}},'Terminer'));
   const cabBox=h('div',{class:'stack sticky-col'},banner,art);
   const palette=lib?breakerPalette({lib,det:panel.details||{},selected:state.place?.cat,onSelect:(b,issues)=>{
