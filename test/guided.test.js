@@ -57,3 +57,9 @@ test('mode guidé : vérification des appareils',()=>{
  assert.ok(!checkAppliances(s,['range']).some(x=>x.type==='missing'));
  assert.equal(guessUsage('Plinthes — chambres'),'Chauffage');assert.equal(guessUsage('Borne VÉ'),'Borne de recharge');assert.equal(guessUsage('Truc'),'Autre');
 });
+
+test('mode guidé : position couverte par un disjoncteur double',()=>{
+ let s=newGuided({positions:8});
+ s=answerPosition(s,2,{format:'double',amps:30,label:'Chauffe-eau'});
+ assert.throws(()=>answerPosition(s,4,{format:'single',amps:15}),/fait partie du disjoncteur 2\/4/);
+});

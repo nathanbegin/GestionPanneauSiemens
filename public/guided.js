@@ -94,6 +94,7 @@ function resetPosition(circuits,n,positions){
  * Remet d'abord la position à l'état vierge : on peut revenir en arrière et changer d'avis.
  */
 export function answerPosition(state,n,answer){
+ const cov=coveredFrom(state,n);if(cov)throw Error(`La position ${n} fait partie du disjoncteur ${designation(cov)}${cov.label?' ('+cov.label+')':''} : modifiez d’abord ce disjoncteur.`);
  const err=canPlace(state,n,answer.format);if(err)throw Error(err);
  const span={double:2,triple:3}[answer.format]||1;
  let circuits=resetPosition(state.circuits,n,state.positions);

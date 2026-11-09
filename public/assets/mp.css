@@ -594,3 +594,17 @@ dialog.xl .ai-art svg{width:100%;height:calc(100dvh - 360px);min-height:420px;ma
 .card.stat.link{text-decoration:none;color:inherit}
 /* Filet de sécurité mobile : un élément trop large ne doit jamais élargir la page (Chrome dézoomerait tout l’écran). */
 html,body{overflow-x:clip}
+/* Vue réaliste du panneau */
+.view-switch{display:inline-flex;background:#e3e8e0;border-radius:8px;padding:2px;gap:2px}
+.view-switch button{padding:4px 10px;font-size:12px;min-height:0;border:0;background:transparent;border-radius:6px;font-weight:700;color:#4f6b52}
+.view-switch button.on{background:#fff;color:#183c32;box-shadow:0 1px 2px #0002}
+.panel-area.real .panel-caption{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.real-wrap{background:linear-gradient(180deg,#f3f5f2,#e6ebe4);border-radius:12px;padding:6px}
+.panel-real{display:block;width:100%;height:auto;max-height:none;user-select:none}
+.panel-real .rp-slot{cursor:pointer;outline:none}
+.panel-real .rp-sel{opacity:0}
+.panel-real .rp-slot:hover .rp-sel,.panel-real .rp-slot:focus .rp-sel{opacity:.55}
+.panel-real .rp-slot.sel .rp-sel{opacity:1}
+.panel-real .rp-slot.dim{opacity:.35}
+.panel-real .rp-label{cursor:pointer}
+.panel-area.real .panel-caption .check{letter-spacing:0;text-transform:none;font-size:13px;color:var(--ink);display:inline-flex;gap:6px;align-items:center}

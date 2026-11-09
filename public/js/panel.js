@@ -7,6 +7,7 @@ import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.j
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
 import {GUIDE_STEPS,GUIDE_DISCLAIMER} from '../loadguide.js';
 import {panelArt,isEmptySlot} from './panelart.js';
+import {panelReal} from './panelreal.js';
 import {loadLibrary,breakerPalette,validStarts,compatibility} from './library.js';
 import {placeBreaker,bulkApply,ampsList,protections,usages} from '../model.js';
 import {assignDialog} from './assign.js';
@@ -27,6 +28,12 @@ export async function panelView({id,tab='panel',ctx}){
  const lib=planning?await loadLibrary().catch(()=>null):null;
  let saving=Promise.resolve();
  const state={tab:tabNames[tab]?tab:'panel',q:'',status:'',tag:'',place:null,select:null};
+ // Vue du panneau : schéma (par défaut) ou réaliste ; préférence gardée sur l'appareil.
+ const pref=k=>{try{return localStorage.getItem(k);}catch{return null;}};
+ const setPref=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
+ state.view=pref('mp_panel_view')==='reel'?'reel':'schema';
+ // Désignations à côté du panneau : par défaut seulement sur les écrans assez larges.
+ state.realLabels=pref('mp_panel_real_labels')?pref('mp_panel_real_labels')!=='0':window.innerWidth>=700;
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
 
  const root=h('div',{class:'container'});
@@ -105,7 +112,21 @@ export async function panelView({id,tab='panel',ctx}){
     meta);
   }):[h('p',{class:'empty-state muted',text:'Aucun circuit ne correspond à la recherche.'})]));
  }
+ function viewSwitch(){
+  return h('div',{class:'view-switch',role:'group','aria-label':'Affichage du panneau'},
+   h('button',{type:'button','aria-pressed':String(state.view==='schema'),class:state.view==='schema'?'on':'',onclick:()=>{state.view='schema';setPref('mp_panel_view','schema');renderBody();}},'Schéma'),
+   h('button',{type:'button','aria-pressed':String(state.view==='reel'),class:state.view==='reel'?'on':'',onclick:()=>{state.view='reel';setPref('mp_panel_view','reel');renderBody();}},'Réaliste'));
+ }
+ function realCabinet(){
+  const filtering=!!(state.q||state.status||state.tag);
+  const labels=h('label',{class:'check small'},h('input',{type:'checkbox',checked:state.realLabels,onchange:e=>{state.realLabels=e.target.checked;setPref('mp_panel_real_labels',e.target.checked?'1':'0');renderBody();}}),'Désignations');
+  return h('section',{class:'panel-area real','aria-label':'Vue réaliste du panneau'},
+   h('div',{class:'panel-caption'},viewSwitch(),labels),
+   h('div',{class:'real-wrap'},panelReal({panel,labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit})),
+   h('p',{class:'panel-tip',text:state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche. DDFT : bouton TEST blanc et fil témoin ; anti-arc : bouton TEST bleu.'}));
+ }
  function cabinet(){
+  if(state.tab==='panel'&&state.view==='reel')return realCabinet();
   const det=panel.details||{};
   const grid=h('div',{class:'breakers'});
   grid.style.gridTemplateRows=`repeat(${panel.positions},16px)`;
@@ -128,7 +149,7 @@ export async function panelView({id,tab='panel',ctx}){
    grid.append(b);
   }
   return h('section',{class:'panel-area','aria-label':'Face avant du panneau'},
-   h('div',{class:'panel-caption'},h('span',{text:'VUE DE FACE'}),h('span',{text:`1 — ${panel.positions}`})),
+   h('div',{class:'panel-caption'},state.tab==='panel'?viewSwitch():h('span',{text:'VUE DE FACE'}),h('span',{text:`1 — ${panel.positions}`})),
    h('div',{class:'cabinet'},
     h('div',{class:'manufacturer'},h('b',{text:det.brand||'Panneau'}),h('span',{text:[det.model,panel.tag].filter(Boolean).join(' · ')||panel.kind})),
     h('div',{class:'main-breaker'},h('span',{text:'PRINCIPAL'}),h('div',{class:'main-switch'},h('b',{text:det.mainAmps||'—'}),h('span',{text:'A'}))),
