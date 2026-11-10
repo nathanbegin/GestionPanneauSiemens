@@ -180,3 +180,7 @@ API_URL=https://gestion-panneau-siemens.vercel.app npm run ios
 
 ## Avertissement
 L'application ne contrôle ni ne mesure l'installation. Les documents sont indicatifs et ne remplacent pas une inspection par un maître électricien.
+
+## Langue de l'interface (français / anglais)
+
+Le bouton **FR / EN** de la barre du haut change la langue de l'application (mémorisée sur l'appareil ; par défaut selon la langue du navigateur). Le code de l'application est écrit en français : en anglais, `public/i18n.js` traduit à la volée chaque texte affiché (texte, placeholder, title, aria-label, boîtes de dialogue natives, formats de nombres et de dates) d'après le dictionnaire `public/i18n-en.js`. Les données saisies ne sont jamais traduites. Pour une nouvelle phrase, ajouter une ligne `["texte français", "English text"]` au dictionnaire (`{}` = valeur variable, `{1}`, `{2}` pour réordonner) ; sans entrée, le texte reste en français. Non traduits pour l'instant : les PDF, la console d'administration, les pages publiques (accueil, tarifs, conditions, fonctionnement), la page du guide de calcul et les messages envoyés par courriel.

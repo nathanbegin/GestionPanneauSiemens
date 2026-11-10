@@ -292,7 +292,7 @@ function planningSection(c,panel,markDirty,root,lib){
  });
  // Ajout d'une charge de la bibliothèque.
  const groups=new Map();for(const l of LOAD_LIBRARY)groups.set(l.g,[...(groups.get(l.g)||[]),l]);
- const add=h('select',{class:'add-load','aria-label':'Ajouter une charge'},new Option('+ Ajouter une charge…',''),...[...groups].map(([g,ls])=>{const og=h('optgroup',{label:g});ls.forEach(l=>og.append(new Option(`${l.name} — ${(l.w/1000).toLocaleString('fr-CA')} kW`,l.id)));return og;}),h('optgroup',{label:'Autre'},new Option('Charge personnalisée…','custom')));
+ const add=h('select',{class:'add-load','aria-label':'Ajouter une charge'},new Option('+ Ajouter une charge…',''),...[...groups].map(([g,ls])=>{const og=h('optgroup',{label:g});ls.forEach(l=>og.append(new Option(`${l.name} — ${(l.w/1000).toLocaleString((globalThis.MP_LOCALE||'fr-CA'))} kW`,l.id)));return og;}),h('optgroup',{label:'Autre'},new Option('Charge personnalisée…','custom')));
  add.addEventListener('change',()=>{
   const id=add.value;add.value='';if(!id)return;
   if(id==='custom')loads.push({id:'custom',name:'Charge personnalisée',w:1000,v:120,qty:1,cat:'basic',cont:false});
@@ -325,7 +325,7 @@ function planningSection(c,panel,markDirty,root,lib){
   const note=live.dataset.note;
   live.replaceChildren(...[
    h('div',{class:'load-kpis'},
-    h('span',{},h('b',{text:(r.watts/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW'}),'charge'),
+    h('span',{},h('b',{text:(r.watts/1000).toLocaleString((globalThis.MP_LOCALE||'fr-CA'),{maximumFractionDigits:2})+' kW'}),'charge'),
     h('span',{},h('b',{text:r.demandAmps+' A'}),`à ${r.volts} V`),
     h('span',{},h('b',{text:r.percent!=null?r.percent+' %':'—'}),'du disjoncteur'),
     h('span',{},h('b',{text:r.minBreaker?r.minBreaker+' A':'—'}),'disjoncteur min.'),

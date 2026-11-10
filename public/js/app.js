@@ -12,6 +12,7 @@ import {panelView} from './panel.js';
 import {billingView} from './billing.js';
 import {updateCard,checkUpdateQuietly} from './update.js';
 import {compareView} from './compare.js';
+import {lang,setLang} from '../i18n.js';
 import {designDialog} from './design.js';
 import {adminView} from './admin.js';
 
@@ -44,6 +45,8 @@ function crumbs(items){
   btn.onclick=e=>{e.stopPropagation();const open=menu.classList.toggle('open');btn.setAttribute('aria-expanded',String(open));};
   parts.push(h('div',{class:'user-menu'},btn,menu));
  }else parts.push(h('a',{class:'btn sm',href:webUrl('/fonctionnement'),target:NATIVE?'_blank':null},'Fonctionnement'));
+ // Langue : FR / EN (le bouton montre la langue vers laquelle on bascule).
+ parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:()=>setLang(lang==='en'?'fr':'en')},lang==='en'?'FR':'EN'));
  topbar.replaceChildren(...parts);
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Mon Panneau';
 }

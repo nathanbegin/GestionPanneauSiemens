@@ -7,7 +7,7 @@ import {FAMILIES,familyOf} from '../catalog.js';
 import {siteVolts,voltageLabel} from '../voltage.js';
 import {DESIGN_APPLIANCES,designItems,designCalc,designDemand,mainFor,genericPositions,draftLayout} from '../design.js';
 
-const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:1})+' kW';
+const kw=w=>(w/1000).toLocaleString((globalThis.MP_LOCALE||'fr-CA'),{maximumFractionDigits:1})+' kW';
 
 /** onManual() : ouvre la création simple d'un panneau vide ; onCreated(panel) après création. */
 export function designDialog({site,onCreated,onManual}){

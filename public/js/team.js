@@ -2,7 +2,7 @@
 import {h,field,toast,confirmDialog,dialog,select} from './dom.js';
 import {api} from './api.js';
 
-const fmt=d=>new Date(d).toLocaleDateString('fr-CA',{dateStyle:'medium'});
+const fmt=d=>new Date(d).toLocaleDateString((globalThis.MP_LOCALE||'fr-CA'),{dateStyle:'medium'});
 const copy=async t=>{try{await navigator.clipboard.writeText(t);toast('Lien copié.');}catch{prompt('Copiez ce lien :',t);}};
 
 export async function teamView({ctx}){

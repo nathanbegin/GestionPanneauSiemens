@@ -11,7 +11,7 @@ import {panelReport} from '../loadcalc.js';
 import {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance,inferLoad} from '../appliances.js';
 export {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance,inferLoad};
 
-const fmtW=w=>w>=1000?(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW':w+' W';
+const fmtW=w=>w>=1000?(w/1000).toLocaleString((globalThis.MP_LOCALE||'fr-CA'),{maximumFractionDigits:2})+' kW':w+' W';
 
 /**
  * Onglet « Électroménagers ». save({circuits, appliances}) enregistre et retourne le panneau à jour ; onChange() redessine.

@@ -13,7 +13,7 @@ document.getElementById('g-toc').replaceChildren(...steps.map(([id,s])=>h('a',{h
 const L=(id,qty=1)=>{const l=loadById(id);return {name:l.name,w:l.w,v:l.v,qty,cat:l.cat,cont:l.cont};};
 const c=blank(30);c[0].loads=[L('range-12')];c[1].loads=[L('dryer')];c[2].loads=[L('wh-4500')];c[3].loads=[L('bb-2000',7)];c[4].loads=[L('hp-3t')];c[5].loads=[L('ev-l2-30')];c[6].loads=[L('fridge'),L('dishwasher')];
 const ex=dwellingCalc(c,{livingArea:100,basementArea:80});
-const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
+const kw=w=>(w/1000).toLocaleString((globalThis.MP_LOCALE||'fr-CA'),{maximumFractionDigits:2})+' kW';
 document.getElementById('g-body').replaceChildren(
  h('div',{class:'notice info'},h('p',{text:GUIDE_INTRO.why}),h('p',{class:'small',text:GUIDE_INTRO.scope})),
  ...steps.map(([id,s])=>h('section',{id,class:'g-step'},h('h2',{},s.title,h('span',{class:'badge',text:'Règle '+s.rule})),h('p',{text:s.plain}),

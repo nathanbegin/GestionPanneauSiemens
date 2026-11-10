@@ -105,7 +105,7 @@ export function dwellingCalc(circuits,{livingArea=0,basementArea=0,children=[],p
  collect(circuits,panelTag);for(const p of children)collect(p.circuits||[],p.tag||p.name);
  const of=cat=>items.filter(i=>i.cat===cat);
  const sum=cat=>of(cat).reduce((t,i)=>t+i.w,0);
- const kw=w=>(Math.round(w/100)/10).toLocaleString('fr-CA')+' kW';
+ const kw=w=>(Math.round(w/100)/10).toLocaleString((globalThis.MP_LOCALE||'fr-CA'))+' kW';
  const above=Math.max(0,Number(livingArea)||0),basement=Math.max(0,Number(basementArea)||0);
  const area=Math.round((above+0.75*basement)*10)/10;
  const steps=[];
@@ -207,7 +207,7 @@ export function suggestions(report){
  if(fits)out.push(`Borne de recharge : jusqu’à « ${fits.name} » sans dépasser le principal (${verdict(fits).replace(/^✓ /,'')}). Marge restante avant 100 % ≈ ${rem} A.`);
  else if(rem>12)out.push(`Borne de recharge : seule une borne de niveau 1 ou une borne de niveau 2 réglée à basse intensité est possible (marge ≈ ${rem} A). Un gestionnaire de charge (EVEMS, règle 8-106 11)) peut éviter l’augmentation de l’entrée.`);
  else out.push('Borne de recharge : capacité insuffisante. Envisagez un gestionnaire de charge (EVEMS) ou l’augmentation de l’entrée électrique.');
- for(const id of ['pool-hp','spa','hp-3t','wh-4500']){const l=LOAD_LIBRARY.find(x=>x.id===id);out.push(`${l.name} (${(l.w/1000).toLocaleString('fr-CA')} kW, ≈ ${round(l.w/bi)} A) : ${verdict(l)}.`);}
+ for(const id of ['pool-hp','spa','hp-3t','wh-4500']){const l=LOAD_LIBRARY.find(x=>x.id===id);out.push(`${l.name} (${(l.w/1000).toLocaleString((globalThis.MP_LOCALE||'fr-CA'))} kW, ≈ ${round(l.w/bi)} A) : ${verdict(l)}.`);}
  if(report.free===0)out.push('Plus aucune position libre : un sous-panneau ou des disjoncteurs jumelés (si permis) seront nécessaires.');
  if(report.isDwelling&&report.calc.recommended&&report.mainAmps&&report.calc.recommended>report.mainAmps)out.push(`Entrée électrique recommandée selon le calcul : ${report.calc.recommended} A (actuelle : ${report.mainAmps} A).`);
  return out;

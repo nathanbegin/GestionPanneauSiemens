@@ -138,7 +138,7 @@ async function plans(){
 async function journal(){
  const {log}=await api('/api/admin?action=audit');
  return h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Date','Administrateur','Action','Cible','Détails'].map(t=>h('th',{text:t})))),
-  h('tbody',{},log.length?log.map(l=>h('tr',{},h('td',{text:new Date(l.at).toLocaleString('fr-CA')}),h('td',{text:l.admin_email}),h('td',{text:l.action}),h('td',{text:l.target_email||l.target}),h('td',{class:'small',text:JSON.stringify(l.details).slice(0,200)}))):h('tr',{},h('td',{colspan:5,class:'muted',text:'Aucune action.'})))));
+  h('tbody',{},log.length?log.map(l=>h('tr',{},h('td',{text:new Date(l.at).toLocaleString((globalThis.MP_LOCALE||'fr-CA'))}),h('td',{text:l.admin_email}),h('td',{text:l.action}),h('td',{text:l.target_email||l.target}),h('td',{class:'small',text:JSON.stringify(l.details).slice(0,200)}))):h('tr',{},h('td',{colspan:5,class:'muted',text:'Aucune action.'})))));
 }
 
 // ---------- Intelligence artificielle : choix et ordre des modèles ----------
@@ -175,7 +175,7 @@ async function aiSettings(){
   const addCustom=()=>{const id=custom.value.trim();if(!/^[a-z0-9][a-z0-9._-]{1,63}$/i.test(id))return toast('Identifiant invalide.');if(!list.some(x=>x.id===id))list.unshift({id,on:true});custom.value='';draw();};
   const save=async(models,det)=>{err.textContent='';try{await api('/api/admin?action=ai',{method:'POST',body:{models,detail:det}});toast('Réglages de l’IA enregistrés : ils s’appliquent dès la prochaine analyse.');await load();}catch(e){err.textContent=e.message;}};
   const srcText={console:'réglage de cette console',variable:`variable Vercel OPENAI_MODEL (${d.envModel})`,defaut:'valeurs par défaut de l’application'}[d.source];
-  const usage=d.usage.map(u=>{const m=known.get(u.model);const cost=m&&m.input!=null?(u.input*m.input+u.output*m.output)/1e6:null;return h('tr',{},h('td',{text:u.model}),h('td',{text:u.ok}),h('td',{text:u.failed}),h('td',{text:u.input.toLocaleString('fr-CA')}),h('td',{text:u.output.toLocaleString('fr-CA')}),h('td',{text:cost==null?'—':cost.toLocaleString('fr-CA',{style:'currency',currency:'USD'})}));});
+  const usage=d.usage.map(u=>{const m=known.get(u.model);const cost=m&&m.input!=null?(u.input*m.input+u.output*m.output)/1e6:null;return h('tr',{},h('td',{text:u.model}),h('td',{text:u.ok}),h('td',{text:u.failed}),h('td',{text:u.input.toLocaleString((globalThis.MP_LOCALE||'fr-CA'))}),h('td',{text:u.output.toLocaleString((globalThis.MP_LOCALE||'fr-CA'))}),h('td',{text:cost==null?'—':cost.toLocaleString((globalThis.MP_LOCALE||'fr-CA'),{style:'currency',currency:'USD'})}));});
   box.replaceChildren(
    h('div',{class:'card form-card'},
     h('h2',{text:'Lecture de panneaux par IA'}),
@@ -216,7 +216,7 @@ async function suggestions(){
    return h('article',{class:'card fb-item fb-'+f.status},
     h('div',{class:'fb-head'},h('span',{class:'badge '+(f.category==='Problème'?'warn':''),text:f.category}),
      h('b',{},f.user_id?h('a',{href:'#/admin/abonne/'+f.user_id,text:f.name||f.email}):(f.name||f.email||'Compte supprimé')),
-     h('span',{class:'small muted',text:[f.email,new Date(f.created_at).toLocaleString('fr-CA'),f.client!=='web'?f.client:'',f.app_version&&'v'+f.app_version].filter(Boolean).join(' · ')})),
+     h('span',{class:'small muted',text:[f.email,new Date(f.created_at).toLocaleString((globalThis.MP_LOCALE||'fr-CA')),f.client!=='web'?f.client:'',f.app_version&&'v'+f.app_version].filter(Boolean).join(' · ')})),
     h('p',{class:'fb-msg',text:f.message}),
     f.page?h('p',{class:'small muted',text:'Page : '+f.page}):null,
     h('div',{class:'fb-actions'},status,note,saveBtn));
