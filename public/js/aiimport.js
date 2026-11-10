@@ -4,7 +4,7 @@
 import {h,field,select,dialog,toast} from './dom.js';
 import {api} from './api.js';
 import {panelArt} from './panelart.js';
-import {blank,resize,designation,sortCircuits,ampsList,panelKinds,voltages,slotPos,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,suggestLinks} from '../model.js';
+import {blank,resize,mergeScanned,designation,sortCircuits,ampsList,panelKinds,voltages,slotPos,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,suggestLinks} from '../model.js';
 import {FAMILIES} from '../catalog.js';
 import {AI_CONFIDENT} from '../aiscan.js';
 import {positionQuiz} from './guided.js';
@@ -40,11 +40,13 @@ async function prepare(file){
 const pct=v=>v==null?'—':Math.round(v*100)+' %';
 const confClass=v=>v==null?'':v>=AI_CONFIDENT?'ok':v>=.5?'mid':'low';
 
-export async function aiImportDialog({site,siblings=[],onCreated}){
+/** `target` : panneau existant à garnir (au lieu de créer un nouveau panneau) ; `onApplied(panel)` après enregistrement. */
+export async function aiImportDialog({site,siblings=[],onCreated,target=null,onApplied}){
  const stage=h('div',{class:'ai-stage'});
  // replaceChildren natif écrit « null » pour une valeur nulle : on filtre.
  const put=(...kids)=>stage.replaceChildren(...kids.flat().filter(k=>k!=null&&k!==false&&k!==''));
- const d=dialog({title:'Ajouter un panneau par photo',eyebrow:'Assistant IA · '+site.name,wide:'xl',body:[stage]});
+ let replaceExisting=false;
+ const d=dialog({title:target?'Garnir le panneau par photos':'Ajouter un panneau par photo',eyebrow:'Assistant IA · '+(target?[target.tag,target.name].filter(Boolean).join(' · '):site.name),wide:'xl',body:[stage]});
  stage.append(h('p',{class:'muted',text:'Vérification de votre forfait…'}));
  let status;
  try{status=await api('/api/panels?action=scan');}catch(e){put(h('p',{class:'error',text:e.message}));return;}
@@ -69,8 +71,8 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
   };
   const camera=h('input',{type:'file',accept:'image/*',capture:'environment',class:'sr-only',id:'aiCamera',onchange:e=>add(e.target)});
   const picker=h('input',{type:'file',multiple:true,accept:'image/*,application/pdf,.csv,.txt,.json',class:'sr-only',id:'aiFiles',onchange:e=>add(e.target)});
-  const brand=h('input',{name:'brand',maxlength:60,placeholder:'Facultatif',list:'aiBrands'});
-  const positions=h('input',{name:'positions',type:'number',min:2,max:84,step:2,placeholder:'Facultatif',inputmode:'numeric'});
+  const brand=h('input',{name:'brand',maxlength:60,placeholder:'Facultatif',list:'aiBrands',value:target?.details?.brand||''});
+  const positions=h('input',{name:'positions',type:'number',min:2,max:84,step:2,placeholder:'Facultatif',inputmode:'numeric',value:target?.positions||''});
   const note=h('input',{name:'note',maxlength:300,placeholder:'Ex. sous-panneau du garage, répertoire sur la 2e photo'});
   const analyze=h('button',{type:'button',class:'primary lg',disabled:true,onclick:()=>read({brand:brand.value.trim(),positions:Number(positions.value)||undefined,note:note.value.trim()})},'Analyser avec l’IA');
   put(
@@ -99,7 +101,7 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
    const out=await api('/api/panels?action=scan',{method:'POST',body:{files:files.map(({name,data})=>({name,data})),hint}});
    status.used=out.used;usedModel=out.model||'';
    if(out.notPanel)return photos('L’IA ne reconnaît pas de panneau électrique sur ces fichiers. '+(out.summary||''));
-   identify(out.proposal);
+   if(target)build(out.proposal);else identify(out.proposal);
   }catch(e){photos(e.message);}
   finally{clearInterval(timer);}
  }
@@ -188,10 +190,22 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
   const create=h('button',{type:'button',class:'primary lg',onclick:async()=>{
    create.disabled=true;errBox.textContent='';
    try{
+    if(target){
+     const merged=mergeScanned(target.circuits,circuits,target.positions,{replace:replaceExisting});
+     // Complète la fiche du panneau (marque, gamme, principal…) seulement là où elle est vide.
+     const det=target.details||{},rd=p.meta.details||{},fill={};
+     for(const k of ['brand','model','mainAmps','family'])if((det[k]==null||det[k]==='')&&rd[k])fill[k]=rd[k];
+     const body={revision:target.revision,circuits:merged.circuits};
+     if(Object.keys(fill).length)body.meta={name:target.name,tag:target.tag,kind:target.kind,location:target.location,details:{...det,...fill}};
+     const out=await api('/api/panels?id='+target.id,{method:'PUT',body});
+     d.close();
+     toast(`${merged.applied} circuit(s) ajouté(s) au panneau${merged.skipped.length?` · ${merged.skipped.length} ignoré(s) (déjà décrits ou hors du panneau)`:''}. Vérifiez les circuits « À confirmer ».`,8000);
+     onApplied?.(out.panel);return;
+    }
     const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...p.meta,positions:p.positions,circuits}});
     d.close();toast('Panneau créé à partir de la lecture IA. Vérifiez les circuits marqués « À confirmer ».',7000);onCreated?.(panel);
    }catch(e){errBox.textContent=e.message;create.disabled=false;}
-  }},'Oui, c’est la configuration en place — créer le panneau');
+  }},target?'Oui — garnir le panneau avec cette lecture':'Oui, c’est la configuration en place — créer le panneau');
   put(
    h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Confirmation'}),h('h3',{text:'Est-ce bien la configuration en place ?'}),usedModel&&h('span',{class:'small muted',text:'Lu par '+usedModel})),
    state.note?h('div',{class:'notice info'},state.note):null,
@@ -199,9 +213,11 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
     h('div',{class:'form-actions'},links.map(l=>h('button',{type:'button',class:'sm',onclick:()=>{try{const next=groupCircuits(circuits,l.a,l.b,p.positions,{force:true});edited.add(l.a);confirm(p,{circuits:next,edited,changed,note:`${l.slots.join(' + ')} groupés : un seul disjoncteur de ${l.amps} A.`});}catch(e){toast(e.message);}}},`Grouper ${l.slots.join(' + ')} · ${l.amps} A · ${l.label}`)))):null,
    h('p',{class:'small muted',text:'Comparez avec le panneau réel. Corrigez un calibre ou une désignation directement dans le tableau. Les lignes orange sont à vérifier en priorité. Il manque quelque chose ? Ajoutez des photos rapprochées pour préciser.'}),
    h('div',{class:'ai-build'},art,h('div',{class:'ai-table-wrap'},h('table',{class:'ai-table'},h('thead',{},h('tr',{},h('th',{text:'Pos.'}),h('th',{text:'Calibre'}),h('th',{text:'Désignation'}),h('th',{text:'Confiance'}))),h('tbody',{},rows.length?rows:[h('tr',{},h('td',{colspan:4,class:'muted',text:'Aucun disjoncteur lu : ajoutez des photos pour préciser, ou créez le panneau vide.'}))])))),
+   target?h('div',{class:'notice info small'},h('b',{text:'Garnir « '+target.name+' » : '}),'seuls les emplacements encore vides sont remplis ; vos circuits déjà décrits sont conservés.',
+    h('label',{class:'check small'},h('input',{type:'checkbox',checked:replaceExisting,onchange:e=>{replaceExisting=e.target.checked;}}),' Remplacer aussi les circuits déjà décrits par la lecture IA')):null,
    errBox,
    h('div',{class:'form-actions'},
-    h('button',{type:'button',class:'ghost',onclick:()=>identify(p)},'← Revenir à l’identification'),
+    target?null:h('button',{type:'button',class:'ghost',onclick:()=>identify(p)},'← Revenir à l’identification'),
     h('button',{type:'button',class:'ghost',onclick:()=>photos()},'Recommencer'),
     uncertain().length?h('button',{type:'button',onclick:()=>quiz(p,{circuits,edited,changed})},`🧭 Questions sur les points incertains (${uncertain().length})`):null,
     h('button',{type:'button',onclick:()=>clarify(p,{circuits,edited})},'📷 Ajouter des photos pour préciser'),

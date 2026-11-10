@@ -40,3 +40,33 @@ test('un vrai double couvre toujours ses positions',()=>{
  const st={...newGuided({positions:30}),circuits:c};
  assert.equal(isSplit(st,3),false);assert.ok(coveredFrom(st,3));
 });
+
+import {mergeScanned} from '../public/model.js';
+import {scanToPanel} from '../public/aiscan.js';
+test('garnir un panneau existant avec une lecture IA',()=>{
+ const scan={is_panel:true,brand:'Siemens',series:'',catalog_number:'',family:'',main_amps:200,bus_amps:200,positions:30,voltage:'120/240 V monophasé',panel_kind:'Principal',
+  breakers:[
+   {position:1,poles:1,half:'A',spans_next:false,amps:15,label:'Micro-ondes',label_source:'directory',protection:'Standard',confidence:.9},
+   {position:1,poles:1,half:'B',spans_next:true,amps:15,label:'Comptoirs',label_source:'directory',protection:'Standard',confidence:.9},
+   {position:2,poles:1,half:'',spans_next:false,amps:20,label:'Salon',label_source:'directory',protection:'Standard',confidence:.9},
+   {position:4,poles:2,half:'',spans_next:false,amps:40,label:'Cuisinière',label_source:'directory',protection:'Standard',confidence:.9},
+   {position:30,poles:1,half:'',spans_next:false,amps:15,label:'Garage',label_source:'directory',protection:'Standard',confidence:.9},
+  ],empty_positions:[],confidence:.8,warnings:[],summary:''};
+ const scanned=scanToPanel(scan);
+ // Panneau existant de 20 positions : le circuit 2 est déjà décrit.
+ let ex=blank(20).map(c=>c.slots[0]==='2A'?{...c,label:'Chambre',amps:15,status:'Identifié'}:c);
+ const r=mergeScanned(ex,scanned.circuits,20);
+ const at=s=>r.circuits.find(c=>c.slots.includes(s));
+ assert.equal(at('1A').label,'Micro-ondes');assert.deepEqual(at('1B').slots,['1B','3A']);assert.equal(at('1B').label,'Comptoirs');
+ assert.equal(at('2A').label,'Chambre','circuit déjà décrit conservé');
+ assert.equal(at('4A').label,'Cuisinière');assert.equal(at('4A').amps,40);
+ assert.equal(r.applied,3);
+ assert.deepEqual(r.skipped.map(s=>s.reason).sort(),['déjà décrit','hors du panneau'],'Salon (déjà décrit) et Garage (position 30 hors du panneau)');
+ validate(r.circuits,{positions:20});
+ // remplacement demandé
+ const r2=mergeScanned(ex,scanned.circuits,20,{replace:true});
+ assert.equal(r2.circuits.find(c=>c.slots.includes('2A')).label,'Salon');
+ // panneau vide : tout est appliqué
+ const r3=mergeScanned(blank(30),scanned.circuits,30);
+ assert.equal(r3.applied,5);assert.equal(r3.skipped.length,0);
+});

@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES} from './catalog.js';
-export const APP_VERSION='2.13.0';
+export const APP_VERSION='2.14.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -232,6 +232,26 @@ export function placeBreaker(circuits,p,b,positions){
  else if(b.kind==='quad'){add(`${p}A`,[`${p}A`],a[0]);add(`${p}B`,[`${p}B`,`${p+2}A`],a[1]??a[0]);add(`${p+2}B`,[`${p+2}B`],a[2]??a[0]);}
  else add(String(p),target,a[0]);
  return validate(mergeHalves(sortCircuits(out)),{positions});
+}
+/**
+ * Garnit un panneau existant avec les circuits lus par l'IA : ne remplit que les emplacements encore vides
+ * (sauf `replace`, qui remplace aussi les circuits déjà décrits). Retourne {circuits, applied, skipped:[{slots,label,reason}]}.
+ */
+export function mergeScanned(existing,scanned,positions,{replace=false}={}){
+ const protectedC=c=>hasData(c)||c.amps!=null||!!c.vacant||!!c.loads?.length;
+ let out=existing.map(c=>({...c}));
+ const ids=new Set(out.map(c=>c.id));
+ let applied=0;const skipped=[];
+ for(const sc of scanned.filter(c=>c.label||c.amps!=null||c.vacant)){
+  if(sc.slots.some(s=>slotPos(s)>positions)){skipped.push({slots:sc.slots,label:sc.label||'',reason:'hors du panneau'});continue;}
+  const hit=out.filter(c=>c.slots.some(s=>sc.slots.includes(s)));
+  if(!replace&&hit.some(protectedC)){skipped.push({slots:sc.slots,label:sc.label||'',reason:'déjà décrit'});continue;}
+  for(const c of hit)ids.delete(c.id);
+  out=out.filter(c=>!hit.includes(c));
+  for(const c of hit)for(const s of c.slots)if(!sc.slots.includes(s)){const nid=freeId(ids,'c'+s);ids.add(nid);out.push(emptyCircuit(nid,[s]));}
+  const nid=freeId(ids,sc.id);ids.add(nid);out.push({...sc,id:nid});applied++;
+ }
+ return {circuits:validate(mergeHalves(sortCircuits(out)),{positions}),applied,skipped};
 }
 // Ajuste le nombre de positions d'un panneau.
 export function resize(circuits,positions){
