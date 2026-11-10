@@ -103,6 +103,17 @@ function resetView(token){
  return authCard('Nouveau mot de passe',null,form);
 }
 
+// ---------- Affichage tuiles / liste (mémorisé sur l'appareil) ----------
+const getPref=(k,d)=>{try{return localStorage.getItem(k)||d;}catch{return d;}};
+const setPref=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
+/** Bascule tuiles / liste sur `target` (élément « .cards »). */
+function viewToggle(key,target){
+ let mode=getPref(key,'grid')==='list'?'list':'grid';
+ const apply=()=>{target.classList.toggle('list',mode==='list');for(const b of box.querySelectorAll('button'))b.setAttribute('aria-pressed',String(b.dataset.mode===mode)),b.classList.toggle('on',b.dataset.mode===mode);};
+ const mk=(m,label)=>h('button',{type:'button','data-mode':m,onclick:()=>{mode=m;setPref(key,m);apply();}},label);
+ const box=h('div',{class:'view-switch',role:'group','aria-label':'Affichage : tuiles ou liste'},mk('grid','▦ Tuiles'),mk('list','☰ Liste'));
+ apply();return box;
+}
 // ---------- Sites ----------
 async function sitesView(){
  crumbs([['Mes sites']]);
@@ -116,13 +127,14 @@ async function sitesView(){
   h('button',{type:'button',class:'primary lg',onclick:create},'+ Ajouter mon premier site'),
   h('p',{class:'small muted mt'},'Forfait gratuit : 5 panneaux. ',h('a',{href:'#/abonnement',text:'Voir les forfaits'}),'.'),
   h('p',{class:'small muted mt'},'Vous utilisiez l’ancienne version avec une clé d’accès ? ',h('a',{href:'#/compte',text:'Importez vos panneaux'}),'.')));
- return h('div',{class:'container'},
-  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`Bonjour ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
-  h('div',{class:'cards'},...sites.map(s=>h('a',{class:'card site-card',href:'#/sites/'+s.id},
+ const grid=h('div',{class:'cards'},...sites.map(s=>h('a',{class:'card site-card',href:'#/sites/'+s.id},
    h('div',{},h('h2',{text:s.name}),s.shared&&h('span',{class:'badge shared',text:`👥 Partagé par ${s.shared.by}`}),h('div',{class:'addr',text:siteAddress(s)||'Adresse à préciser'}),s.client&&h('div',{class:'addr',text:'Client : '+s.client})),
    h('div',{class:'chips'},s.panels.length?s.panels.map(p=>h('span',{class:'badge '+(p.progress===100?'ok':''),text:`${p.tag||p.name} · ${p.progress} %`})):h('span',{class:'badge warn',text:'Aucun panneau'})),
    h('div',{class:'small muted',text:'Modifié '+fmtRelative(s.updatedAt)}))),
-   h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site')));
+   h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
+ return h('div',{class:'container'},
+  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`Bonjour ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
+  grid);
 }
 
 function tree(panels){
@@ -154,7 +166,7 @@ async function siteView(id){
    h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',onclick:addGuided},'🧭 Mode guidé'),h('button',{type:'button',onclick:addByPhoto},'📷 Ajouter par photo (IA)'),h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
-    panels.length?h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'))
+    panels.length?(()=>{const g=h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'));return h('div',{},h('div',{class:'cards-toolbar'},viewToggle('mp_panels_view',g)),g);})()
      :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'▦'}),h('h2',{text:'Aucun panneau pour l’instant'}),h('p',{text:'Ajoutez le panneau principal. Vous pourrez ensuite ajouter les sous-panneaux (garage, atelier, logement…) et indiquer lequel alimente l’autre.'}),h('div',{class:'page-actions center'},h('button',{type:'button',class:'primary lg',onclick:addPanel},'+ Ajouter le panneau principal'),h('button',{type:'button',class:'lg',onclick:addGuided},'🧭 Mode guidé (questions)'),h('button',{type:'button',class:'lg',onclick:addByPhoto},'📷 Par photo (IA)')))),
    h('aside',{class:'stack'},
     panels.length>0&&h('div',{class:'card side-card'},h('h3',{text:'Hiérarchie d’alimentation'}),tree(panels)),

@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES} from './catalog.js';
-export const APP_VERSION='2.16.0';
+export const APP_VERSION='2.17.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
