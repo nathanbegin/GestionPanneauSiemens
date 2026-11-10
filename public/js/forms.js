@@ -6,7 +6,7 @@ import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
 import {api} from './api.js';
 import {circuitLoad,polesOf} from '../loadcalc.js';
-import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormats,designation,formatOf,reshape,validate,tagGroups,panelTitle,MAX_POSITIONS} from '../model.js';
+import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormats,designation,formatOf,reshape,validate,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,tagGroups,panelTitle,MAX_POSITIONS} from '../model.js';
 
 const input=(name,value,attrs={})=>h('input',{name,value:value??'',...attrs});
 const area=(name,value,attrs={})=>{const t=h('textarea',{name,rows:3,...attrs});t.value=value??'';return t;};
@@ -182,6 +182,7 @@ export function circuitEditor({panel,id,order,onSave,planning=false,lib=null,fee
     field('Protection',select('protection',protections,c.protection||'Standard'),{hint:'DDFT : différentiel (salle de bain, extérieur). Anti-arc : chambres, aires habitables.'}),
     field('Statut',select('status',states,c.status)),
     field('Format du disjoncteur',select('format',Object.entries(breakerFormats),fmt),{hint:'Bipolaire = 240 V (cuisinière, sécheuse…).'}),
+    h('div',{class:'full group-block'}),
     h('datalist',{id:'rooms'},[...new Set(panel.circuits.map(x=>x.room).filter(Boolean))].map(r=>h('option',{value:r}))),
     h('details',{class:'full'},h('summary',{class:'small',text:'Tags, exceptions et notes'}),h('div',{class:'fields'},
      field('Tags · emplacements',input('locations',(c.tags?.locations||[]).join(', '),{placeholder:'Sous-sol, Cinéma'}),{hint:'Séparez par des virgules.'}),
@@ -198,10 +199,22 @@ export function circuitEditor({panel,id,order,onSave,planning=false,lib=null,fee
    const drawFeed=()=>{const usage=body.querySelector('[name=usage]').value;slot.replaceChildren(usage==='Sous-panneau'?subpanelLink({panel,circuit:c,siblings:feeds.siblings,createSubpanel:feeds.createSubpanel,onChange:feeds.onChange}):'');};
    body.querySelector('[name=usage]').addEventListener('change',drawFeed);drawFeed();
   }
+  // Grouper deux demi-emplacements adjacents (jumelé / bipolaire à cheval sur deux positions) ou dissocier.
+  const gb=body.querySelector('.group-block');
+  if(gb){
+   const cands=groupCandidates(panel.circuits,c.id),linked=isLinkedPair(c);
+   const act=async fn=>{e.textContent='';try{const next=fn(dirty?collect():structuredClone(panel.circuits));await onSave(next);dirty=false;statusTouched=false;render();}catch(x){e.textContent=x.message;}};
+   gb.replaceChildren(h('b',{class:'small',text:'Grouper avec un emplacement adjacent'}),
+    h('p',{class:'small muted',text:'Pour un disjoncteur jumelé ou bipolaire qui occupe deux demi-emplacements voisins de la même colonne (ex. 5B + 7A). Choisissez l’emplacement voisin.'}),
+    h('div',{class:'form-actions',style:{justifyContent:'flex-start'}},
+     ...cands.map(x=>h('button',{type:'button',class:'sm',onclick:()=>act(n=>groupCircuits(n,c.id,x.id,panel.positions,{force:!x.hasData}))},`＋ ${x.slot}${x.label?' · '+x.label:' (libre)'}`)),
+     linked&&h('button',{type:'button',class:'sm',onclick:()=>act(n=>ungroupCircuit(n,c.id,panel.positions))},'Dissocier '+c.slots.join(' + ')),
+     !cands.length&&!linked&&h('span',{class:'small muted',text:'Aucun emplacement voisin à grouper.'})));
+  }
   d.el.querySelector('.dlg-head h2').textContent='Circuit '+designation(c);
   d.el.querySelector('.dlg-head .eyebrow').textContent=`Fiche ${idx+1} sur ${order.length} · ${panelTitle(panel)}`;
   prevBtn.disabled=idx<=0;nextBtn.disabled=idx>=order.length-1;
-  if(c.slots.length===1&&c.slots[0].endsWith('B'))body.querySelector('[name=format]').disabled=true;
+  if((c.slots.length===1&&c.slots[0].endsWith('B'))||isLinkedPair(c))body.querySelector('[name=format]').disabled=true;
   if(d.el.open)setTimeout(()=>body.querySelector('[name=label]').focus(),0);
  };
  const collect=()=>{

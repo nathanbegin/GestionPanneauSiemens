@@ -66,11 +66,12 @@ export const SCAN_SCHEMA={
   voltage:{type:'string',enum:[...voltages,''],description:'Tension du panneau.'},
   panel_kind:{type:'string',enum:['Principal','Sous-panneau','Inconnu']},
   breakers:{type:'array',items:{type:'object',additionalProperties:false,
-   required:['position','poles','half','amps','label','label_source','protection','confidence'],
+   required:['position','poles','half','spans_next','amps','label','label_source','protection','confidence'],
    properties:{
     position:{type:'integer',description:'Première position occupée (numérotation : impairs à gauche 1,3,5… de haut en bas ; pairs à droite 2,4,6…).'},
     poles:{type:'integer',enum:[1,2,3],description:'1 unipolaire, 2 bipolaire (positions n et n+2), 3 tripolaire.'},
     half:{type:'string',enum:['','A','B'],description:'Disjoncteur jumelé (tandem) : A = moitié du haut, B = moitié du bas. Vide sinon.'},
+    spans_next:{type:'boolean',description:'true si ce disjoncteur occupe aussi le demi-emplacement suivant de la même colonne (ex. un 25 A sur 5B puis 7A) : donne alors half du premier. false sinon.'},
     amps:{...nullable('integer'),description:'Calibre lu sur la manette, null si illisible.'},
     label:{type:'string',description:'Désignation du circuit (répertoire de la porte ou étiquette), recopiée telle quelle. Vide si absente.'},
     label_source:{type:'string',enum:['breaker','directory','none']},
@@ -88,7 +89,7 @@ export const SCAN_SCHEMA={
 export function cleanPrevious(list){
  if(!Array.isArray(list))return [];
  return list.slice(0,200).filter(b=>Number.isInteger(b?.position)&&b.position>=1&&b.position<=84).map(b=>({
-  position:b.position,half:b.half==='A'||b.half==='B'?b.half:'',poles:[1,2,3].includes(b.poles)?b.poles:1,
+  position:b.position,half:b.half==='A'||b.half==='B'?b.half:'',poles:[1,2,3].includes(b.poles)?b.poles:1,spans_next:b.spans_next===true,
   amps:Number.isInteger(b.amps)?b.amps:null,label:String(b.label||'').slice(0,100),vacant:b.vacant===true,user_confirmed:b.user_confirmed===true}));
 }
 function previousPrompt(hint){
@@ -107,7 +108,7 @@ export function scanPrompt(hint={}){
  return [
   'Tu es un assistant pour maîtres électriciens au Québec. Analyse les photos et documents fournis d’un panneau de distribution résidentiel ou commercial léger (normes canadiennes).',
   'Objectif : reconstituer la configuration du panneau (marque, gamme, disjoncteur principal, nombre de positions, et chaque disjoncteur avec sa position, son nombre de pôles, son calibre et sa désignation).',
-  'Numérotation canadienne habituelle : positions impaires dans la colonne de gauche (1, 3, 5… de haut en bas), paires à droite (2, 4, 6…). Un bipolaire occupe n et n+2 dans la même colonne ; donne sa première position. Un jumelé (tandem) loge deux demi-disjoncteurs dans une position : déclare-les séparément avec half A (haut) et B (bas).',
+  'Numérotation canadienne habituelle : positions impaires dans la colonne de gauche (1, 3, 5… de haut en bas), paires à droite (2, 4, 6…). Un bipolaire occupe n et n+2 dans la même colonne ; donne sa première position. Un jumelé (tandem) loge deux demi-disjoncteurs dans une position : déclare-les séparément avec half A (haut) et B (bas). Vérifie chaque disjoncteur : un seul disjoncteur peut occuper deux demi-emplacements consécutifs à cheval sur deux positions, par exemple 5B et 7A (chauffage 25 A). Dans ce cas, déclare-le UNE seule fois avec half du premier demi-emplacement (B) et spans_next à true, sans déclarer le second séparément.',
   'Si les numéros sont imprimés sur le panneau ou le répertoire, ils ont priorité sur ta déduction.',
   'Le calibre est le nombre moulé sur la manette (15, 20, 30, 40…). Repère DDFT (bouton TEST, « GFCI »/« DDFT ») et anti-arc (« AFCI », « CAFCI », témoin).',
   'Les désignations viennent du répertoire collé sur la porte ou d’étiquettes : recopie-les telles quelles (français ou anglais), sans les traduire ni les inventer.',

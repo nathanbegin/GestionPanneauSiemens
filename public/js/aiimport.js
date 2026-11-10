@@ -4,13 +4,14 @@
 import {h,field,select,dialog,toast} from './dom.js';
 import {api} from './api.js';
 import {panelArt} from './panelart.js';
-import {blank,resize,designation,sortCircuits,ampsList,panelKinds,voltages,slotPos} from '../model.js';
+import {blank,resize,designation,sortCircuits,ampsList,panelKinds,voltages,slotPos,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,suggestLinks} from '../model.js';
 import {FAMILIES} from '../catalog.js';
 import {AI_CONFIDENT} from '../aiscan.js';
 import {positionQuiz} from './guided.js';
 
 const MAX_SIDE=2000,MAX_FILES=6,MAX_TOTAL=3*1024*1024;
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const norm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 const readAsDataUrl=file=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(Error('Lecture du fichier impossible.'));r.readAsDataURL(file);});
 // Photo réduite à 2000 px (côté le plus long) en JPEG : lisible pour l'IA et légère à envoyer.
 function shrinkImage(file){
@@ -167,11 +168,26 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
    const label=h('input',{value:c.vacant?'':c.label,maxlength:100,'aria-label':'Désignation '+designation(c),placeholder:c.vacant?'Espace inutilisé':'Désignation'});
    const upd=()=>{edited.add(c.id);circuits=circuits.map(x=>x.id!==c.id?x:{...x,vacant:undefined,amps:amps.value===''?null:Number(amps.value),label:label.value.trim(),status:label.value.trim()&&x.status==='Identifié'?'Identifié':'À confirmer'});draw();};
    amps.addEventListener('change',upd);label.addEventListener('change',upd);
+   // Grouper avec un emplacement adjacent (jumelé / bipolaire à cheval sur deux positions) ou dissocier.
+   const cands=groupCandidates(circuits,c.id);
+   const grp=h('select',{'aria-label':'Grouper '+designation(c)},new Option('Grouper…',''),
+    ...cands.map(x=>new Option(`avec ${x.slot}${x.label?' · '+x.label:' (libre)'}`,x.id)),...(isLinkedPair(c)?[new Option('Dissocier','__u')]:[]));
+   grp.disabled=grp.options.length<2;
+   grp.addEventListener('change',()=>{
+    if(!grp.value)return;
+    try{
+     const cand=cands.find(x=>x.id===grp.value);
+     const next=grp.value==='__u'?ungroupCircuit(circuits,c.id,p.positions):groupCircuits(circuits,c.id,cand.id,p.positions,{force:!cand.hasData||norm(cand.label)===norm(c.label)});
+     edited.add(c.id);
+     confirm(p,{circuits:next,edited,changed,note:grp.value==='__u'?'Disjoncteur dissocié.':`Emplacements ${c.slots.join(' + ')} + ${cand.slot} groupés en un seul disjoncteur.`});
+    }catch(e){toast(e.message);grp.value='';}
+   });
    const ch=changed.get(c.id);
-   return h('tr',{class:[r?confClass(r.confidence):'',ch?'changed':''].join(' ')},h('td',{},designation(c),ch?h('span',{class:'ai-new',text:ch}):null),h('td',{},amps),h('td',{},label),h('td',{class:'small',text:pct(r?.confidence)}));
+   return h('tr',{class:[r?confClass(r.confidence):'',ch?'changed':''].join(' ')},h('td',{},designation(c),ch?h('span',{class:'ai-new',text:ch}):null),h('td',{},amps),h('td',{},label),h('td',{},grp),h('td',{class:'small',text:pct(r?.confidence)}));
   });
   // Positions incertaines : confiance faible ou disjoncteur sans désignation (hors corrections de l'utilisateur).
   const uncertain=()=>[...new Set(circuits.filter(c=>!c.vacant&&!edited.has(c.id)&&(c.amps!=null||c.label||p.review[c.id])&&((p.review[c.id]&&p.review[c.id].confidence<AI_CONFIDENT)||!c.label)).map(c=>slotPos(c.slots[0])))].sort((a,b)=>a-b);
+  const links=suggestLinks(circuits);
   const errBox=h('p',{class:'error',role:'alert'});
   const create=h('button',{type:'button',class:'primary lg',onclick:async()=>{
    create.disabled=true;errBox.textContent='';
@@ -183,8 +199,10 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
   stage.replaceChildren(
    h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Confirmation'}),h('h3',{text:'Est-ce bien la configuration en place ?'}),usedModel&&h('span',{class:'small muted',text:'Lu par '+usedModel})),
    state.note?h('div',{class:'notice info'},state.note):null,
+   links.length?h('div',{class:'notice'},h('b',{text:'Un seul disjoncteur sur deux emplacements ? '}),'Ces emplacements voisins ont le même calibre et la même désignation :',
+    h('div',{class:'form-actions'},links.map(l=>h('button',{type:'button',class:'sm',onclick:()=>{try{const next=groupCircuits(circuits,l.a,l.b,p.positions,{force:true});edited.add(l.a);confirm(p,{circuits:next,edited,changed,note:`${l.slots.join(' + ')} groupés : un seul disjoncteur de ${l.amps} A.`});}catch(e){toast(e.message);}}},`Grouper ${l.slots.join(' + ')} · ${l.amps} A · ${l.label}`)))):null,
    h('p',{class:'small muted',text:'Comparez avec le panneau réel. Corrigez un calibre ou une désignation directement dans le tableau. Les lignes orange sont à vérifier en priorité. Il manque quelque chose ? Ajoutez des photos rapprochées pour préciser.'}),
-   h('div',{class:'ai-build'},art,h('div',{class:'ai-table-wrap'},h('table',{class:'ai-table'},h('thead',{},h('tr',{},h('th',{text:'Pos.'}),h('th',{text:'Calibre'}),h('th',{text:'Désignation'}),h('th',{text:'Confiance'}))),h('tbody',{},rows.length?rows:[h('tr',{},h('td',{colspan:4,class:'muted',text:'Aucun disjoncteur lu : ajoutez des photos pour préciser, ou créez le panneau vide.'}))])))),
+   h('div',{class:'ai-build'},art,h('div',{class:'ai-table-wrap'},h('table',{class:'ai-table'},h('thead',{},h('tr',{},h('th',{text:'Pos.'}),h('th',{text:'Calibre'}),h('th',{text:'Désignation'}),h('th',{text:'Groupe'}),h('th',{text:'Confiance'}))),h('tbody',{},rows.length?rows:[h('tr',{},h('td',{colspan:5,class:'muted',text:'Aucun disjoncteur lu : ajoutez des photos pour préciser, ou créez le panneau vide.'}))])))),
    errBox,
    h('div',{class:'form-actions'},
     h('button',{type:'button',class:'ghost',onclick:()=>identify(p)},'← Revenir à l’identification'),
@@ -245,7 +263,7 @@ export async function aiImportDialog({site,siblings=[],onCreated}){
   stage.replaceChildren(h('div',{class:'ai-wait'},h('div',{class:'spinner','aria-hidden':'true'}),msg,h('p',{class:'small muted',text:'L’IA complète la configuration déjà établie.'})));
   const current=state.circuits;
   // Configuration actuelle transmise à l'IA (les corrections de l'utilisateur sont marquées).
-  const previous=current.filter(c=>c.label||c.amps||c.vacant).map(c=>({position:slotPos(c.slots[0]),half:c.slots.length===1?c.slots[0].slice(-1):'',poles:new Set(c.slots.map(slotPos)).size,amps:c.amps??null,label:c.label||'',vacant:!!c.vacant,user_confirmed:state.edited.has(c.id)}));
+  const previous=current.filter(c=>c.label||c.amps||c.vacant).map(c=>({position:slotPos(c.slots[0]),half:c.slots.length===1||isLinkedPair(c)?c.slots[0].slice(-1):'',poles:isLinkedPair(c)?1:new Set(c.slots.map(slotPos)).size,spans_next:isLinkedPair(c),amps:c.amps??null,label:c.label||'',vacant:!!c.vacant,user_confirmed:state.edited.has(c.id)}));
   const det=p.meta.details;
   try{
    const out=await api('/api/panels?action=scan',{method:'POST',body:{files:extra.map(({name,data})=>({name,data})),hint:{note,previous,brand:det.brand,series:det.model,mainAmps:det.mainAmps??undefined,positions:p.positions}}});

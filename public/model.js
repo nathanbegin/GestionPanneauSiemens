@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES} from './catalog.js';
-export const APP_VERSION='2.8.1';
+export const APP_VERSION='2.9.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -147,6 +147,54 @@ export function reshape(circuits,id,format,positions){
   else{const nid=freeId(ids,'c'+slots[0]);ids.add(nid);out.push(emptyCircuit(nid,slots));}
  }
  return validate(mergeHalves(sortCircuits(out)),{positions});
+}
+// ---------- Groupement de demi-emplacements adjacents (jumelé / bipolaire à cheval sur deux positions) ----------
+// Demi-emplacement qui suit / précède dans la même colonne : 5A → 5B → 7A ; 7A → 5B → 5A.
+export const nextSlot=s=>{const n=slotPos(s);return s.endsWith('A')?`${n}B`:`${n+2}A`;};
+export const prevSlot=s=>{const n=slotPos(s);if(s.endsWith('B'))return `${n}A`;return n>2?`${n-2}B`:null;};
+// Groupe de deux demi-emplacements sur deux positions différentes (ex. 5B + 7A).
+export const isLinkedPair=c=>c.slots.length===2&&slotPos(c.slots[0])!==slotPos(c.slots[1]);
+const meaningful=c=>!!(c.label||c.room||c.notes||c.exceptions||c.amps!=null||(c.tags&&Object.values(c.tags).some(a=>a.length))||c.loads?.length);
+/** Voisins admissibles d'un circuit : demi-emplacements adjacents (même colonne) occupés par un circuit d'un seul emplacement. */
+export function groupCandidates(circuits,id){
+ const c=circuits.find(x=>x.id===id);if(!c||c.slots.length>=6)return [];
+ const out=[];
+ for(const [side,slot] of [['after',nextSlot(c.slots.at(-1))],['before',prevSlot(c.slots[0])]]){
+  if(!slot)continue;
+  const o=circuits.find(x=>x.slots.includes(slot));
+  if(o&&o.id!==id&&o.slots.length===1)out.push({side,slot,id:o.id,label:o.label||'',hasData:meaningful(o)});
+ }
+ return out;
+}
+/** Fusionne deux circuits adjacents en un seul disjoncteur. Le circuit `id` est conservé ; sans `force`, refuse d'écraser deux fiches remplies. */
+export function groupCircuits(circuits,id,otherId,positions,{force=false}={}){
+ const c=circuits.find(x=>x.id===id),o=circuits.find(x=>x.id===otherId);
+ if(!c||!o||c===o)throw Error('Circuit introuvable.');
+ if(!force&&meaningful(c)&&meaningful(o))throw Error(`Les deux emplacements contiennent déjà une fiche (« ${c.label||'sans nom'} » et « ${o.label||'sans nom'} »). Videz l’une des deux avant de les grouper.`);
+ const slots=[...c.slots,...o.slots].sort((a,b)=>slotOrder(a)-slotOrder(b));
+ const keep=meaningful(c)||!meaningful(o)?c:o;
+ const merged={...keep,id:c.id,slots};
+ return validate(sortCircuits([...circuits.filter(x=>x!==c&&x!==o),merged]),{positions});
+}
+/** Sépare un groupe de deux demi-emplacements : le premier garde la fiche, le second redevient libre. */
+export function ungroupCircuit(circuits,id,positions){
+ const c=circuits.find(x=>x.id===id);
+ if(!c||!isLinkedPair(c))throw Error('Ce circuit n’est pas un groupe de deux emplacements.');
+ const [first,...rest]=c.slots;const ids=new Set(circuits.map(x=>x.id));
+ const out=[...circuits.filter(x=>x!==c),{...c,slots:[first]}];
+ for(const s of rest){const nid=freeId(ids,'c'+s);ids.add(nid);out.push(emptyCircuit(nid,[s]));}
+ return validate(mergeHalves(sortCircuits(out)),{positions});
+}
+/** Paires de demi-emplacements adjacents (ex. 5B et 7A) qui ressemblent à un seul disjoncteur : même calibre et même désignation. */
+export function suggestLinks(circuits){
+ const norm=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+ const out=[];
+ for(const a of circuits){
+  if(a.slots.length!==1||a.vacant||a.amps==null||!a.label||!a.slots[0].endsWith('B'))continue;
+  const b=circuits.find(x=>x.slots.length===1&&x.slots[0]===nextSlot(a.slots[0]));
+  if(b&&!b.vacant&&b.amps===a.amps&&norm(b.label)===norm(a.label))out.push({a:a.id,b:b.id,slots:[a.slots[0],b.slots[0]],label:a.label,amps:a.amps});
+ }
+ return out;
 }
 // Regroupe deux demi-emplacements vides d'une même position en une position entière.
 function mergeHalves(list){
