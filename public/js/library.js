@@ -78,11 +78,28 @@ export function suggestModels(panels,{circuits,bipolar=0,margin=0.2,family='',ma
  return res.slice(0,Math.max(limit,8));
 }
 
+/** Lignes de comparaison côte à côte de modèles suggérés (sorties de suggestModels). */
+export const COMPARE_ROWS=[
+ ['Principal',s=>s.p.main?s.p.main+' A':'Cosses (sans principal)'],
+ ['Barres',s=>s.p.bus?s.p.bus+' A':'—'],
+ ['Type',s=>s.p.type||'—'],
+ ['Espaces',s=>String(s.p.espaces)],
+ ['Circuits maximum',s=>s.p.circuits!=null?String(s.p.circuits):'—'],
+ ['Jumelés',s=>s.tandem?'Requis pour vos circuits':s.p.circuits>s.p.espaces?'Acceptés (non requis)':'Non acceptés'],
+ ['Espaces libres',s=>String(s.spare)],
+ ['Circuits en réserve',s=>String(s.spareCircuits)],
+ ['Marge demandée',s=>s.tier==='marge'?'✔ Respectée':'Non (juste suffisant)'],
+ ['Enveloppe',s=>s.p.enveloppe||'—'],
+ ['Neutre enfichable',s=>s.p.pon?'Oui':'Non'],
+ ['Statut',s=>s.p.statut||'—'],
+];
+export const compareTable=models=>COMPARE_ROWS.map(([label,fn])=>{const v=models.map(fn);return {label,values:v,differs:new Set(v).size>1};});
+
 // ---------- Sélecteur visuel de modèle ----------
 export async function modelPicker({current,onPick}){
  let lib;
  try{lib=await loadLibrary();}catch(e){toast(e.message,7000);return;}
- const state={family:current?.family||'',type:'',q:'',bus:'',showOld:false,showInfo:false,circuits:current?.circuits||'',bipolar:current?.bipolar||0,margin:0.2,main:Number(current?.mainAmps)||0};
+ const state={family:current?.family||'',type:'',q:'',bus:'',showOld:false,showInfo:false,circuits:current?.circuits||'',bipolar:current?.bipolar||0,margin:0.2,main:Number(current?.mainAmps)||0,cmp:new Set()};
  const grid=h('div',{class:'model-grid'});
  const count=h('span',{class:'small muted'});
  const fams=lib.families.map(f=>f.id);
@@ -125,6 +142,7 @@ export async function modelPicker({current,onPick}){
   if(!list.length)grid.append(h('p',{class:'muted',text:'Aucun modèle ne correspond.'}));
  }
  // Suggestions selon le nombre de circuits et la marque choisie.
+ const cmpBox=h('div',{class:'sug-compare'});
  const sugGrid=h('div',{class:'model-grid'}),sugNote=h('p',{class:'small muted'});
  const circIn=h('input',{type:'number',min:1,max:200,step:1,value:state.circuits,placeholder:'Ex. 28',oninput:e=>{state.circuits=Number(e.target.value)||'';drawSug();}});
  const bipIn=h('input',{type:'number',min:0,max:100,step:1,value:state.bipolar,oninput:e=>{state.bipolar=Number(e.target.value)||0;drawSug();}});
@@ -132,15 +150,28 @@ export async function modelPicker({current,onPick}){
  const marSel=h('select',{'aria-label':'Marge d’expansion',onchange:e=>{state.margin=Number(e.target.value);drawSug();}},...[[0,'Aucune marge'],[0.2,'Marge de 20 %'],[0.3,'Marge de 30 %']].map(([v,t])=>{const o=new Option(t,v);o.selected=v===state.margin;return o;}));
  function drawSug(){
   const list=suggestModels(lib.panels,{circuits:Number(state.circuits),bipolar:state.bipolar,margin:state.margin,family:state.family,mainAmps:state.main||null});
-  if(!Number(state.circuits)){sugNote.textContent='Entrez le nombre de circuits pour obtenir des modèles adaptés.';sugGrid.replaceChildren();return;}
+  if(!Number(state.circuits)){sugNote.textContent='Entrez le nombre de circuits pour obtenir des modèles adaptés.';sugGrid.replaceChildren();cmpBox.replaceChildren();return;}
   sugNote.textContent=list.length?`${list.length} modèle(s) adapté(s) à ${state.circuits} circuit(s)${state.bipolar?` dont ${state.bipolar} bipolaire(s)`:''}${state.family?` · ${lib.familyInfo[state.family]?.gamme?.split(' (')[0]||state.family}`:' · deux meilleurs par marque (choisissez une marque pour en voir plus)'} :`:'Aucun modèle du catalogue ne loge autant de circuits pour cette marque : choisissez une autre marque ou répartissez sur un sous-panneau.';
+  for(const k of [...state.cmp])if(!list.some(s=>s.p.cat===k))state.cmp.delete(k);
   sugGrid.replaceChildren(...list.map(s=>{
    const c=card(s.p);
    const why=h('span',{class:'small '+(s.tier==='marge'?'ok':'muted'),text:[s.tier==='marge'?`✔ Marge de ${Math.round(state.margin*100)} % respectée`:'Juste suffisant (sans marge)',s.tandem?'jumelés requis':'sans jumelés',s.spare>0?`${s.spare} espace(s) libre(s)`:'aucun espace libre'].join(' · ')});
-   (c.querySelector('.model-info')||c).append(why);return c;}));
+   (c.querySelector('.model-info')||c).append(why);
+   const box=h('input',{type:'checkbox',checked:state.cmp.has(s.p.cat),disabled:!state.cmp.has(s.p.cat)&&state.cmp.size>=3,onchange:e=>{e.target.checked?state.cmp.add(s.p.cat):state.cmp.delete(s.p.cat);drawSug();}});
+   return h('div',{class:'sug-item'},c,h('label',{class:'check small sug-cmp'},box,' Comparer'+(state.cmp.size>=3&&!state.cmp.has(s.p.cat)?' (3 maximum)':'')));}));
+  drawCmp(list);
+ }
+ function drawCmp(list){
+  const chosen=list.filter(s=>state.cmp.has(s.p.cat));
+  if(chosen.length<2){cmpBox.replaceChildren(chosen.length?h('p',{class:'small muted',text:'Cochez un deuxième modèle (jusqu’à 3) pour les comparer côte à côte.'}):h('p',{class:'small muted',text:'Astuce : cochez « Comparer » sur 2 ou 3 modèles pour les voir côte à côte.'}));return;}
+  const rows=compareTable(chosen);
+  cmpBox.replaceChildren(h('h4',{text:'Comparaison côte à côte'}),h('div',{class:'cmp-scroll'},h('table',{class:'cmp-table'},
+   h('thead',{},h('tr',{},h('th'),...chosen.map(s=>h('th',{},h('b',{text:s.p.cat}),h('div',{class:'small muted',text:lib.familyInfo[s.p.family]?.marque||familyOf(s.p.family).brand||s.p.family}))))),
+   h('tbody',{},...rows.map(r=>h('tr',{class:r.differs?'cmp-diff':''},h('th',{scope:'row',text:r.label}),...r.values.map(v=>h('td',{text:v})))),
+    h('tr',{},h('th'),...chosen.map(s=>h('td',{},h('button',{type:'button',class:'primary sm',onclick:()=>{d.close();onPick(s.p,lib);}},'Choisir ce modèle'))))))));
  }
  const suggest=h('details',{class:'suggest',open:true},h('summary',{text:'💡 Suggérer des modèles selon mes circuits'}),
-  h('div',{class:'fields'},h('label',{class:'f'},h('span',{text:'Nombre de circuits'}),circIn),h('label',{class:'f'},h('span',{text:'Dont bipolaires (240 V)'}),bipIn),h('label',{class:'f'},h('span',{text:'Principal'}),mainSel),h('label',{class:'f'},h('span',{text:'Marge'}),marSel)),sugNote,sugGrid);
+  h('div',{class:'fields'},h('label',{class:'f'},h('span',{text:'Nombre de circuits'}),circIn),h('label',{class:'f'},h('span',{text:'Dont bipolaires (240 V)'}),bipIn),h('label',{class:'f'},h('span',{text:'Principal'}),mainSel),h('label',{class:'f'},h('span',{text:'Marge'}),marSel)),sugNote,sugGrid,cmpBox);
  drawChips();
  d=dialog({title:'Bibliothèque de panneaux',eyebrow:`${lib.panels.filter(p=>p.designable).length} modèles · catalogues canadiens des fabricants`,wide:true,
   body:[chips,suggest,h('div',{class:'toolbar-row mt'},h('label',{class:'search'},h('span',{'aria-hidden':'true',text:'⌕'}),search),typeSel,busSel),h('div',{class:'row-between'},old,count),grid,

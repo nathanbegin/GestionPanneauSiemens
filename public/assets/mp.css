@@ -666,3 +666,8 @@ body.app .container{max-width:min(1760px,96vw)}
 .suggest summary{font-weight:600;cursor:pointer}
 .suggest .fields{margin:12px 0 8px}
 .suggest .small.ok{color:#245c3a;font-weight:600}
+.sug-item{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sug-cmp{justify-content:center}
+.sug-compare{margin-top:14px}
+.sug-compare h4{margin:0 0 8px}
+.suggest .cmp-table{background:#fff;border-radius:8px}

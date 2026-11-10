@@ -46,3 +46,14 @@ test('principal demandé',()=>{
  const s=suggestModels(panels,{circuits:28,bipolar:4,family:'SIE',mainAmps:200});
  assert.ok(s.length>0&&s.every(x=>x.p.main===200||(x.p.main==null&&x.p.bus>=200)));
 });
+
+import {compareTable} from '../public/js/library.js';
+test('comparaison côte à côte de modèles suggérés',()=>{
+ const panels=catalogue.panneaux.map(normalizePanel);
+ const s=suggestModels(panels,{circuits:28,bipolar:4,family:'SIE',mainAmps:200});
+ const t=compareTable(s.slice(0,3));
+ assert.equal(t.length,12);assert.ok(t.every(r=>r.values.length===Math.min(3,s.length)));
+ const byLabel=Object.fromEntries(t.map(r=>[r.label,r]));
+ assert.equal(byLabel['Principal'].values[0],s[0].p.main?s[0].p.main+' A':'Cosses (sans principal)');
+ assert.equal(byLabel['Espaces'].differs,new Set(s.slice(0,3).map(x=>x.p.espaces)).size>1);
+});
