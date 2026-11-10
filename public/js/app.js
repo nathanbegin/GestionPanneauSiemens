@@ -138,7 +138,7 @@ async function sitesView(){
    h('div',{class:'small muted',text:'Modifié '+fmtRelative(s.updatedAt)}))),
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
  return h('div',{class:'container'},
-  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`Bonjour ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
+  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
   grid);
 }
 

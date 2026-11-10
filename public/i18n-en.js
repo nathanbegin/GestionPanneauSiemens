@@ -1452,7 +1452,6 @@ export default [
  ["Liste", "List"],
  ["Client : {}", "Client: {}"],
  ["Gratuit", "Free"],
- ["Bonjour {}", "Hello {}"],
  ["Propriétaire", "Homeowner"],
  ["Gestionnaire d’immeuble", "Building manager"],
  ["Électricien Solo", "Electrician Solo"],
