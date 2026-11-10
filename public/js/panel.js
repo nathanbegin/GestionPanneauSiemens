@@ -2,6 +2,7 @@
 import {h,toast,confirmDialog,fmtRelative,dialog} from './dom.js';
 import {api,openDocument,NATIVE,webUrl} from './api.js';
 import {qrMatrix,qrSvg,panelLink,qrAllowed} from '../qr.js';
+import {voltsOf} from '../voltage.js';
 import {designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
@@ -216,8 +217,8 @@ export async function panelView({id,tab='panel',ctx}){
     h('span',{class:'num',text:designation(c)}),h('span',{class:'lever',text:c.amps??'?'}),h('span',{class:'short',text:shortText(c)||'—'}),h('i',{class:'dot'}));
    if(showLoads){
     // Phase et taux de charge du circuit.
-    const r=circuitLoad(c);
-    const leg=r.volts===240?'L1+L2':legOf(n);
+    const r=circuitLoad(c,voltsOf(panel.details));
+    const leg=r.volts===voltsOf(panel.details).bi?'L1+L2':legOf(n);
     const tag=h('span',{class:'leg-tag',text:leg});tag.style[side===2?'left':'right']='3px';b.append(tag);
     if(r.percent!=null){const bar=h('i',{class:r.percent>100?'over':r.percent>80?'high':''});bar.style.width=Math.min(100,r.percent)+'%';b.append(h('span',{class:'load-bar'},bar));}
    }

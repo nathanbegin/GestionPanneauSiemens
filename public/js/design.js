@@ -4,6 +4,7 @@ import {api} from './api.js';
 import {panelArt} from './panelart.js';
 import {loadLibrary,suggestModels} from './library.js';
 import {FAMILIES,familyOf} from '../catalog.js';
+import {userVolts,voltageLabel} from '../voltage.js';
 import {DESIGN_APPLIANCES,designItems,designCalc,designDemand,mainFor,genericPositions,draftLayout} from '../design.js';
 
 const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:1})+' kW';
@@ -19,7 +20,7 @@ export function designDialog({site,onCreated,onManual}){
  const head=(n,title)=>h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:`Étape ${n} de 4`}),h('h3',{text:title}));
  const nav=(back,next,nextLabel='Continuer →')=>h('div',{class:'form-actions'},back&&h('button',{type:'button',class:'ghost',onclick:back},'← Retour'),next&&h('button',{type:'button',class:'primary',onclick:next},nextLabel));
  const areas=()=>({livingArea:Number(S.livingArea)||0,basementArea:Number(S.basementArea)||0});
- const compute=()=>{const items=designItems({...areas(),picks:S.picks});return {items,calc:designCalc(items,areas()),demand:designDemand(items)};};
+ const compute=()=>{const vs=userVolts();const items=designItems({...areas(),picks:S.picks,vs});return {items,calc:designCalc(items,{...areas(),vs}),demand:designDemand(items)};};
 
  // ---------- 1. Bâtiment ----------
  function step1(){
@@ -90,7 +91,7 @@ export function designDialog({site,onCreated,onManual}){
    create.disabled=true;err.textContent='';
    try{
     const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,name:S.name,tag:S.tag,kind:S.kind,location:S.location,positions:r.positions,circuits:r.circuits,
-     details:{...det,voltage:'120/240 V monophasé',livingArea:Number(S.livingArea)||null,basementArea:Number(S.basementArea)||null,stage:'conception',state:'Planifié',notes:`Panneau conçu avec l’assistant : charge de calcul ${r.calc.amps} A, entrée recommandée ${r.main??'—'} A.`}}});
+     details:{...det,voltage:voltageLabel(userVolts().bi),livingArea:Number(S.livingArea)||null,basementArea:Number(S.basementArea)||null,stage:'conception',state:'Planifié',notes:`Panneau conçu avec l’assistant : charge de calcul ${r.calc.amps} A, entrée recommandée ${r.main??'—'} A.`}}});
     d.close();toast('Panneau créé en conception. Ajustez-le, puis passez au relevé une fois installé.',8000);onCreated?.(panel);
    }catch(e){err.textContent=e.message;create.disabled=false;}
   }},'Créer le panneau');

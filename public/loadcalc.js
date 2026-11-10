@@ -1,6 +1,7 @@
 // Calculs de charge : circuits, phases L1/L2, capacité du panneau, calcul d'un logement (règle 8-200),
 // dimensionnement et suggestions. Outils d'aide : la conformité relève d'un maître électricien.
 import {slotPos,designation,sortCircuits} from './model.js';
+import {voltsOf,DEFAULT_VOLTS} from './voltage.js';
 import {CONTINUOUS_FACTOR,STANDARD_BREAKERS,SERVICE_SIZES,WIRE_TABLE,wireAmps,LOAD_LIBRARY,familyOf,serviceCheck} from './catalog.js';
 // Modèle de la bibliothèque, d'après l'instantané enregistré dans la fiche du panneau.
 export const panelModel=det=>det?.modelId?{id:det.modelId,family:det.family,maxCircuits:det.maxCircuits??null,tandem:det.tandem!==false,pon:det.pon??null,label:det.modelInfo||det.modelId}:null;
@@ -8,7 +9,7 @@ export const panelModel=det=>det?.modelId?{id:det.modelId,family:det.family,maxC
 export const polesOf=c=>c.slots.length===1?1:new Set(c.slots.map(slotPos)).size;
 // Phases : les rangées alternent L1 / L2 (positions 1-2 = L1, 3-4 = L2, 5-6 = L1…).
 export const legOf=pos=>Math.floor((pos-1)/2)%2===0?'L1':'L2';
-export const circuitVolts=c=>polesOf(c)>=2?240:120;
+export const circuitVolts=(c,vs=DEFAULT_VOLTS)=>polesOf(c)>=2?vs.bi:vs.uni;
 const round=(n,d=1)=>Math.round(n*10**d)/10**d;
 export const nextBreaker=a=>STANDARD_BREAKERS.find(b=>b>=a-1e-9)??null;
 export const wireFor=amps=>WIRE_TABLE.find(w=>w.amps>=amps)?.gauge??null;
@@ -16,9 +17,9 @@ export const wireFor=amps=>WIRE_TABLE.find(w=>w.amps>=amps)?.gauge??null;
 // Puissance d'une charge en watts.
 const lw=l=>(Number(l.w)||0)*(Number(l.qty)||1);
 
-export function circuitLoad(c){
+export function circuitLoad(c,vs=DEFAULT_VOLTS){
  const loads=c.loads||[];
- const volts=circuitVolts(c);
+ const volts=circuitVolts(c,vs);
  const watts=loads.reduce((s,l)=>s+lw(l),0);
  const contW=loads.filter(l=>l.cont).reduce((s,l)=>s+lw(l),0);
  // Cuisinière : 6000 W + 40 % de l'excédent de 12 kW (même logique que le calcul du logement).
@@ -37,7 +38,8 @@ export function circuitLoad(c){
  }
  if(watts&&!breaker)issues.push({level:'warn',text:'Calibre du disjoncteur à préciser.'});
  const loadVolts=new Set(loads.map(l=>Number(l.v)||0).filter(Boolean));
- if(loadVolts.has(240)&&volts===120)issues.push({level:'error',text:'Appareil 240 V sur un disjoncteur unipolaire : un bipolaire est requis.'});
+ if([...loadVolts].some(v=>v>=208)&&volts===vs.uni)issues.push({level:'error',text:`Appareil ${[...loadVolts].find(v=>v>=208)} V sur un disjoncteur unipolaire : un bipolaire est requis.`});
+ if(vs.bi===208&&loadVolts.has(240))issues.push({level:'info',text:'Appareil 240 V sur un réseau 208 V : un élément chauffant fournit environ 75 % de sa puissance. Vérifiez la plaque signalétique.'});
  if(wire&&breaker&&wireAmps(wire)!=null&&wireAmps(wire)<breaker)issues.push({level:'error',text:`Fil ${wire} (${wireAmps(wire)} A) trop petit pour un disjoncteur de ${breaker} A.`});
  if(breaker&&!wire&&watts)issues.push({level:'info',text:`Fil suggéré : ${wireFor(breaker)} cuivre.`});
  return {volts,watts,contW,amps:round(amps),demandAmps:round(demandAmps),minBreaker:watts?nextBreaker(minBreakerAmps):null,suggestedWire:breaker?wireFor(breaker):null,
@@ -45,12 +47,12 @@ export function circuitLoad(c){
 }
 
 // Charges par phase (A). Un circuit bipolaire 240 V charge L1 et L2 ; un 120 V charge sa phase.
-export function phaseBalance(circuits){
+export function phaseBalance(circuits,vs=DEFAULT_VOLTS){
  const legs={L1:0,L2:0};
  for(const c of circuits){
-  const r=circuitLoad(c);if(!r.watts)continue;
-  if(r.volts===240){legs.L1+=r.watts/240;legs.L2+=r.watts/240;}
-  else legs[legOf(slotPos(c.slots[0]))]+=r.watts/120;
+  const r=circuitLoad(c,vs);if(!r.watts)continue;
+  if(r.volts===vs.bi){legs.L1+=r.watts/vs.bi;legs.L2+=r.watts/vs.bi;}
+  else legs[legOf(slotPos(c.slots[0]))]+=r.watts/vs.uni;
  }
  const max=Math.max(legs.L1,legs.L2),min=Math.min(legs.L1,legs.L2);
  return {L1:round(legs.L1),L2:round(legs.L2),imbalance:max?round((max-min)/max*100,0):0};
@@ -59,7 +61,7 @@ export function phaseBalance(circuits){
 // Calcul de charge d'un logement unifamilial (règle 8-200 du CCÉ, simplifiée), détaillé étape par étape.
 // Chaque étape indique la règle, la formule, les appareils pris en compte et ceux qui sont exclus.
 // children : sous-panneaux alimentés par ce panneau (leurs charges font partie du même logement).
-export function dwellingCalc(circuits,{livingArea=0,basementArea=0,children=[],panelTag=''}={}){
+export function dwellingCalc(circuits,{livingArea=0,basementArea=0,children=[],panelTag='',vs=DEFAULT_VOLTS}={}){
  const items=[];
  const collect=(cs,tag)=>{for(const c of cs)for(const l of c.loads||[])items.push({name:l.qty>1?`${l.qty} × ${l.name}`:l.name,w:lw(l),cat:l.cat,cont:l.cont,where:[tag,designation(c)].filter(Boolean).join(' · ')});};
  collect(circuits,panelTag);for(const p of children)collect(p.circuits||[],p.tag||p.name);
@@ -102,7 +104,7 @@ export function dwellingCalc(circuits,{livingArea=0,basementArea=0,children=[],p
  if(other){const w=rangeW?0.25*other:Math.min(other,6000)+0.25*Math.max(0,other-6000);
   steps.push({id:'other',title:'Autres appareils de plus de 1500 W',rule:'CCÉ 8-200 1) a) vii)',formula:rangeW?`25 % de ${kw(other)} (une cuisinière est prévue) = ${Math.round(w)} W`:`100 % des 6 premiers kW${other>6000?` + 25 % de ${kw(other-6000)}`:''} (aucune cuisinière) = ${Math.round(w)} W`,w,items:of('other')});}
  const total=steps.reduce((t,x)=>t+x.w,0);
- const amps=total/240;
+ const amps=total/vs.bi;
  const minService=area>=80?100:60;
  const recommended=SERVICE_SIZES.find(v=>v>=Math.max(amps,minService))??null;
  const warnings=[];
@@ -115,16 +117,17 @@ export function dwellingCalc(circuits,{livingArea=0,basementArea=0,children=[],p
 // Bilan complet d'un panneau.
 export function panelReport(panel,{children=[]}={}){
  const det=panel.details||{};
+ const vs=voltsOf(det);
  const model=panelModel(det);
  const circuits=sortCircuits(panel.circuits);
- const rows=circuits.map(c=>({c,r:circuitLoad(c)}));
- const connectedW=rows.reduce((s,x)=>s+x.r.watts,0)+children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c).watts,0),0);
- const balance=phaseBalance(circuits);
+ const rows=circuits.map(c=>({c,r:circuitLoad(c,vs)}));
+ const connectedW=rows.reduce((s,x)=>s+x.r.watts,0)+children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c,vs).watts,0),0);
+ const balance=phaseBalance(circuits,vs);
  // Sous-panneaux : charge répartie sur les deux phases.
- const childAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c).watts,0),0)/240;
+ const childAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c,vs).watts,0),0)/vs.bi;
  balance.L1=round(balance.L1+childAmps);balance.L2=round(balance.L2+childAmps);
  const mainAmps=Number(det.mainAmps)||null;
- const calc=dwellingCalc(circuits,{livingArea:det.livingArea,basementArea:det.basementArea,children,panelTag:panel.tag||''});
+ const calc=dwellingCalc(circuits,{livingArea:det.livingArea,basementArea:det.basementArea,children,panelTag:panel.tag||'',vs});
  const isDwelling=panel.kind==='Principal'&&calc.area>0;
  const designAmps=isDwelling?calc.amps:Math.max(balance.L1,balance.L2);
  const percent=mainAmps&&designAmps?round(designAmps/mainAmps*100,0):null;
@@ -139,7 +142,7 @@ export function panelReport(panel,{children=[]}={}){
  if(service?.status==='warn')issues.push({level:'warn',text:service.text});
  if(balance.imbalance>30&&Math.max(balance.L1,balance.L2)>20)issues.push({level:'warn',text:`Déséquilibre de ${balance.imbalance} % entre L1 et L2 : déplacez des circuits 120 V.`});
  const free=circuits.filter(c=>c.status==='Libre'||(!c.label&&!c.loads?.length&&c.amps==null)).length;
- return {model,mainAmps,service,rows,connectedW,balance,calc,isDwelling,designAmps,percent,status:percent==null?'unknown':percent>100?'over':percent>80?'high':percent>70?'medium':'ok',issues,free,remainingAmps:mainAmps?round(mainAmps*CONTINUOUS_FACTOR-designAmps):null};
+ return {vs,model,mainAmps,service,rows,connectedW,balance,calc,isDwelling,designAmps,percent,status:percent==null?'unknown':percent>100?'over':percent>80?'high':percent>70?'medium':'ok',issues,free,remainingAmps:mainAmps?round(mainAmps*CONTINUOUS_FACTOR-designAmps):null};
 }
 
 // Suggestions : quelle borne ou quel appareil peut encore être ajouté ?
@@ -147,11 +150,12 @@ export function suggestions(report){
  const out=[];
  const rem=report.remainingAmps;
  if(rem==null){out.push('Indiquez le calibre du disjoncteur principal pour obtenir des suggestions.');return out;}
- const fits=LOAD_LIBRARY.filter(l=>l.cat==='ev'&&l.v===240).filter(l=>l.w/240<=rem).sort((a,b)=>b.w-a.w)[0];
+ const bi=report.vs?.bi||240;
+ const fits=LOAD_LIBRARY.filter(l=>l.cat==='ev'&&l.v===240).filter(l=>l.w/bi<=rem).sort((a,b)=>b.w-a.w)[0];
  if(fits)out.push(`Borne de recharge : jusqu’à « ${fits.name} » sans dépasser 80 % du principal (marge restante ≈ ${rem} A).`);
  else if(rem>12)out.push(`Borne de recharge : seule une borne de niveau 1 ou une borne de niveau 2 réglée à basse intensité est possible (marge ≈ ${rem} A). Un gestionnaire de charge (EVEMS, règle 8-106 11)) peut éviter l’augmentation de l’entrée.`);
  else out.push('Borne de recharge : capacité insuffisante. Envisagez un gestionnaire de charge (EVEMS) ou l’augmentation de l’entrée électrique.');
- for(const id of ['pool-hp','spa','hp-3t','wh-4500']){const l=LOAD_LIBRARY.find(x=>x.id===id);out.push(`${l.name} (${(l.w/1000).toLocaleString('fr-CA')} kW, ≈ ${round(l.w/240)} A) : ${l.w/240<=rem?'✓ possible':'✗ dépasserait 80 % du principal'}.`);}
+ for(const id of ['pool-hp','spa','hp-3t','wh-4500']){const l=LOAD_LIBRARY.find(x=>x.id===id);out.push(`${l.name} (${(l.w/1000).toLocaleString('fr-CA')} kW, ≈ ${round(l.w/bi)} A) : ${l.w/bi<=rem?'✓ possible':'✗ dépasserait 80 % du principal'}.`);}
  if(report.free===0)out.push('Plus aucune position libre : un sous-panneau ou des disjoncteurs jumelés (si permis) seront nécessaires.');
  if(report.isDwelling&&report.calc.recommended&&report.mainAmps&&report.calc.recommended>report.mainAmps)out.push(`Entrée électrique recommandée selon le calcul : ${report.calc.recommended} A (actuelle : ${report.mainAmps} A).`);
  return out;

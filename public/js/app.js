@@ -12,6 +12,7 @@ import {panelView} from './panel.js';
 import {billingView} from './billing.js';
 import {updateCard,checkUpdateQuietly} from './update.js';
 import {compareView} from './compare.js';
+import {setUserVolts,prefBipolar,UNIPOLAR_VOLTS} from '../voltage.js';
 import {designDialog} from './design.js';
 import {adminView} from './admin.js';
 
@@ -69,7 +70,7 @@ function authForm(fields,submitLabel,onSubmit){
  return form;
 }
 async function afterAuth(out,welcome){
- setToken(out.token);state.user=out.user;
+ setToken(out.token);state.user=out.user;setUserVolts(out.user.profile);
  const redirect=sessionStorage.getItem('mp_after_login');sessionStorage.removeItem('mp_after_login');
  location.hash=redirect||'#/sites';toast(welcome);
 }
@@ -206,11 +207,14 @@ function accountView(){
  const profile=h('form',{class:'card form-card',novalidate:true},
   h('fieldset',{class:'form-section'},h('legend',{text:'Profil'}),h('div',{class:'fields'},field('Nom complet',h('input',{name:'name',value:u.name,required:true,maxlength:100,autocomplete:'name'})),field('Courriel de connexion',h('input',{value:u.email,readOnly:true,disabled:true})))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Type de compte'}),h('div',{class:'radio-cards'},radio('particulier','Particulier','Rapports à votre nom.'),radio('pro','Électricien / entrepreneur','Entreprise, licence RBQ et coordonnées sur les rapports.'))),
+  h('fieldset',{class:'form-section'},h('legend',{text:'Tensions du réseau'}),h('div',{class:'fields'},
+   field('Disjoncteur unipolaire',h('input',{value:UNIPOLAR_VOLTS+' V',readOnly:true,'aria-label':'Tension unipolaire'}),{hint:'Éclairage, prises, petits appareils.'}),
+   field('Disjoncteur bipolaire',select('bipolarVolts',[[240,'240 V (par défaut) — monophasé 120/240 V'],[208,'208 V (option) — triphasé 120/208 V']],prefBipolar(p)),{hint:'Cuisinière, sécheuse, chauffage, borne… Sert aux calculs de charge et aux nouveaux panneaux ; chaque panneau garde sa propre tension dans sa fiche.'}))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Informations professionnelles (rapports PDF)'}),proBox),e1,
   h('div',{class:'form-actions'},h('button',{type:'submit',class:'primary'},'Enregistrer le profil')));
  const syncPro=()=>{proBox.closest('fieldset').hidden=profile.elements.accountType.value!=='pro';};
  profile.addEventListener('change',syncPro);syncPro();
- profile.addEventListener('submit',async ev=>{ev.preventDefault();e1.textContent='';const f=formData(profile);try{const out=await api('/api/account',{method:'PUT',body:{name:f.name,profile:f}});state.user=out.user;toast('Profil enregistré.');crumbs([['Mes sites','#/sites'],['Mon compte']]);}catch(x){e1.textContent=x.message;}});
+ profile.addEventListener('submit',async ev=>{ev.preventDefault();e1.textContent='';const f=formData(profile);try{const out=await api('/api/account',{method:'PUT',body:{name:f.name,profile:f}});state.user=out.user;setUserVolts(out.user.profile);toast('Paramètres enregistrés.');crumbs([['Mes sites','#/sites'],['Mon compte']]);}catch(x){e1.textContent=x.message;}});
 
  const e2=h('p',{class:'error',role:'alert'});
  const pwd=h('form',{class:'card form-card',novalidate:true},h('fieldset',{class:'form-section'},h('legend',{text:'Mot de passe'}),h('div',{class:'fields'},
@@ -281,7 +285,7 @@ window.addEventListener('hashchange',()=>{
 });
 
 async function boot(){
- try{const me=await api('/api/auth');state.user=me.user;state.features=me.features||{};}
+ try{const me=await api('/api/auth');state.user=me.user;setUserVolts(me.user?.profile);state.features=me.features||{};}
  catch(e){if(!state.user&&e.offline){view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:'📡'}),h('h2',{text:'Hors ligne'}),h('p',{text:e.message}),h('button',{type:'button',class:'primary',onclick:()=>location.reload()},'Réessayer'))));return;}}
  lastPath=location.hash.split('/').slice(0,3).join('/');
  route();

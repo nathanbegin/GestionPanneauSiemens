@@ -2,6 +2,7 @@
 // (au sens du catalogue des fabricants) et dispose les disjoncteurs. Sans DOM : partagé navigateur / tests.
 import {LOAD_LIBRARY,SERVICE_SIZES,STANDARD_BREAKERS} from './catalog.js';
 import {dwellingCalc} from './loadcalc.js';
+import {DEFAULT_VOLTS} from './voltage.js';
 import {blank,reshape,validate,sortCircuits,usages} from './model.js';
 
 const lib=id=>LOAD_LIBRARY.find(l=>l.id===id);
@@ -20,13 +21,14 @@ export const DESIGN_APPLIANCES=[
 const USAGE_BY_CAT={range:'Électroménager',heating:'Chauffage',heating100:'Chauffage',cooling:'Climatisation',ev:'Borne de recharge',water100:'Autre',other:'Autre',basic:'Électroménager'};
 const usageOf=(l,fallback='Autre')=>{const u=l.id==='wh-4500'?'Chauffe-eau':USAGE_BY_CAT[l.cat]||fallback;return usages.includes(u)?u:fallback;};
 const nextBreaker=a=>STANDARD_BREAKERS.find(b=>b>=a)||null;
-const loadOf=(l,qty=1)=>({id:'d-'+l.id,name:l.name,w:l.w,v:l.v,qty,cat:l.cat,cont:!!l.cont});
+// Un appareil 240 V est alimenté à la tension bipolaire du réseau (208 V en option) ; sa puissance nominale est conservée (prudent).
+const loadOf=(l,qty=1,vs=DEFAULT_VOLTS)=>({id:'d-'+l.id,name:l.name,w:l.w,v:l.v>=208?vs.bi:vs.uni,qty,cat:l.cat,cont:!!l.cont});
 
 /**
  * Circuits à prévoir. input : {livingArea, basementArea, picks:{[id d'appareil]: quantité}}.
  * Retourne [{label, amps, poles, usage, protection?, loads?}] : circuits généraux puis appareils.
  */
-export function designItems({livingArea=0,basementArea=0,picks={}}={}){
+export function designItems({livingArea=0,basementArea=0,picks={},vs=DEFAULT_VOLTS}={}){
  const area=Math.max(0,Number(livingArea)||0)+0.75*Math.max(0,Number(basementArea)||0);
  const items=[];
  const general=Math.max(6,Math.ceil(area/20));
@@ -38,21 +40,21 @@ export function designItems({livingArea=0,basementArea=0,picks={}}={}){
   const l=lib(a.id);if(!l)continue;
   if(a.id==='bb-1500'){
    // Deux plinthes de 1 500 W par circuit de 240 V (20 A).
-   for(let left=qty,n=1;left>0;n++){const k=Math.min(2,left);left-=k;items.push({label:`Plinthes électriques — circuit ${n}`,amps:20,poles:2,usage:'Chauffage',loads:[loadOf(l,k)]});}
+   for(let left=qty,n=1;left>0;n++){const k=Math.min(2,left);left-=k;items.push({label:`Plinthes électriques — circuit ${n}`,amps:20,poles:2,usage:'Chauffage',loads:[loadOf(l,k,vs)]});}
    continue;
   }
   for(let k=1;k<=qty;k++){
    const amps=l.b||nextBreaker(Math.ceil(l.w/l.v*1.25))||60;
    items.push({label:qty>1?`${a.short} ${k}`:a.short,amps,poles:l.v>=208?2:1,usage:usageOf(l),
-    ...(a.id==='spa'?{protection:'DDFT'}:{}),loads:[loadOf(l,1)]});
+    ...(a.id==='spa'?{protection:'DDFT'}:{}),loads:[loadOf(l,1,vs)]});
   }
  }
  return items;
 }
 /** Calcul de la charge du logement (CCÉ 8-200) sur les circuits prévus : {amps, recommended, totalW, ...}. */
-export function designCalc(items,{livingArea=0,basementArea=0}={}){
+export function designCalc(items,{livingArea=0,basementArea=0,vs=DEFAULT_VOLTS}={}){
  const circuits=items.filter(i=>i.loads?.length).map((i,k)=>({id:'d'+k,slots:[`${k*2+1}A`,`${k*2+1}B`],label:i.label,loads:i.loads}));
- return dwellingCalc(circuits,{livingArea,basementArea});
+ return dwellingCalc(circuits,{livingArea,basementArea,vs});
 }
 /** Besoin en circuits au sens du catalogue (pôles ; A/B = 1, bipolaire = 2, principal exclu) et en espaces. */
 export function designDemand(items){

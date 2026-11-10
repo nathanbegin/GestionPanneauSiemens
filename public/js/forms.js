@@ -6,6 +6,7 @@ import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
 import {api} from './api.js';
 import {circuitLoad,polesOf} from '../loadcalc.js';
+import {voltsOf,voltageLabel,userVolts} from '../voltage.js';
 import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormats,designation,formatOf,reshape,validate,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,tagGroups,panelTitle,MAX_POSITIONS} from '../model.js';
 
 const input=(name,value,attrs={})=>h('input',{name,value:value??'',...attrs});
@@ -55,7 +56,7 @@ export function panelFields(panel={},siblings=[],{library=false}={}){
    field('Calibre principal (A)',input('mainAmps',d.mainAmps??'',{type:'number',min:15,max:1200,step:5,inputmode:'numeric',placeholder:'Ex. 200'})),
    field('Marque',input('brand',d.brand,{maxlength:60,placeholder:'Ex. Siemens, Square D, Eaton',list:'brands'})),
    field('Modèle',input('model',d.model,{maxlength:60,placeholder:'Ex. EQ, QO, BR'})),
-   field('Tension',select('voltage',voltages,d.voltage||voltages[0])),
+   field('Tension',select('voltage',voltages,d.voltage||voltageLabel(userVolts().bi)),{hint:'Détermine la tension des circuits bipolaires (240 V, ou 208 V en option).'}),
    field('Superficie hors sol (m²)',input('livingArea',d.livingArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 140'}),{hint:'Rez-de-chaussée et étages, mesurés par l’extérieur (calcul de charge, règle 8-110).'}),
    field('Superficie du sous-sol (m²)',input('basementArea',d.basementArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 80'}),{hint:'Compte à 75 % (parties de plus de 1,8 m de hauteur).'}),
    field('Étape du projet',select('stage',Object.entries(PANEL_STAGES).map(([k,s])=>[k,`${s.n}. ${s.label}`]),d.stage||stageFromState(d.state)),{hint:'Conception : pas encore de panneau. Relevé : panneau existant. Vérification : charges et électroménagers.'}),
@@ -317,7 +318,7 @@ function planningSection(c,panel,markDirty,root,lib){
   return {slots,amps,loads,wire:{gauge:f?.elements.wireGauge?.value||''}};
  }
  function refresh(){
-  const r=circuitLoad(draft());
+  const r=circuitLoad(draft(),voltsOf(panel.details));
   const note=live.dataset.note;
   live.replaceChildren(...[
    h('div',{class:'load-kpis'},
@@ -332,8 +333,8 @@ function planningSection(c,panel,markDirty,root,lib){
    r.watts>0&&h('button',{type:'button',class:'sm',onclick:()=>{
     const f=form();if(!f)return;const needs240=loads.some(l=>l.v>=208);
     if(needs240&&FORMAT_POLES[f.elements.format.value]<2)f.elements.format.value='double';
-    const r2=circuitLoad(draft());if(r2.minBreaker){f.elements.amps.value=String(r2.minBreaker);}
-    const r3=circuitLoad(draft());if(r3.suggestedWire)f.elements.wireGauge.value=r3.suggestedWire;
+    const r2=circuitLoad(draft(),voltsOf(panel.details));if(r2.minBreaker){f.elements.amps.value=String(r2.minBreaker);}
+    const r3=circuitLoad(draft(),voltsOf(panel.details));if(r3.suggestedWire)f.elements.wireGauge.value=r3.suggestedWire;
     const want={single:'single',double:'double',triple:'triple',tandem:'tandem'}[f.elements.format.value];const amps=Number(f.elements.amps.value);const match=choices.filter(b=>b.kind===want&&b.amps[0]===amps&&b.protection===f.elements.protection.value);const best=match.find(b=>b.neutre!=='PoN'||panel.details?.pon)||match[0];if(best){f.elements.breakerRef.value=best.cat;pick.value=best.cat;}
     markDirty();refresh();}},'Appliquer le disjoncteur et le fil suggérés')].flat().filter(x=>x!=null&&x!==false));
  }

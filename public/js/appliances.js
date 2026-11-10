@@ -6,6 +6,7 @@ import {api} from './api.js';
 import {prepare} from './aiimport.js';
 import {LOAD_LIBRARY,VOLTAGES} from '../catalog.js';
 import {designation} from '../model.js';
+import {voltsOf} from '../voltage.js';
 import {panelReport} from '../loadcalc.js';
 import {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance} from '../appliances.js';
 export {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance};
@@ -52,7 +53,7 @@ export async function addDialog({panel,save,onChange}){
  let status={allowed:false,configured:false};
  try{status=await api('/api/panels?action=scan');}catch{}
  const f={name:h('input',{maxlength:80,placeholder:'Ex. Sécheuse',required:true}),w:h('input',{type:'number',min:0,max:200000,step:10,placeholder:'Watts'}),
-  v:select('v',VOLTAGES.map(v=>[v,v+' V']),240),qty:h('input',{type:'number',min:1,max:100,step:1,value:1}),cont:h('input',{type:'checkbox'})};
+  v:select('v',VOLTAGES.map(v=>[v,v+' V']),voltsOf(panel.details).bi),qty:h('input',{type:'number',min:1,max:100,step:1,value:1}),cont:h('input',{type:'checkbox'})};
  let source='manuel';
  const note=h('p',{class:'small muted',role:'status'});
  const circuitBox=h('div');
