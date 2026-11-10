@@ -9,7 +9,9 @@ import {loadLibrary} from './library.js';
 import {breakerUnits,matchBreakers,applyModel,clearModel} from '../units.js';
 import {miniBreaker} from './assign.js';
 import {newGuided,answerPosition,nextPosition,prevPosition,coveredFrom,fillRestEmpty,currentAnswer,checkAppliances,assignAppliance,progress,canPlace,guessUsage,
- LABEL_SUGGESTIONS,APPLIANCES,FORMATS} from '../guided.js';
+ LABEL_SUGGESTIONS,APPLIANCES,FORMATS,isSplit,ownHalves,sharedHalf} from '../guided.js';
+// replaceChildren natif écrit « null » pour une valeur nulle : on filtre.
+const fill=(el,...kids)=>el.replaceChildren(...kids.flat().filter(k=>k!=null&&k!==false&&k!==''));
 
 const COMMON_AMPS=[15,20,25,30,40,50,60];
 const PROTECTIONS=[['Standard','Standard'],['DDFT','DDFT (bouton TEST)'],['Anti-arc','Anti-arc'],['DDFT + anti-arc','DDFT + anti-arc']];
@@ -32,6 +34,10 @@ export function positionQuiz(box,ctx){
  function ask(n){
   const st=ctx.getState();
   if(n==null)return ctx.onFinish();
+  const split=isSplit(st,n);
+  if(split&&!ownHalves(st,n).length)return ask(next(n));
+  const shared=split?sharedHalf(st,n):null,free=split?ownHalves(st,n)[0].slots[0]:'';
+  const formats=split?{single:{label:'Un disjoncteur sur cette moitié',hint:'Une manette sur l’emplacement '+free+'.'},empty:FORMATS.empty,unknown:FORMATS.unknown}:FORMATS;
   if(coveredFrom(st,n)&&!order())return ask(next(n));
   const cur=currentAnswer(st,n);
   let format=cur?.format||'';
@@ -67,7 +73,7 @@ export function positionQuiz(box,ctx){
    detail.replaceChildren(...halves.map(x=>x.el));
   };
   const formatBox=h('div',{class:'gd-formats'});
-  const drawFormats=()=>formatBox.replaceChildren(...Object.entries(FORMATS).map(([k,f])=>h('button',{type:'button',class:'gd-format'+(format===k?' on':''),'aria-pressed':String(format===k),onclick:()=>{format=k;drawFormats();drawDetail();if(k==='empty'||k==='unknown')apply();else halves[0]?.focus();}},
+  const drawFormats=()=>formatBox.replaceChildren(...Object.entries(formats).map(([k,f])=>h('button',{type:'button',class:'gd-format'+(format===k?' on':''),'aria-pressed':String(format===k),onclick:()=>{format=k;drawFormats();drawDetail();if(k==='empty'||k==='unknown')apply();else halves[0]?.focus();}},
    h('span',{class:'gd-ico gd-ico-'+k,'aria-hidden':'true'}),h('b',{text:f.label}),h('span',{class:'small muted',text:f.hint}))));
   drawFormats();drawDetail();
   function apply(){
@@ -80,8 +86,9 @@ export function positionQuiz(box,ctx){
   }
   const p=prev(n);
   const pr=progress(ctx.getState());
-  box.replaceChildren(
+  fill(box,
    h('div',{class:'gd-head'},h('span',{class:'ai-step',text:order()?`Point à vérifier ${order().indexOf(n)+1} / ${order().length}`:`Position ${n} sur ${st.positions}`}),h('h3',{text:`Position ${n}`}),h('span',{class:'small muted',text:`Colonne de ${side(n)}, ${row(n)}${row(n)===1?'re':'e'} rangée à partir du haut`})),
+   split?h('p',{class:'notice info small',text:`Cette position est partagée : l’emplacement ${shared.slot} fait partie du disjoncteur groupé ${designation(shared.circuit)}${shared.circuit.label?' ('+shared.circuit.label+')':''}. Vous ne décrivez ici que l’emplacement ${free}.`}):null,
    order()?null:h('div',{class:'progress gd-progress','aria-label':`${pr.percent} % des positions décrites`},h('i',{style:{width:pr.percent+'%'}})),
    h('p',{class:'gd-ask',text:'Qu’y a-t-il à cette position ?'}),
    formatBox,detail,err,

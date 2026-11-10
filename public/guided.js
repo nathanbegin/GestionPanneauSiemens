@@ -49,7 +49,28 @@ export function newGuided({positions=32,meta={}}={}){
 // Circuit qui couvre la position n (démarre ici ou plus haut).
 export const circuitAt=(state,n)=>state.circuits.find(c=>c.slots.some(s=>slotPos(s)===n));
 // Position couverte par un disjoncteur commencé plus haut (2e pôle d'un double, par exemple).
-export function coveredFrom(state,n){const c=circuitAt(state,n);return c&&slotPos(c.slots[0])!==n?c:null;}
+// Une position dont une moitié appartient à un disjoncteur groupé (ex. 1B + 3A) mais dont l'autre moitié a son propre disjoncteur n'est pas « couverte » : voir isSplit.
+export function coveredFrom(state,n){
+ const c=circuitAt(state,n);
+ if(!c||slotPos(c.slots[0])===n)return null;
+ return state.circuits.some(x=>slotPos(x.slots[0])===n)?null:c;
+}
+const spansPositions=c=>new Set(c.slots.map(slotPos)).size>1;
+const halfCircuit=(state,slot)=>state.circuits.find(c=>c.slots.includes(slot));
+/** Position partagée : une moitié (A ou B) fait partie d'un disjoncteur à cheval sur deux positions (ex. 1B + 3A), l'autre est à part. */
+export function isSplit(state,n){
+ const a=halfCircuit(state,n+'A'),b=halfCircuit(state,n+'B');
+ return !!a&&!!b&&a!==b&&(spansPositions(a)||spansPositions(b));
+}
+/** Moitiés de la position n qui ont leur propre disjoncteur (un seul emplacement) : seules ces moitiés se décrivent ici. */
+export const ownHalves=(state,n)=>state.circuits.filter(c=>c.slots.length===1&&slotPos(c.slots[0])===n);
+/** Moitié de la position n qui fait partie d'un disjoncteur groupé : {slot, circuit} ou null. */
+export function sharedHalf(state,n){
+ if(!isSplit(state,n))return null;
+ const a=halfCircuit(state,n+'A'),b=halfCircuit(state,n+'B');
+ const c=spansPositions(a)?a:b;
+ return {slot:c===a?n+'A':n+'B',circuit:c};
+}
 // Prochaine position à décrire après n (les positions couvertes sont sautées). null à la fin.
 export function nextPosition(state,n){for(let p=n+1;p<=state.positions;p++)if(!coveredFrom(state,p))return p;return null;}
 export function prevPosition(state,n){for(let p=n-1;p>=1;p--)if(!coveredFrom(state,p))return p;return null;}
@@ -94,6 +115,15 @@ function resetPosition(circuits,n,positions){
  * Remet d'abord la position à l'état vierge : on peut revenir en arrière et changer d'avis.
  */
 export function answerPosition(state,n,answer){
+ // Position partagée avec un disjoncteur groupé : on ne touche qu'à la moitié qui a son propre disjoncteur.
+ if(isSplit(state,n)){
+  const own=ownHalves(state,n);
+  if(!own.length)throw Error(`Les deux moitiés de la position ${n} font partie de disjoncteurs groupés : modifiez ces disjoncteurs.`);
+  if(!['single','tandem','empty','unknown'].includes(answer.format))throw Error(`Seule la moitié ${own.map(c=>c.slots[0]).join(' et ')} de la position ${n} est libre : choisissez un disjoncteur, un espace vide ou « je ne sais pas ».`);
+  const patch=answer.format==='empty'?{status:'Libre',vacant:true}:answer.format==='unknown'?null:fields(answer.format==='tandem'?(answer.halves||[])[own[0].slots[0].endsWith('A')?0:1]:answer);
+  const circuits=state.circuits.map(c=>own.includes(c)&&patch?{...c,...patch}:c);
+  return {...state,circuits:validate(sortCircuits(circuits),{positions:state.positions}),done:[...state.done.filter(x=>x!==n),n]};
+ }
  const cov=coveredFrom(state,n);if(cov)throw Error(`La position ${n} fait partie du disjoncteur ${designation(cov)}${cov.label?' ('+cov.label+')':''} : modifiez d’abord ce disjoncteur.`);
  const err=canPlace(state,n,answer.format);if(err)throw Error(err);
  const span={double:2,triple:3}[answer.format]||1;
@@ -127,6 +157,13 @@ export function fillRestEmpty(state,from){
 }
 // Réponse actuelle pour la position n (pour revenir en arrière avec les champs déjà remplis).
 export function currentAnswer(state,n){
+ if(isSplit(state,n)){
+  const c=ownHalves(state,n)[0];
+  if(!c||!state.done.includes(n))return null;
+  if(c.vacant)return {format:'empty'};
+  if(!c.label&&c.amps==null&&!c.protection)return {format:'unknown'};
+  return {format:'single',amps:c.amps,label:c.label,protection:c.protection,usage:c.usage};
+ }
  const cs=state.circuits.filter(c=>slotPos(c.slots[0])===n);
  if(!state.done.includes(n)||!cs.length)return null;
  if(cs.length===2&&cs.every(c=>c.slots.length===1)){const [a,b]=cs.sort((x,y)=>x.slots[0]<y.slots[0]?-1:1);return {format:'tandem',halves:[a,b].map(c=>({amps:c.amps,label:c.label,protection:c.protection,usage:c.usage}))};}

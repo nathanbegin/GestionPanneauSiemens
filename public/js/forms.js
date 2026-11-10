@@ -1,7 +1,7 @@
 // Formulaires : site, panneau, fiche de circuit.
 import {h,field,select,dialog,toast,confirmDialog} from './dom.js';
 import {FAMILIES,PANEL_STATES,LOAD_LIBRARY,LOAD_CATEGORIES,WIRE_TABLE,WIRE_TYPES,familyOf,wireAmps,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,serviceCheck} from '../catalog.js';
-import {modelPicker} from './library.js';
+import {modelPicker,panelDemand} from './library.js';
 import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
 import {api} from './api.js';
@@ -97,7 +97,7 @@ function serviceFieldset(d,fed){
 }
 // Modèle de la bibliothèque (abonnés) : remplit marque, gamme, calibre, positions et famille.
 function catalogFieldset(d,library,circuits=[]){
- const used=circuits.filter(c=>!c.vacant&&(c.label||c.amps!=null));
+ const demand=panelDemand(circuits);
  const hidden=h('input',{type:'hidden',name:'modelId',value:d.modelId||''});
  const fam=select('family',[['','— Autre / non précisée —'],...Object.entries(FAMILIES).filter(([k])=>k!=='generic').map(([k,f])=>[k,f.name])],d.family||d.breakerFamily||'');
  const summary=h('div',{class:'model-summary'});
@@ -105,7 +105,7 @@ function catalogFieldset(d,library,circuits=[]){
  show(d.modelInfo,d.modelId,d.family);
  const choose=h('button',{type:'button',class:library?'primary':'',onclick:()=>{
   if(!library){location.hash='#/abonnement';return;}
-  modelPicker({current:{modelId:hidden.value,family:fam.value,circuits:used.length||'',bipolar:used.filter(c=>formatOf(c)==='double').length,mainAmps:hidden.closest('form')?.elements.mainAmps?.value},onPick:(p,lib)=>{
+  modelPicker({current:{modelId:hidden.value,family:fam.value,circuits:demand.circuits||'',spaces:demand.spaces||'',mainAmps:hidden.closest('form')?.elements.mainAmps?.value},onPick:(p,lib)=>{
    const f=hidden.closest('form');const info=lib.familyInfo[p.family];
    hidden.value=p.cat;fam.value=p.family;
    f.elements.brand.value=familyOf(p.family).brand||info?.marque||'';f.elements.model.value=(info?.gamme||'').split(' (')[0];
