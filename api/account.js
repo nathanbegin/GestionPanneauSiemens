@@ -33,7 +33,7 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
  if(req.method==='PUT'&&action==='branding'){
   if(!await canBrand())throw new HttpError(402,'La personnalisation des documents est incluse dans les forfaits Électricien.',{quota:true});
   const color=v=>{const c=String(v||'').trim();if(!c)return '';if(!/^#[0-9a-fA-F]{6}$/.test(c))throw new HttpError(400,'Couleur invalide (format #RRVVBB).');return c.toLowerCase();};
-  const branding={primary:color(data.primary),accent:color(data.accent),footer:s(data.footer,140),footerId:s(data.footerId,40)};
+  const branding={primary:color(data.primary),accent:color(data.accent),tableHead:color(data.tableHead),footer:s(data.footer,140),footerId:s(data.footerId,40)};
   if(branding.footerId){const ps=await loadPdfSettings(sql);if(!(ps.footers||[]).some(f=>f.id===branding.footerId))throw new HttpError(400,'Modèle de pied de page introuvable.');}
   if(data.logo){
    let l;try{l=decodeLogo(data.logo);}catch(e){throw new HttpError(400,e.message);}

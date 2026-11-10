@@ -36,6 +36,7 @@ export function brandingCard(){
   }
   let logo=b.logo||'';
   const primary=h('input',{type:'color',name:'primary',value:b.primary||DEFAULTS.primary});
+  const tableHead=h('input',{type:'color',name:'tableHead',value:b.tableHead||b.primary||DEFAULTS.primary});
   const accent=h('input',{type:'color',name:'accent',value:b.accent||DEFAULTS.accent});
   const footer=h('input',{name:'footer',maxlength:140,value:b.footer||'',placeholder:'Ex. Merci de votre confiance — Électricité Exemple inc.'});
   const model=h('select',{name:'footerId'},new Option('Texte personnalisé (ci-dessous)',''),...models.map(m=>new Option(m.label,m.id)));model.value=b.footerId||'';
@@ -57,7 +58,7 @@ export function brandingCard(){
   };
   const removeBtn=h('button',{type:'button',class:'ghost',onclick:()=>{logo='';refresh();}},'Retirer le logo');
   file.addEventListener('change',async()=>{err.textContent='';const f=file.files[0];file.value='';if(!f)return;try{logo=await resizeLogo(f);refresh();}catch(e){err.textContent=e.message;}});
-  for(const el of [primary,accent])el.addEventListener('input',refresh);
+  for(const el of [primary,accent,tableHead])el.addEventListener('input',refresh);
   const form=h('form',{class:'',novalidate:true},
    h('fieldset',{class:'form-section'},h('legend',{text:'Documents à l’image de votre entreprise'}),
     h('p',{class:'small muted',text:'Votre logo et vos couleurs remplacent l’en-tête Mon Panneau sur tous les PDF. Le logo du fabricant du panneau reste affiché à droite.'}),
@@ -65,18 +66,19 @@ export function brandingCard(){
     h('div',{class:'fields'},
      h('div',{class:'f'},h('span',{},'Logo'),h('div',{class:'page-actions'},h('label',{class:'btn',for:'brandLogo'},'Choisir une image…'),file,removeBtn),h('span',{class:'hint',text:'PNG avec fond transparent idéalement. Redimensionné automatiquement.'})),
      field('Couleur principale (en-tête)',primary),
+     field('Couleur des en-têtes de tableau',tableHead,{hint:'Fond des titres de colonnes (texte noir ou blanc automatique).'}),
      field('Couleur d’accent',accent,{hint:'Barre et sur-titres de l’en-tête.'}),
      models.length?field('Modèle de pied de page',model,{full:true,hint:legal?'Suivi de la mention : '+legal:''}):null,
      field('Pied de page',footer,{full:true}))),
    err,
    h('div',{class:'form-actions'},
-    h('button',{type:'button',class:'ghost',onclick:()=>{primary.value=DEFAULTS.primary;accent.value=DEFAULTS.accent;refresh();}},'Couleurs par défaut'),
+    h('button',{type:'button',class:'ghost',onclick:()=>{primary.value=DEFAULTS.primary;tableHead.value=DEFAULTS.primary;accent.value=DEFAULTS.accent;refresh();}},'Couleurs par défaut'),
     h('button',{type:'submit',class:'primary'},'Enregistrer la personnalisation')));
   form.addEventListener('submit',async ev=>{
    ev.preventDefault();err.textContent='';
    try{
-    const custom=primary.value!==DEFAULTS.primary||accent.value!==DEFAULTS.accent;
-    await api('/api/account?action=branding',{method:'PUT',body:{primary:custom?primary.value:'',accent:custom?accent.value:'',footer:footer.value,footerId:model.value,logo}});
+    const custom=primary.value!==DEFAULTS.primary||accent.value!==DEFAULTS.accent;const th=tableHead.value!==(primary.value)&&!(tableHead.value===DEFAULTS.primary&&!custom);
+    await api('/api/account?action=branding',{method:'PUT',body:{primary:custom?primary.value:'',accent:custom?accent.value:'',tableHead:th?tableHead.value:'',footer:footer.value,footerId:model.value,logo}});
     toast('Personnalisation enregistrée : elle s’applique aux prochains PDF.');
    }catch(e){err.textContent=e.message;}
   });

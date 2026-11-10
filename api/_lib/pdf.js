@@ -29,7 +29,7 @@ export function panelModelLine(panel){
 }
 
 const SIZES={letter:[612,792],legal:[612,1008]};
-const C={ink:rgb(.094,.235,.196),green:rgb(.133,.416,.318),muted:rgb(.42,.47,.44),line:rgb(.80,.84,.80),soft:rgb(.93,.95,.92),white:rgb(1,1,1),amber:rgb(.70,.52,.22),free:rgb(.62,.66,.62),lime:rgb(.89,.97,.66)};
+const C={ink:rgb(.094,.235,.196),green:rgb(.133,.416,.318),muted:rgb(.42,.47,.44),line:rgb(.80,.84,.80),soft:rgb(.93,.95,.92),white:rgb(1,1,1),amber:rgb(.70,.52,.22),free:rgb(.62,.66,.62),lime:rgb(.89,.97,.66),danger:rgb(.64,.24,.2),warn:rgb(.55,.35,.1),track:rgb(.89,.91,.88),frame:rgb(.75,.8,.77)};
 const M=40;
 
 // ---------- Image de marque de l'entreprise (forfaits avec « branding ») ----------
@@ -38,9 +38,10 @@ const hex=v=>/^#[0-9a-f]{6}$/i.test(v||'')?[1,3,5].map(i=>parseInt(v.slice(i,i+2
 const lum=([r,g,b])=>{const f=c=>c<=.03928?c/12.92:((c+.055)/1.055)**2.4;return .2126*f(r)+.7152*f(g)+.0722*f(b);};
 const mix=(a,b,t)=>a.map((x,i)=>x*(1-t)+b[i]*t);
 export function brandTheme(brand){
- const base={...C,headBg:C.ink,headText:C.white,headSub:rgb(.8,.87,.83)};
+ const base={...C,headBg:C.ink,headText:C.white,headSub:rgb(.8,.87,.83),tableBg:C.ink,tableText:C.white};
  const p=hex(brand?.primary),a=hex(brand?.accent);
- if(!p&&!a)return base;
+ const th=hex(brand?.tableHead);
+ if(!p&&!a&&!th)return base;
  const t={...base};
  if(p){
   t.headBg=rgb(...p);
@@ -49,7 +50,9 @@ export function brandTheme(brand){
   // Texte courant : la couleur principale seulement si elle est assez foncée pour être lisible.
   if(lum(p)<.12)t.ink=rgb(...p);
   t.soft=rgb(...mix(p,[1,1,1],.92));
+  t.tableBg=t.headBg;t.tableText=t.headText;
  }
+ if(th){t.tableBg=rgb(...th);t.tableText=lum(th)>.45?rgb(.08,.08,.08):C.white;}
  if(a)t.lime=rgb(...a);
  // Accent trop proche du fond de l'en-tête : on garde un contraste minimal.
  if(p&&a&&Math.abs(lum(p)-lum(a))<.08)t.lime=lum(p)>.45?rgb(.1,.1,.1):C.white;
@@ -173,7 +176,7 @@ async function header(d,{overline,title,subtitle,right,logos=[],model=''}){
  if(plate){
   const lh=20,pad=9,gap=10,lw=Math.min(d.logosWidth(logos,lh,gap),150);
   const pw=lw+pad*2,ph=lh+pad*2-2,px=d.W-M-pw,py=d.H-12-ph;
-  d.p.drawRectangle({x:px,y:py,width:pw,height:ph,color:d.C.white,borderColor:rgb(.75,.8,.77),borderWidth:.6});
+  d.p.drawRectangle({x:px,y:py,width:pw,height:ph,color:d.C.white,borderColor:d.C.frame,borderWidth:.6});
   const scale=lw<d.logosWidth(logos,lh,gap)?lw/d.logosWidth(logos,lh,gap):1;
   await d.drawLogos(logos,px+pad,py+(ph-lh*scale)/2,lh*scale,gap*scale);
   rightW=Math.max(rightW,pw+16);
@@ -272,13 +275,13 @@ function directory(d,panel,{rowH=18,compact=false}={}){
 function legend(d){
  d.ensure(16);
  let x=M;
- for(const [t,col] of [['Identifié',d.C.green],['À confirmer',C.amber],['Libre',C.free]]){d.rect(x,d.y-7,6,6,{color:col});d.text(t,x+10,d.y-7,{size:7,color:d.C.muted});x+=70;}
+ for(const [t,col] of [['Identifié',d.C.green],['À confirmer',d.C.amber],['Libre',C.free]]){d.rect(x,d.y-7,6,6,{color:col});d.text(t,x+10,d.y-7,{size:7,color:d.C.muted});x+=70;}
  d.y-=16;
 }
 
 function detailTable(d,panel){
  const cols=[['Pos.',50],['Désignation',142],['Pièce / zone',92],['Type',78],['Calibre',42],['Protection',64],['Statut',64]];
- const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white});x+=w;}d.y-=18;};
+ const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.tableBg});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.tableText});x+=w;}d.y-=18;};
  head();
  let zebra=false;
  for(const c of sortCircuits(panel.circuits)){
@@ -310,13 +313,13 @@ function applianceSection(d,panel,{limit=Infinity}={}){
  d.ensure(70);
  sectionTitle(d,`Liste des électroménagers (${rows.length})`,'Tous les appareils inscrits, du plus gros au plus petit. Plaque signalétique ou valeur typique, et circuit relié. Seuls les appareils reliés comptent dans le calcul.');
  const cols=[['Électroménager',190],['Qté',30],['Puissance',64],['Tension',46],['Circuit',d.W-2*M-190-30-64-46]];
- const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white});x+=w;}d.y-=18;};
+ const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.tableBg});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.tableText});x+=w;}d.y-=18;};
  head();
  const fmt=w=>w>=1000?(w/1000).toLocaleString(LOC,{maximumFractionDigits:2})+' kW':w+' W';
  for(const r of rows.slice(0,limit)){
   d.ensure(16,head);
   const vals=[r.name+(r.model?' · '+r.model:''),String(r.qty),fmt(r.total),r.v+' V',r.pending?'Non relié à un circuit':r.circuit+(r.circuitLabel?' · '+r.circuitLabel:'')];
-  let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:8,f:i===0?d.bold:d.font,color:i===4&&r.pending?C.amber:d.C.ink,max:cols[i][1]-6});x+=cols[i][1];});
+  let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:8,f:i===0?d.bold:d.font,color:i===4&&r.pending?d.C.amber:d.C.ink,max:cols[i][1]-6});x+=cols[i][1];});
   d.y-=15;d.line(M,d.y,d.W-M,d.y);
  }
  if(rows.length>limit){d.ensure(14);d.text(`… et ${rows.length-limit} autre(s) appareil(s).`,M,d.y-10,{size:7.5,color:d.C.muted});d.y-=14;}
@@ -395,7 +398,7 @@ export async function buildReport({kind='report',format='letter',user,site,panel
   infoGrid(d,[['Site',site.name],['Client',site.client],['Adresse',siteAddress(site)],['Panneaux',String(panels.length)]]);
   preparedBlock(d,user,generatedAt);
   sectionTitle(d,'Panneaux du site','Hiérarchie d’alimentation et avancement de l’identification.');
-  const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});[['Panneau',M+5],['Type',M+200],['Emplacement',M+290],['Alimenté par',M+420]].forEach(([t,x])=>d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white}));d.y-=18;};
+  const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.tableBg});[['Panneau',M+5],['Type',M+200],['Emplacement',M+290],['Alimenté par',M+420]].forEach(([t,x])=>d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.tableText}));d.y-=18;};
   head();
   for(const {panel,fedFromLabel} of panels){
    d.ensure(20,head);const s=stats(panel.circuits);
@@ -426,7 +429,7 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=
   if(it.type==='qr'){
    // Étiquette du code QR : ouvre ce panneau dans l'application (connexion requise).
    const m=qrMatrix(qrUrl,{ecl:'M'}),n=m.length,plate=62,qz=2,mod=plate/(n+2*qz);
-   d.rect(x+6,y+5,plate,plate,{color:rgb(1,1,1),borderColor:rgb(.75,.8,.77),borderWidth:.4});
+   d.rect(x+6,y+5,plate,plate,{color:rgb(1,1,1),borderColor:d.C.frame,borderWidth:.4});
    for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])d.rect(x+6+(c+qz)*mod,y+5+plate-(r+qz+1)*mod,mod+.05,mod+.05,{color:rgb(0,0,0)});
    const tx=x+78,tw=W-88;
    d.text('CODE QR · PANNEAU',tx,y+H-18,{size:6,f:d.bold,color:d.C.green,max:tw});
@@ -478,14 +481,14 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  sectionTitle(d,'Synthèse','Charge de calcul comparée au disjoncteur principal : permise jusqu’à 100 % (facteurs de demande appliqués) ; 80 % = marge de prudence.');
  const boxes=[['Capacité utilisée',rep.percent!=null?rep.percent+' %':'—'],['Charge de calcul',rep.designAmps+' A'],['Charge branchée',kw(rep.connectedW)],['Phase L1 / L2',`${rep.balance.L1} / ${rep.balance.L2} A`],['Marge de prudence (80 %)',rep.remainingAmps!=null?rep.remainingAmps+' A':'—']];
  const bw=(d.W-2*M-4*8)/5;
- boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:d.C.soft,borderColor:d.C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:d.C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:12,f:d.bold,color:i===0&&rep.percent>80?rgb(.64,.24,.2):d.C.ink,max:bw-14});});
+ boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:d.C.soft,borderColor:d.C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:d.C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:12,f:d.bold,color:i===0&&rep.percent>80?d.C.danger:d.C.ink,max:bw-14});});
  d.y-=56;
- if(rep.percent!=null){const w=d.W-2*M;d.rect(M,d.y-8,w,8,{color:rgb(.89,.91,.88)});d.rect(M,d.y-8,w*Math.min(1,rep.percent/100),8,{color:rep.percent>100?rgb(.64,.24,.2):rep.percent>80?C.amber:d.C.green});d.line(M+w*.8,d.y+2,M+w*.8,d.y-12,d.C.ink,1);d.text('80 %',M+w*.8-8,d.y-22,{size:6.5,color:d.C.muted});d.y-=34;}
+ if(rep.percent!=null){const w=d.W-2*M;d.rect(M,d.y-8,w,8,{color:d.C.track});d.rect(M,d.y-8,w*Math.min(1,rep.percent/100),8,{color:rep.percent>100?d.C.danger:rep.percent>80?d.C.amber:d.C.green});d.line(M+w*.8,d.y+2,M+w*.8,d.y-12,d.C.ink,1);d.text('80 %',M+w*.8-8,d.y-22,{size:6.5,color:d.C.muted});d.y-=34;}
  // Alertes.
  sectionTitle(d,`Alertes (${rep.issues.length})`);
  if(!rep.issues.length){d.text('Aucune alerte.',M,d.y,{size:8.5,color:d.C.muted});d.y-=14;}
  for(const n of (rep.notes||[])){const ls=d.wrap('Note : '+n.text,8,d.W-2*M-16);d.ensure(ls.length*10+4);ls.forEach((l,j)=>d.text(l,M+8,d.y-j*10,{size:8,color:d.C.muted}));d.y-=ls.length*10+4;}
- for(const i of rep.issues){const lines=d.wrap((i.circuit?`Circuit ${i.circuit} : `:'')+i.text,8.5,d.W-2*M-16);d.ensure(lines.length*11+4);d.rect(M,d.y-(lines.length-1)*11-3,3,(lines.length-1)*11+11,{color:i.level==='error'?rgb(.64,.24,.2):C.amber});lines.forEach((l,j)=>d.text(l,M+10,d.y-j*11,{size:8.5}));d.y-=lines.length*11+4;}
+ for(const i of rep.issues){const lines=d.wrap((i.circuit?`Circuit ${i.circuit} : `:'')+i.text,8.5,d.W-2*M-16);d.ensure(lines.length*11+4);d.rect(M,d.y-(lines.length-1)*11-3,3,(lines.length-1)*11+11,{color:i.level==='error'?d.C.danger:d.C.amber});lines.forEach((l,j)=>d.text(l,M+10,d.y-j*11,{size:8.5}));d.y-=lines.length*11+4;}
  d.y-=6;
  // Calcul 8-200.
  if(panel.kind==='Principal'){
@@ -497,7 +500,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  d.page();
  sectionTitle(d,'Liste de charges par circuit','Charge de calcul, taux de charge du disjoncteur (charge continue limitée à 80 % du calibre, charge non continue jusqu’à 100 %) et conducteur.');
  const cols=[['Pos.',44],['Circuit et charges',196],['kW',42],['A',38],['Disj.',40],['%',34],['Fil',58],['Ph.',30],['État',50]];
- const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white});x+=w;}d.y-=18;};
+ const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.tableBg});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.tableText});x+=w;}d.y-=18;};
  head();
  const {legOf}=await import('../../public/loadcalc.js');
  for(const {c,r} of rep.rows){
@@ -507,7 +510,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
   const h=14+subLines.length*8.5;d.ensure(h+2,head);
   const err=r.issues.some(i=>i.level==='error'),warn=r.issues.some(i=>i.level==='warn');
   const vals=[designation(c),c.label||'—',r.watts?(r.watts/1000).toLocaleString(LOC,{maximumFractionDigits:2}):'—',r.watts?String(r.demandAmps):'—',c.amps?c.amps+' A':'—',r.percent!=null?r.percent+' %':'—',c.wire?.gauge||(r.suggestedWire?'~ '+r.suggestedWire:'—'),r.volts===240?'L1+L2':legOf(parseInt(c.slots[0])),err?'À corriger':warn?'À surveiller':'OK'];
-  let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:7.6,f:i<2?d.bold:d.font,color:i===8?(err?rgb(.64,.24,.2):warn?C.amber:d.C.green):d.C.ink,max:cols[i][1]-5});x+=cols[i][1];});
+  let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:7.6,f:i<2?d.bold:d.font,color:i===8?(err?d.C.danger:warn?d.C.amber:d.C.green):d.C.ink,max:cols[i][1]-5});x+=cols[i][1];});
   subLines.forEach((l,j)=>d.text(l,M+49,d.y-19-j*8.5,{size:6.8,color:d.C.muted}));
   d.y-=h;d.line(M,d.y,d.W-M,d.y);
  }
@@ -548,12 +551,12 @@ export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],ge
  const pct=det.mainAmps&&calc.amps?Math.round(calc.amps/det.mainAmps*100):null;
  const boxes=[['Charge calculée',kw(calc.totalW)],['Intensité (÷ 240 V)',calc.amps+' A'],['Minimum du Code',calc.minService+' A'],['Entrée recommandée',(calc.recommended??'—')+' A'],['Principal installé',det.mainAmps?`${det.mainAmps} A${pct!=null?` (${pct} %)`:''}`:'—']];
  const bw=(d.W-2*M-4*8)/5;d.ensure(50);
- boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:d.C.soft,borderColor:d.C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:d.C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:11.5,f:d.bold,color:i===4&&pct>100?rgb(.64,.24,.2):d.C.ink,max:bw-14});});
+ boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:d.C.soft,borderColor:d.C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:d.C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:11.5,f:d.bold,color:i===4&&pct>100?d.C.danger:d.C.ink,max:bw-14});});
  d.y-=54;
  const verdict=!calc.area?'Superficie manquante : le calcul est incomplet.':!det.mainAmps?'Indiquez le calibre du disjoncteur principal pour comparer.':calc.amps<=det.mainAmps&&det.mainAmps>=calc.minService?`Le principal de ${det.mainAmps} A est suffisant pour la charge calculée (${pct} % utilisé).${pct>80?' Marge réduite : prévoyez les ajouts futurs.':''}`:`Le principal de ${det.mainAmps} A est insuffisant : une entrée d’au moins ${calc.recommended} A est requise selon ce calcul.`;
  para(verdict,{f:d.bold,size:9});
  const svc=det.fedFrom?null:serviceCheck(det);
- if(svc?.text)para(svc.text,{size:8.6,color:svc.status==='warn'?rgb(.64,.24,.2):d.C.ink});
+ if(svc?.text)para(svc.text,{size:8.6,color:svc.status==='warn'?d.C.danger:d.C.ink});
  if(calc.recommended&&!det.fedFrom){const need=calc.recommended;para(`Rappel : les conducteurs d’entrée (du mât au panneau) et l’embase du compteur doivent convenir à l’entrée choisie (${need} A ou plus). Leur calibre se choisit avec le tableau 39 du Code pour un logement unifamilial, et les exigences d’Hydro-Québec (norme E.21-10) s’appliquent au mât et au branchement.`,{size:8,color:d.C.muted});}
  d.y-=6;
  // Méthode.
@@ -577,10 +580,10 @@ export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],ge
   if(!st.items?.length&&g.excludes?.length&&st.id!=='area')para('À ne pas additionner : '+g.excludes.join(' ; '),{size:7.8,color:d.C.muted});
   d.y-=8;
  }
- d.ensure(30);d.rect(M,d.y-18,d.W-2*M,20,{color:d.C.ink});
- d.text('TOTAL',M+8,d.y-11,{size:9,f:d.bold,color:d.C.white});const tot=`${kw(calc.totalW)} ÷ 240 V = ${calc.amps} A`;d.text(tot,d.W-M-8-d.width(tot,9,d.bold),d.y-11,{size:9,f:d.bold,color:d.C.lime});d.y-=30;
+ d.ensure(30);d.rect(M,d.y-18,d.W-2*M,20,{color:d.C.tableBg});
+ d.text('TOTAL',M+8,d.y-11,{size:9,f:d.bold,color:d.C.tableText});const tot=`${kw(calc.totalW)} ÷ 240 V = ${calc.amps} A`;d.text(tot,d.W-M-8-d.width(tot,9,d.bold),d.y-11,{size:9,f:d.bold,color:d.C.tableText});d.y-=30;
  para(G.GUIDE_STEPS.total.plain,{size:8.2});
- if(calc.warnings.length){d.y-=4;sectionTitle(d,'Points à corriger');for(const w of calc.warnings)para('• '+w,{size:8.2,color:rgb(.55,.35,.1)});}
+ if(calc.warnings.length){d.y-=4;sectionTitle(d,'Points à corriger');for(const w of calc.warnings)para('• '+w,{size:8.2,color:d.C.warn});}
  d.y-=6;sectionTitle(d,'Autres règles à respecter');
  for(const r of G.GUIDE_RULES){para(`${r.title} (${r.rule})`,{size:8.4,f:d.bold});para(r.plain,{size:8,color:d.C.muted});d.y-=2;}
  d.y-=4;sectionTitle(d,'Références et avertissement');
