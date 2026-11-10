@@ -38,7 +38,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   const [{n}]=await sql`SELECT count(*)::int AS n FROM app_sites WHERE user_id=${user.id}`;
   if(n>=200)throw new HttpError(400,'Limite de 200 sites atteinte.');
   await assertCanCreateSite(sql,user.id);
-  const [row]=await sql`INSERT INTO app_sites(id,user_id,name,client,street,city,province,postal_code,notes) VALUES(${newId()},${user.id},${site.name},${site.client},${site.street},${site.city},${site.province},${site.postalCode},${site.notes}) RETURNING *`;
+  const [row]=await sql`INSERT INTO app_sites(id,user_id,name,client,street,city,province,postal_code,notes,bipolar_volts) VALUES(${newId()},${user.id},${site.name},${site.client},${site.street},${site.city},${site.province},${site.postalCode},${site.notes},${site.bipolarVolts}) RETURNING *`;
   return res.status(201).json({site:siteOut(row)});
  }
  if(!id)throw new HttpError(400,'Site manquant.');
@@ -53,7 +53,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  if(req.method==='PUT'&&acc.role==='panels')throw new HttpError(403,'Seuls certains panneaux de ce site vous sont partagés.');
  if(req.method==='PUT'){
   const site=check(()=>cleanSite(body(req)));
-  const [u]=await sql`UPDATE app_sites SET name=${site.name},client=${site.client},street=${site.street},city=${site.city},province=${site.province},postal_code=${site.postalCode},notes=${site.notes},updated_at=now() WHERE id=${id} RETURNING *`;
+  const [u]=await sql`UPDATE app_sites SET name=${site.name},client=${site.client},street=${site.street},city=${site.city},province=${site.province},postal_code=${site.postalCode},notes=${site.notes},bipolar_volts=${site.bipolarVolts},updated_at=now() WHERE id=${id} RETURNING *`;
   return res.status(200).json({site:siteOut(u)});
  }
  await sql`DELETE FROM app_sites WHERE id=${id} AND user_id=${user.id}`;

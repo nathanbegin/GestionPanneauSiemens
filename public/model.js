@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,STAGE_IDS,stageFromState} from './catalog.js';
-export const APP_VERSION='2.20.0';
+export const APP_VERSION='2.21.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -46,6 +46,7 @@ export function validate(data,{positions=LEGACY_POSITIONS}={}){
    for(const l of c.loads){
     if(!l||typeof l!=='object'||typeof l.name!=='string'||!l.name.trim()||l.name.length>80)throw Error('Nom de charge invalide.');
     if(l.id!==undefined&&(typeof l.id!=='string'||l.id.length>40))throw Error('Charge invalide.');
+    if(l.model!==undefined&&(typeof l.model!=='string'||l.model.length>60))throw Error('Numéro de modèle invalide : '+l.name);
     if(typeof l.w!=='number'||!isFinite(l.w)||l.w<0||l.w>200000)throw Error('Puissance invalide : '+l.name);
     if(!VOLTAGES.includes(l.v))throw Error('Tension invalide : '+l.name);
     if(!Number.isInteger(l.qty)||l.qty<1||l.qty>100)throw Error('Quantité invalide : '+l.name);
@@ -318,13 +319,14 @@ export function cleanAppliances(list){
   const v=Number(a?.v);if(!VOLTAGES.includes(v))throw Error('Tension invalide : '+name);
   const qty=a?.qty==null?1:Number(a.qty);if(!Number.isInteger(qty)||qty<1||qty>100)throw Error('Quantité invalide : '+name);
   const source=['liste','plaque','manuel'].includes(a?.source)?a.source:'manuel';
-  return {id:str(a?.id,40,'Identifiant')||('a'+Math.random().toString(36).slice(2,10)),name,w:Math.round(w),v,qty,source,cont:a?.cont===true};
+  const model=str(a?.model,60,'Numéro de modèle');
+  return {id:str(a?.id,40,'Identifiant')||('a'+Math.random().toString(36).slice(2,10)),name,...(model?{model}:{}),w:Math.round(w),v,qty,source,cont:a?.cont===true};
  });
 }
 export function cleanSite(input={}){
  const name=str(input.name,100,'Nom du site');if(!name)throw Error('Donnez un nom au site.');
  const postalCode=str(input.postalCode,12,'Code postal').toUpperCase();
- return {name,client:str(input.client,120,'Client'),street:str(input.street,160,'Adresse'),city:str(input.city,80,'Ville'),province:str(input.province,40,'Province')||'QC',postalCode,notes:str(input.notes,2000,'Notes')};
+ return {name,client:str(input.client,120,'Client'),street:str(input.street,160,'Adresse'),city:str(input.city,80,'Ville'),province:str(input.province,40,'Province')||'QC',postalCode,notes:str(input.notes,2000,'Notes'),bipolarVolts:Number(input.bipolarVolts)===208?208:240};
 }
 export const siteAddress=s=>[s.street,[s.city,s.province].filter(Boolean).join(' (')+(s.city&&s.province?')':''),s.postalCode].filter(Boolean).join(', ');
 export const panelTitle=p=>(p.tag?p.tag+' · ':'')+p.name;

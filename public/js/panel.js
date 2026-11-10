@@ -334,7 +334,7 @@ export async function panelView({id,tab='panel',ctx}){
  // Création d'un sous-panneau pré-relié à un circuit de ce panneau (sans quitter la page).
  function createSubpanel(initial){
   return new Promise(resolve=>{
-   panelDialog({siblings,library:planning,initial,title:'Nouveau sous-panneau',eyebrow:`Alimenté par ${panelTitle(panel)} · circuit ${initial.details?.fedFromCircuit||''}`,
+   panelDialog({siblings,library:planning,defaultBipolar:site.bipolarVolts,initial,title:'Nouveau sous-panneau',eyebrow:`Alimenté par ${panelTitle(panel)} · circuit ${initial.details?.fedFromCircuit||''}`,
     onSave:async f=>{const {panel:p}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});resolve({id:p.id,name:p.name,tag:p.tag,kind:p.kind,fedFrom:p.details?.fedFrom||'',fedFromCircuit:p.details?.fedFromCircuit||''});}});
   });
  }

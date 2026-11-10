@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {voltsOf,voltageLabel,prefBipolar,prefVolts,setUserVolts,userVolts,DEFAULT_VOLTS} from '../public/voltage.js';
+import {voltsOf,voltageLabel,siteBipolar,siteVolts,DEFAULT_VOLTS} from '../public/voltage.js';
+import {cleanSite} from '../public/model.js';
 import {circuitLoad,circuitVolts,phaseBalance,panelReport,suggestions} from '../public/loadcalc.js';
 import {blank,reshape} from '../public/model.js';
 import {designItems,designCalc,mainFor} from '../public/design.js';
@@ -10,9 +11,8 @@ test('réseaux : 120/240 V par défaut, 208 V en option',()=>{
  assert.deepEqual(voltsOf({voltage:'120/208 V triphasé'}),{uni:120,bi:208});
  assert.deepEqual(voltsOf({voltage:'347/600 V triphasé'}),{uni:347,bi:600});
  assert.equal(voltageLabel(208),'120/208 V triphasé');assert.equal(voltageLabel(240),'120/240 V monophasé');assert.equal(voltageLabel(undefined),'120/240 V monophasé');
- assert.equal(prefBipolar({}),240);assert.equal(prefBipolar({bipolarVolts:208}),208);assert.equal(prefBipolar({bipolarVolts:'208'}),208);assert.equal(prefBipolar({bipolarVolts:999}),240);
- assert.deepEqual(prefVolts({bipolarVolts:208}),{uni:120,bi:208});
- setUserVolts({bipolarVolts:208});assert.equal(userVolts().bi,208);setUserVolts(undefined);assert.deepEqual(userVolts(),DEFAULT_VOLTS);
+ assert.equal(siteBipolar({}),240);assert.equal(siteBipolar({bipolarVolts:208}),208);assert.equal(siteBipolar({bipolarVolts:'208'}),208);assert.equal(siteBipolar({bipolarVolts:999}),240);assert.equal(siteBipolar(undefined),240);
+ assert.deepEqual(siteVolts({bipolarVolts:208}),{uni:120,bi:208});assert.deepEqual(siteVolts({}),DEFAULT_VOLTS);
 });
 test('charge d’un circuit selon la tension du réseau',()=>{
  let c=blank(30);const id=x=>c.find(y=>y.slots.includes(x)).id;c=reshape(c,id('1A'),'double',30);
@@ -48,4 +48,10 @@ test('conception à 208 V',()=>{
  assert.equal(i208.find(i=>/Laveuse|Éclairage/.test(i.label)).poles,1);
  const c240=designCalc(i240,input),c208=designCalc(i208,{...input,vs:{uni:120,bi:208}});
  assert.ok(c208.amps>c240.amps);assert.ok(mainFor(c208.amps,0.2)>=mainFor(c240.amps,0.2));
+});
+
+test('réglage de tension d’un site',()=>{
+ assert.equal(cleanSite({name:'Maison'}).bipolarVolts,240);
+ assert.equal(cleanSite({name:'Maison',bipolarVolts:'208'}).bipolarVolts,208);
+ assert.equal(cleanSite({name:'Maison',bipolarVolts:'480'}).bipolarVolts,240,'valeur inconnue : 240 V');
 });

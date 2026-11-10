@@ -6,7 +6,7 @@ import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
 import {api} from './api.js';
 import {circuitLoad,polesOf} from '../loadcalc.js';
-import {voltsOf,voltageLabel,userVolts} from '../voltage.js';
+import {voltsOf,voltageLabel,siteBipolar,UNIPOLAR_VOLTS} from '../voltage.js';
 import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormats,designation,formatOf,reshape,validate,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,tagGroups,panelTitle,MAX_POSITIONS} from '../model.js';
 
 const input=(name,value,attrs={})=>h('input',{name,value:value??'',...attrs});
@@ -23,6 +23,9 @@ export function siteFields(site={}){
   field('Province',input('province',site.province||'QC',{maxlength:40,autocomplete:'address-level1'})),
   field('Code postal',input('postalCode',site.postalCode,{maxlength:12,autocomplete:'postal-code'})),
   field('Client',input('client',site.client,{maxlength:120,placeholder:'Facultatif'}),{hint:'Utile pour les électriciens : figure sur le rapport.'}),
+  h('div',{class:'full'},h('b',{class:'small',text:'Tensions du réseau'})),
+  field('Disjoncteur unipolaire',h('input',{value:UNIPOLAR_VOLTS+' V',readOnly:true,'aria-label':'Tension unipolaire'}),{hint:'Éclairage, prises, petits appareils.'}),
+  field('Disjoncteur bipolaire',select('bipolarVolts',[[240,'240 V (par défaut) — monophasé 120/240 V'],[208,'208 V (option) — triphasé 120/208 V']],siteBipolar(site)),{hint:'Cuisinière, sécheuse, chauffage, borne… Sert aux nouveaux panneaux, à la conception et aux calculs. Un panneau déjà créé garde sa tension (modifiable dans sa fiche).'}),
   field('Notes',area('notes',site.notes,{maxlength:2000,placeholder:'Accès, entrée électrique, compteur…'}),{full:true}));
 }
 export const formData=form=>Object.fromEntries(new FormData(form));
@@ -38,7 +41,7 @@ export function siteDialog(site,onSave){
 }
 
 const POSITION_CHOICES=[12,16,20,24,30,32,40,42,48,54,60,66,72,84];
-export function panelFields(panel={},siblings=[],{library=false}={}){
+export function panelFields(panel={},siblings=[],{library=false,defaultBipolar=240}={}){
  const d=panel.details||{};
  const positions=panel.positions||32;
  const choices=[...new Set([...POSITION_CHOICES,positions])].sort((a,b)=>a-b);
@@ -56,7 +59,7 @@ export function panelFields(panel={},siblings=[],{library=false}={}){
    field('Calibre principal (A)',input('mainAmps',d.mainAmps??'',{type:'number',min:15,max:1200,step:5,inputmode:'numeric',placeholder:'Ex. 200'})),
    field('Marque',input('brand',d.brand,{maxlength:60,placeholder:'Ex. Siemens, Square D, Eaton',list:'brands'})),
    field('Modèle',input('model',d.model,{maxlength:60,placeholder:'Ex. EQ, QO, BR'})),
-   field('Tension',select('voltage',voltages,d.voltage||voltageLabel(userVolts().bi)),{hint:'Détermine la tension des circuits bipolaires (240 V, ou 208 V en option).'}),
+   field('Tension',select('voltage',voltages,d.voltage||voltageLabel(defaultBipolar)),{hint:'Détermine la tension des circuits bipolaires (240 V, ou 208 V en option).'}),
    field('Superficie hors sol (m²)',input('livingArea',d.livingArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 140'}),{hint:'Rez-de-chaussée et étages, mesurés par l’extérieur (calcul de charge, règle 8-110).'}),
    field('Superficie du sous-sol (m²)',input('basementArea',d.basementArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 80'}),{hint:'Compte à 75 % (parties de plus de 1,8 m de hauteur).'}),
    field('Étape du projet',select('stage',Object.entries(PANEL_STAGES).map(([k,s])=>[k,`${s.n}. ${s.label}`]),d.stage||stageFromState(d.state)),{hint:'Conception : pas encore de panneau. Relevé : panneau existant. Vérification : charges et électroménagers.'}),
@@ -143,7 +146,7 @@ export function panelPayload(form){
  const f=formData(form);
  return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),basementArea:f.basementArea===''||f.basementArea==null?null:Number(f.basementArea),state:f.state,stage:f.stage,...(f.fedFrom?{}:{serviceGauge:f.serviceGauge,serviceMaterial:f.serviceMaterial,serviceRoute:f.serviceRoute,serviceNotes:f.serviceNotes})}},positions:Number(f.positions)};
 }
-export function panelDialog({siblings=[],onSave,library=false,initial={},title='Nouveau panneau',eyebrow='Étape 2 · un panneau dans ce site'}){
+export function panelDialog({siblings=[],onSave,library=false,defaultBipolar=240,initial={},title='Nouveau panneau',eyebrow='Étape 2 · un panneau dans ce site'}){
  const e=err();
  const fileInput=h('input',{type:'file',accept:'application/json,.json',class:'sr-only',id:'importJson'});
  let imported=null;
@@ -154,7 +157,7 @@ export function panelDialog({siblings=[],onSave,library=false,initial={},title='
    if(data.panel&&!d.form.elements.name.value)d.form.elements.name.value=String(data.panel).slice(0,100);}
   catch(x){imported=null;importNote.textContent='⚠ '+x.message;}
  });
- const d=dialog({title,eyebrow,form:true,wide:true,body:[...panelFields(initial,siblings,{library}),
+ const d=dialog({title,eyebrow,form:true,wide:true,body:[...panelFields(initial,siblings,{library,defaultBipolar}),
   h('div',{class:'notice info'},'Vous avez une sauvegarde JSON (ancienne version ou export) ? ',h('label',{for:'importJson',class:'btn sm',text:'Importer un fichier'}),fileInput,importNote),e],
   actions:[{label:'Annuler',kind:'ghost'},{label:'Créer le panneau',kind:'primary',submit:true}]});
  d.form.addEventListener('submit',async ev=>{

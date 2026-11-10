@@ -34,6 +34,7 @@ async function ensureSchema(sql){
   name text NOT NULL, client text NOT NULL DEFAULT '', street text NOT NULL DEFAULT '', city text NOT NULL DEFAULT '',
   province text NOT NULL DEFAULT 'QC', postal_code text NOT NULL DEFAULT '', notes text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+ await sql`ALTER TABLE app_sites ADD COLUMN IF NOT EXISTS bipolar_volts integer NOT NULL DEFAULT 240`;
  await sql`CREATE INDEX IF NOT EXISTS app_sites_user ON app_sites(user_id)`;
  await sql`CREATE TABLE IF NOT EXISTS app_panels(
   id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,

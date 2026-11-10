@@ -6,6 +6,7 @@ import {panelArt,brandBadge} from './panelart.js';
 import {designation,sortCircuits,ampsList,usages,panelTitle,slotPos} from '../model.js';
 import {FAMILIES,familyOf} from '../catalog.js';
 import {loadLibrary} from './library.js';
+import {voltageLabel} from '../voltage.js';
 import {breakerUnits,matchBreakers,applyModel,clearModel} from '../units.js';
 import {miniBreaker} from './assign.js';
 import {newGuided,answerPosition,nextPosition,prevPosition,coveredFrom,fillRestEmpty,currentAnswer,checkAppliances,assignAppliance,progress,canPlace,guessUsage,
@@ -111,7 +112,7 @@ export function guidedDialog({site,siblings=[],library=false,onCreated}){
  const qBox=h('div',{class:'gd-question'});
  const artBox=h('div',{class:'gd-art'});
  const d=dialog({title:'Construire le panneau en répondant à des questions',eyebrow:'Mode guidé · '+site.name,wide:'xl',body:[h('div',{class:'gd-wrap'},qBox,artBox)]});
- let S={step:'kind',meta:{kind:'Principal',name:'Panneau principal',tag:'',location:'',details:{brand:'',model:'',family:'',mainAmps:null,voltage:'120/240 V monophasé',fedFrom:'',fedFromCircuit:''}},st:null,pos:1,owned:[],fixes:[]};
+ let S={step:'kind',meta:{kind:'Principal',name:'Panneau principal',tag:'',location:'',details:{brand:'',model:'',family:'',mainAmps:null,voltage:voltageLabel(site.bipolarVolts),fedFrom:'',fedFromCircuit:''}},st:null,pos:1,owned:[],fixes:[]};
  const persist=()=>save(site.id,S);
  const drawArt=current=>{
   if(!S.st){artBox.replaceChildren(h('div',{class:'gd-art-empty'},h('span',{class:'gd-big','aria-hidden':'true',text:'▦'}),h('p',{class:'muted',text:'Le dessin de votre panneau apparaîtra ici au fil de vos réponses.'})));return;}

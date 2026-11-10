@@ -11,10 +11,6 @@ export function voltsOf(details={}){
 }
 /** Libellé du réseau (champ « Tension » d'un panneau) pour une tension bipolaire choisie. */
 export const voltageLabel=bi=>Number(bi)===208?'120/208 V triphasé':'120/240 V monophasé';
-/** Préférence de l'utilisateur (profil du compte) : bipolaire 240 V par défaut. */
-export const prefBipolar=profile=>Number(profile?.bipolarVolts)===208?208:240;
-export const prefVolts=profile=>({uni:UNIPOLAR_VOLTS,bi:prefBipolar(profile)});
-// Préférence courante dans le navigateur (mise à jour à la connexion et à l'enregistrement des paramètres).
-let current=DEFAULT_VOLTS;
-export const setUserVolts=profile=>{current=prefVolts(profile);};
-export const userVolts=()=>current;
+/** Tensions du réseau d'un site (réglage du site) : bipolaire 240 V par défaut, 208 V en option. */
+export const siteBipolar=site=>Number(site?.bipolarVolts)===208?208:240;
+export const siteVolts=site=>({uni:UNIPOLAR_VOLTS,bi:siteBipolar(site)});

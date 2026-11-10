@@ -300,18 +300,18 @@ function detailTable(d,panel){
 }
 
 // Électroménagers qui consomment le plus, avec le circuit auquel ils sont reliés (rien d'imprimé s'il n'y en a pas).
-function applianceSection(d,panel,{limit=14}={}){
+function applianceSection(d,panel,{limit=Infinity}={}){
  const rows=listAppliances(panel);
  if(!rows.length)return;
  d.ensure(70);
- sectionTitle(d,'Électroménagers qui consomment le plus','Plaque signalétique ou valeur typique, et circuit relié. Seuls les appareils reliés comptent dans le calcul.');
+ sectionTitle(d,`Liste des électroménagers (${rows.length})`,'Tous les appareils inscrits, du plus gros au plus petit. Plaque signalétique ou valeur typique, et circuit relié. Seuls les appareils reliés comptent dans le calcul.');
  const cols=[['Électroménager',190],['Qté',30],['Puissance',64],['Tension',46],['Circuit',d.W-2*M-190-30-64-46]];
  const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white});x+=w;}d.y-=18;};
  head();
  const fmt=w=>w>=1000?(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW':w+' W';
  for(const r of rows.slice(0,limit)){
   d.ensure(16,head);
-  const vals=[r.name,String(r.qty),fmt(r.total),r.v+' V',r.pending?'Non relié à un circuit':r.circuit+(r.circuitLabel?' · '+r.circuitLabel:'')];
+  const vals=[r.name+(r.model?' · '+r.model:''),String(r.qty),fmt(r.total),r.v+' V',r.pending?'Non relié à un circuit':r.circuit+(r.circuitLabel?' · '+r.circuitLabel:'')];
   let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:8,f:i===0?d.bold:d.font,color:i===4&&r.pending?C.amber:d.C.ink,max:cols[i][1]-6});x+=cols[i][1];});
   d.y-=15;d.line(M,d.y,d.W-M,d.y);
  }

@@ -8,8 +8,8 @@ import {LOAD_LIBRARY,VOLTAGES} from '../catalog.js';
 import {designation} from '../model.js';
 import {voltsOf} from '../voltage.js';
 import {panelReport} from '../loadcalc.js';
-import {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance} from '../appliances.js';
-export {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance};
+import {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance} from '../appliances.js';
+export {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance};
 
 const fmtW=w=>w>=1000?(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW':w+' W';
 
@@ -32,9 +32,9 @@ export function appliancesView({panel,children=[],save,onChange,canEdit=true}){
    const sel=circuitOptions(r,r.circuitId);sel.disabled=!canEdit;
    sel.addEventListener('change',()=>apply(()=>moveAppliance(panel,r.id,sel.value||null)));
    return h('tr',{class:r.pending?'cmp-diff':''},
-    h('td',{},h('b',{text:r.name}),r.qty>1&&h('span',{class:'small muted',text:' × '+r.qty}),h('div',{class:'small muted',text:r.v+' V'})),
-    h('td',{text:fmtW(r.total)}),h('td',{},sel,r.pending&&h('div',{class:'small',text:'⚠ À relier à un circuit pour compter dans le calcul.'})),
-    h('td',{},canEdit&&h('button',{type:'button',class:'ghost sm','aria-label':'Retirer '+r.name,onclick:()=>apply(()=>removeAppliance(panel,r.id))},'✕')));
+    h('td',{},h('b',{text:r.name}),r.qty>1&&h('span',{class:'small muted',text:' × '+r.qty}),r.model&&h('div',{class:'small app-model',text:'Modèle : '+r.model}),h('div',{class:'small muted',text:r.v+' V'})),
+    h('td',{text:fmtW(r.total)}),h('td',{},sel,r.pending&&h('div',{class:'app-warn'},'⚠ ',h('span',{class:'long',text:'À relier à un circuit pour compter dans le calcul.'}),h('span',{class:'short',text:'À relier'}))),
+    h('td',{class:'app-actions'},canEdit&&h('button',{type:'button',class:'ghost sm','aria-label':'Modifier '+r.name,title:'Modifier',onclick:()=>addDialog({panel,save,onChange,edit:r})},'✎'),canEdit&&h('button',{type:'button',class:'ghost sm','aria-label':'Retirer '+r.name,title:'Retirer',onclick:()=>apply(()=>removeAppliance(panel,r.id))},'✕')));
   }))))
   :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'🔌'}),h('h3',{text:'Aucun électroménager inscrit'}),h('p',{text:'Inscrivez les appareils qui consomment le plus (cuisinière, sécheuse, chauffe-eau, thermopompe, borne…) et reliez-les au bon circuit. Vous pouvez photographier leur plaque signalétique : l’IA lit la puissance.'}));
  const gauge=rep&&h('div',{class:'card side-card'},h('h3',{text:'Charge du panneau'}),
@@ -44,21 +44,24 @@ export function appliancesView({panel,children=[],save,onChange,canEdit=true}){
  const pending=rows.filter(r=>r.pending).length;
  return h('div',{class:'container-narrow'},
   h('div',{class:'cmp-head'},h('h2',{text:'Électroménagers qui consomment le plus'}),canEdit&&h('button',{type:'button',class:'primary',onclick:()=>addDialog({panel,save,onChange})},'＋ Ajouter un électroménager')),
-  pending?h('p',{class:'notice small',text:`${pending} appareil(s) pas encore relié(s) à un circuit : choisissez le circuit dans la liste.`}):null,
+  pending?h('p',{class:'notice small app-notice'},h('span',{class:'long',text:`${pending} appareil(s) pas encore relié(s) à un circuit : choisissez le circuit dans la liste.`}),h('span',{class:'short',text:`${pending} à relier à un circuit`})):null,
   gauge,table);
 }
 
 /** Fenêtre d'ajout : plaque signalétique (IA) ou liste d'appareils usuels. */
-export async function addDialog({panel,save,onChange}){
+export async function addDialog({panel,save,onChange,edit=null}){
  let status={allowed:false,configured:false};
  try{status=await api('/api/panels?action=scan');}catch{}
- const f={name:h('input',{maxlength:80,placeholder:'Ex. Sécheuse',required:true}),w:h('input',{type:'number',min:0,max:200000,step:10,placeholder:'Watts'}),
-  v:select('v',VOLTAGES.map(v=>[v,v+' V']),voltsOf(panel.details).bi),qty:h('input',{type:'number',min:1,max:100,step:1,value:1}),cont:h('input',{type:'checkbox'})};
- let source='manuel';
+ const f={name:h('input',{maxlength:80,placeholder:'Ex. Sécheuse',required:true,value:edit?.name||''}),w:h('input',{type:'number',min:0,max:200000,step:10,placeholder:'Watts',value:edit?.w??''}),
+  v:select('v',VOLTAGES.map(v=>[v,v+' V']),edit?.v||voltsOf(panel.details).bi),model:h('input',{maxlength:60,placeholder:'Lu sur la plaque (facultatif)',value:edit?.model||''}),qty:h('input',{type:'number',min:1,max:100,step:1,value:edit?.qty||1}),cont:h('input',{type:'checkbox',checked:!!edit?.cont})};
+ let source=edit?.source||'manuel';
+ // Circuit choisi : en modification, le circuit actuel ; sinon la meilleure suggestion tant que rien n'est choisi à la main.
+ let chosen=edit?(edit.circuitId||''):null;
  const note=h('p',{class:'small muted',role:'status'});
  const circuitBox=h('div');
  const drawCircuit=()=>{const app={name:f.name.value,w:Number(f.w.value)||0,v:Number(f.v.value),qty:Number(f.qty.value)||1};const sel=select('circuit',[['','— Pas encore relié à un circuit —'],...suggestCircuits(panel,app).map((s,i)=>[s.circuit.id,`${s.score>=3&&i<3?'★ ':''}${designation(s.circuit)} · ${s.circuit.label||'sans désignation'}${s.circuit.amps?' · '+s.circuit.amps+' A':''}`])],'');
-  const first=suggestCircuits(panel,app)[0];if(first&&first.score>=3)sel.value=first.circuit.id;
+  if(chosen!==null)sel.value=chosen;else{const first=suggestCircuits(panel,app)[0];if(first&&first.score>=3)sel.value=first.circuit.id;}
+  sel.addEventListener('change',()=>{chosen=sel.value;});
   circuitBox.replaceChildren(field('Relier au circuit',sel,{hint:'★ = suggestion selon le nom, la tension et le calibre.'}));};
  for(const el of [f.name,f.w,f.v,f.qty])el.addEventListener('change',drawCircuit);
  const lib=select('lib',[['','— Choisir dans la liste —'],...LOAD_LIBRARY.map(l=>[l.id,`${l.g} · ${l.name}`])],'');
@@ -73,6 +76,7 @@ export async function addDialog({panel,save,onChange}){
    const r=out.plate;
    if(!r.is_nameplate){note.textContent='Plaque non reconnue : prenez la photo plus près, bien éclairée, ou saisissez la puissance à la main.';return;}
    if(r.name)f.name.value=[r.name,r.brand].filter(Boolean).join(' · ').slice(0,80);
+   if(r.model)f.model.value=String(r.model).slice(0,60);
    if(r.watts)f.w.value=r.watts;
    if([120,208,240,347,600].includes(r.volts))f.v.value=String(r.volts);
    source='plaque';
@@ -84,16 +88,18 @@ export async function addDialog({panel,save,onChange}){
  const photoBlock=status.allowed&&status.configured
   ?h('div',{class:'page-actions'},h('label',{class:'btn primary',for:'plateFile'},'📷 Photographier la plaque signalétique'),photo,h('span',{class:'small muted',text:`Compte pour 1 analyse IA${status.monthly!=null?` (${status.used}/${status.monthly} ce mois-ci)`:''}.`}))
   :h('p',{class:'small muted',text:'La lecture de plaque par IA est incluse dans les forfaits payants. Vous pouvez saisir la puissance à la main ou choisir dans la liste.'});
- const d=dialog({title:'Ajouter un électroménager',eyebrow:'Étape Vérification · '+(panel.tag||panel.name),form:true,wide:true,
-  body:[photoBlock,h('div',{class:'fields'},field('Ou choisir dans la liste',lib,{full:true}),field('Nom',f.name,{full:true}),field('Puissance (W)',f.w),field('Tension',f.v),field('Quantité',f.qty),h('label',{class:'check full'},f.cont,' Fonctionne en continu (3 h ou plus)')),note,circuitBox],
+ const d=dialog({title:edit?'Modifier l’électroménager':'Ajouter un électroménager',eyebrow:'Étape Vérification · '+(panel.tag||panel.name),form:true,wide:true,
+  body:[photoBlock,h('div',{class:'fields'},field('Ou choisir dans la liste',lib,{full:true}),field('Nom',f.name,{full:true}),field('Numéro de modèle',f.model,{full:true,hint:'Détecté par l’IA sur la plaque signalétique, modifiable.'}),field('Puissance (W)',f.w),field('Tension',f.v),field('Quantité',f.qty),h('label',{class:'check full'},f.cont,' Fonctionne en continu (3 h ou plus)')),note,circuitBox],
   actions:[{label:'Annuler',kind:'ghost'},{label:'Enregistrer',kind:'primary',submit:true}]});
  drawCircuit();
  d.form.addEventListener('submit',async ev=>{
   ev.preventDefault();
   const w=Number(f.w.value);if(!f.name.value.trim())return toast('Donnez un nom à l’appareil.');if(!Number.isFinite(w)||w<=0)return toast('Indiquez la puissance en watts.');
   try{
-   const next=addAppliance(panel,{name:f.name.value.trim().slice(0,80),w:Math.round(w),v:Number(f.v.value),qty:Math.max(1,Number(f.qty.value)||1),cont:f.cont.checked,source},d.form.elements.circuit.value||null);
-   await save(next);d.close();onChange();toast('Électroménager enregistré.');
+   const app={name:f.name.value.trim().slice(0,80),model:f.model.value.trim().slice(0,60),w:Math.round(w),v:Number(f.v.value),qty:Math.max(1,Number(f.qty.value)||1),cont:f.cont.checked,source};
+   const circuit=d.form.elements.circuit.value||null;
+   const next=edit?updateAppliance(panel,edit.id,app,circuit):addAppliance(panel,app,circuit);
+   await save(next);d.close();onChange();toast(edit?'Électroménager modifié.':'Électroménager enregistré.');
   }catch(e){toast(e.message,7000);}
  });
 }

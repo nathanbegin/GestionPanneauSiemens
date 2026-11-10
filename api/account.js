@@ -14,7 +14,7 @@ import {shareAction} from './_lib/shares.js';
 
 const s=(v,max)=>String(v??'').trim().slice(0,max);
 function cleanProfile(p={}){
- return {bipolarVolts:Number(p.bipolarVolts)===208?208:240,unipolarVolts:120,accountType:p.accountType==='pro'?'pro':'particulier',company:s(p.company,120),licence:s(p.licence,60),phone:s(p.phone,40),proEmail:s(p.proEmail,200),address:s(p.address,200)};
+ return {accountType:p.accountType==='pro'?'pro':'particulier',company:s(p.company,120),licence:s(p.licence,60),phone:s(p.phone,40),proEmail:s(p.proEmail,200),address:s(p.address,200)};
 }
 const same=(a,b)=>{const h=v=>createHash('sha256').update(String(v)).digest();return timingSafeEqual(h(a),h(b));};
 
