@@ -15,7 +15,7 @@ import {siteAccess,panelAccess} from './_lib/shares.js';
 
 const KINDS=['report','door','labels','loads','calc'],FORMATS=['letter','legal'];
 function params(src){
- const p={kind:String(src.kind||'report'),format:String(src.format||'letter'),panel:src.panel?String(src.panel):'',site:src.site?String(src.site):''};
+ const p={kind:String(src.kind||'report'),format:String(src.format||'letter'),panel:src.panel?String(src.panel):'',site:src.site?String(src.site):'',lang:src.lang==='en'?'en':'fr'};
  if(!KINDS.includes(p.kind)||!FORMATS.includes(p.format))throw new HttpError(400,'Type de document invalide.');
  if(p.panel&&!isUuid(p.panel)||p.site&&!isUuid(p.site)||!p.panel&&!p.site)throw new HttpError(400,'Panneau ou site manquant.');
  if(['labels','loads','calc'].includes(p.kind)&&!p.panel)throw new HttpError(400,'Ce document se génère pour un panneau.');
@@ -77,9 +77,9 @@ export default route(['GET','POST'],async(req,res)=>{
  // Code QR sur les étiquettes : forfaits qui l'incluent (et administrateurs).
  let qrUrl='';
  if(p.kind==='labels'){const e=await entitlement(sql,userId);if(qrAllowed(e.plan.features,adminEmails().includes(user.email)))qrUrl=panelLink(appUrl(req),panels[0].panel.id);}
- const bytes=p.kind==='calc'?await buildCalcNote({user,site,...panels[0],children,version:APP_VERSION,brand}):p.kind==='loads'?await buildLoads({user,site,...panels[0],children,version:APP_VERSION,brand}):p.kind==='labels'
-  ?await buildLabels({site,...panels[0],skipFree:p.skipFree==='1',brand,qrUrl})
-  :await buildReport({kind:p.kind,format:p.format,user,site,panels,version:APP_VERSION,brand});
+ const bytes=p.kind==='calc'?await buildCalcNote({user,site,...panels[0],children,version:APP_VERSION,brand,lang:p.lang}):p.kind==='loads'?await buildLoads({user,site,...panels[0],children,version:APP_VERSION,brand,lang:p.lang}):p.kind==='labels'
+  ?await buildLabels({site,...panels[0],skipFree:p.skipFree==='1',brand,qrUrl,lang:p.lang})
+  :await buildReport({kind:p.kind,format:p.format,user,site,panels,version:APP_VERSION,brand,lang:p.lang});
  const name={report:'rapport',door:'aide-memoire',labels:'etiquettes',loads:'bilan-charges',calc:'note-de-calcul'}[p.kind]+'-'+slug(p.panel?panelTitle(panels[0].panel):site.name)+'.pdf';
  res.setHeader('Content-Type','application/pdf');
  res.setHeader('Content-Disposition',`inline; filename="${name}"`);

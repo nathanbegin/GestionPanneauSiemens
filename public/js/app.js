@@ -12,7 +12,7 @@ import {panelView} from './panel.js';
 import {billingView} from './billing.js';
 import {updateCard,checkUpdateQuietly} from './update.js';
 import {compareView} from './compare.js';
-import {lang,setLang} from '../i18n.js';
+import {lang,setLang,storeLang,followAccountLang} from '../i18n.js';
 import {designDialog} from './design.js';
 import {adminView} from './admin.js';
 
@@ -46,7 +46,7 @@ function crumbs(items){
   parts.push(h('div',{class:'user-menu'},btn,menu));
  }else parts.push(h('a',{class:'btn sm',href:webUrl('/fonctionnement'),target:NATIVE?'_blank':null},'Fonctionnement'));
  // Langue : FR / EN (le bouton montre la langue vers laquelle on bascule).
- parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:()=>setLang(lang==='en'?'fr':'en')},lang==='en'?'FR':'EN'));
+ parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:async()=>{const next=lang==='en'?'fr':'en';if(state.user){try{await api('/api/account',{method:'PUT',body:{name:state.user.name,profile:{...(state.user.profile||{}),lang:next}}});}catch{}}setLang(next);}},lang==='en'?'FR':'EN'));
  topbar.replaceChildren(...parts);
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Mon Panneau';
 }
@@ -72,7 +72,7 @@ function authForm(fields,submitLabel,onSubmit){
  return form;
 }
 async function afterAuth(out,welcome){
- setToken(out.token);state.user=out.user;
+ setToken(out.token);state.user=out.user;if(followAccountLang(out.user.profile))return;
  const redirect=sessionStorage.getItem('mp_after_login');sessionStorage.removeItem('mp_after_login');
  location.hash=redirect||'#/sites';toast(welcome);
 }
@@ -90,9 +90,10 @@ function signupView(){
   field('Nom complet',h('input',{name:'name',autocomplete:'name',required:true,maxlength:100})),
   field('Courriel',h('input',{name:'email',type:'email',autocomplete:'email',required:true,inputmode:'email'})),
   field('Mot de passe',h('input',{name:'password',type:'password',autocomplete:'new-password',required:true,minlength:10}),{hint:'Au moins 10 caractères.'}),
+  field('Langue / Language',select('lang',[['fr','Français'],['en','English']],lang)),
   h('div',{class:'radio-cards',role:'radiogroup','aria-label':'Type de compte'},radio('particulier','Particulier','Ma maison, mon chalet…',true),radio('pro','Électricien / entrepreneur','Rapports à mon nom, plusieurs clients')),
   h('label',{class:'check'},h('input',{type:'checkbox',name:'acceptTerms',value:'1'}),h('span',{},'J’accepte les ',h('a',{href:webUrl('/conditions'),target:'_blank',text:'conditions d’utilisation et la politique de confidentialité'}),'.'))],'Créer mon compte',async f=>{
-  const out=await api('/api/auth?action=signup',{method:'POST',body:{...f,acceptTerms:!!f.acceptTerms}});await afterAuth(out,'Bienvenue, '+out.user.name.split(' ')[0]+' ! Ajoutez votre premier site.');});
+  storeLang(f.lang);const out=await api('/api/auth?action=signup',{method:'POST',body:{...f,acceptTerms:!!f.acceptTerms}});await afterAuth(out,'Bienvenue, '+out.user.name.split(' ')[0]+' ! Ajoutez votre premier site.');});
  return authCard('Créer un compte','Gratuit. Vos données restent privées.',form,['Déjà inscrit ? ',h('a',{href:'#/connexion',text:'Se connecter'})]);
 }
 function forgotView(){
@@ -209,11 +210,12 @@ function accountView(){
  const profile=h('form',{class:'card form-card',novalidate:true},
   h('fieldset',{class:'form-section'},h('legend',{text:'Profil'}),h('div',{class:'fields'},field('Nom complet',h('input',{name:'name',value:u.name,required:true,maxlength:100,autocomplete:'name'})),field('Courriel de connexion',h('input',{value:u.email,readOnly:true,disabled:true})))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Type de compte'}),h('div',{class:'radio-cards'},radio('particulier','Particulier','Rapports à votre nom.'),radio('pro','Électricien / entrepreneur','Entreprise, licence RBQ et coordonnées sur les rapports.'))),
+  h('fieldset',{class:'form-section'},h('legend',{text:'Langue'}),h('div',{class:'fields'},field('Langue de l’application, des PDF et des courriels',select('lang',[['fr','Français'],['en','English']],p.lang||lang),{hint:'Language of the application, PDFs and emails.'}))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Informations professionnelles (rapports PDF)'}),proBox),e1,
   h('div',{class:'form-actions'},h('button',{type:'submit',class:'primary'},'Enregistrer le profil')));
  const syncPro=()=>{proBox.closest('fieldset').hidden=profile.elements.accountType.value!=='pro';};
  profile.addEventListener('change',syncPro);syncPro();
- profile.addEventListener('submit',async ev=>{ev.preventDefault();e1.textContent='';const f=formData(profile);try{const out=await api('/api/account',{method:'PUT',body:{name:f.name,profile:f}});state.user=out.user;toast('Profil enregistré.');crumbs([['Mes sites','#/sites'],['Mon compte']]);}catch(x){e1.textContent=x.message;}});
+ profile.addEventListener('submit',async ev=>{ev.preventDefault();e1.textContent='';const f=formData(profile);try{const out=await api('/api/account',{method:'PUT',body:{name:f.name,profile:f}});state.user=out.user;toast('Profil enregistré.');if((out.user.profile?.lang||'fr')!==lang)setLang(out.user.profile.lang);crumbs([['Mes sites','#/sites'],['Mon compte']]);}catch(x){e1.textContent=x.message;}});
 
  const e2=h('p',{class:'error',role:'alert'});
  const pwd=h('form',{class:'card form-card',novalidate:true},h('fieldset',{class:'form-section'},h('legend',{text:'Mot de passe'}),h('div',{class:'fields'},
@@ -284,7 +286,7 @@ window.addEventListener('hashchange',()=>{
 });
 
 async function boot(){
- try{const me=await api('/api/auth');state.user=me.user;state.features=me.features||{};}
+ try{const me=await api('/api/auth');state.user=me.user;state.features=me.features||{};followAccountLang(me.user?.profile);}
  catch(e){if(!state.user&&e.offline){view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:'📡'}),h('h2',{text:'Hors ligne'}),h('p',{text:e.message}),h('button',{type:'button',class:'primary',onclick:()=>location.reload()},'Réessayer'))));return;}}
  lastPath=location.hash.split('/').slice(0,3).join('/');
  route();

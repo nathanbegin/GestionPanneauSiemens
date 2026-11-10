@@ -7,7 +7,7 @@ const api=(process.env.API_URL||'https://gestion-panneau-siemens.vercel.app').re
 await rm(www,{recursive:true,force:true});await mkdir(www,{recursive:true});
 for(const dir of ['assets','js'])await cp(new URL(dir,pub),new URL(dir,www),{recursive:true});
 await cp(new URL('model.js',pub),new URL('model.js',www));
-for(const f of ['qr.js','i18n.js','i18n-core.js','i18n-en.js'])await cp(new URL(f,pub),new URL(f,www));
+for(const f of ['qr.js','i18n.js','i18n-core.js','i18n-en.js','i18n-load.js','i18n-en-docs.js','i18n-en-admin.js'])await cp(new URL(f,pub),new URL(f,www));
 await cp(new URL('vendor/',pub),new URL('vendor/',www),{recursive:true});
 // Page d'entrée = application ; pas de service worker dans l'app native.
 const html=(await readFile(new URL('app.html',pub),'utf8')).replace('<link rel="manifest" href="manifest.webmanifest">','');

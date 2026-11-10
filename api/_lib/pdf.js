@@ -4,6 +4,9 @@ import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,
 import {FAMILIES,serviceCheck} from '../../public/catalog.js';
 import LOGOS from '../_data/logos.js';
 import {qrMatrix} from '../../public/qr.js';
+import {translatorFor,localeFor} from './i18n.js';
+// Langue du document en cours de fabrication (un document à la fois par exécution).
+let LOC='fr-CA';
 import {listAppliances} from '../../public/appliances.js';
 
 // ---------- Logos et modèle du panneau ----------
@@ -64,19 +67,20 @@ export function decodeLogo(dataUrl){
 }
 
 class Doc{
- static async create(format='letter',title='Mon Panneau',brand=null){
-  const d=new Doc();d.pdf=await PDFDocument.create();d.size=SIZES[format]||SIZES.letter;
+ static async create(format='letter',title='Mon Panneau',brand=null,lang='fr'){
+  const d=new Doc();d.tr=translatorFor(lang);LOC=localeFor(lang);globalThis.MP_LOCALE=LOC;title=d.tr(title);d.pdf=await PDFDocument.create();d.size=SIZES[format]||SIZES.letter;
   d.C=brandTheme(brand);d.brand=brand||null;
   if(brand?.logo){try{const l=decodeLogo(brand.logo);if(l){const img=l.type==='png'?await d.pdf.embedPng(l.buf):await d.pdf.embedJpg(l.buf);d.companyLogo={img,w:img.width,h:img.height};}}catch{}}
   d.font=await d.pdf.embedFont(StandardFonts.Helvetica);d.bold=await d.pdf.embedFont(StandardFonts.HelveticaBold);
-  d.pdf.setTitle(title);d.pdf.setCreator('Mon Panneau');d.pdf.setProducer('Mon Panneau');d.pdf.setLanguage('fr-CA');
+  d.pdf.setTitle(title);d.pdf.setCreator('Mon Panneau');d.pdf.setProducer('Mon Panneau');d.pdf.setLanguage(LOC);
   d.cache=new Map();d.images=new Map();return d;
  }
  // Remplace les caractères absents de l'encodage WinAnsi des polices standard.
  safe(text){
+  text=this.tr?this.tr(String(text??'')):text;
   let out='';
   // Équivalents pour les symboles absents des polices standard.
-  const SUBST={'→':'->','←':'<-','≈':'~','≤':'<=','≥':'>=','✓':'v','✗':'x','⚡':'','×':'x'};
+  const SUBST={'→':'->','←':'<-','≈':'~','≤':'<=','≥':'>=','✓':'v','✗':'x','⚡':'','×':'x','−':'-','≠':'!=','‑':'-'};
   for(let ch of String(text??'').replace(/[\t\r]/g,' ')){
    if(SUBST[ch]!==undefined&&!this.cache.get(ch)){let ok=true;try{this.font.encodeText(ch);}catch{ok=false;}if(!ok){out+=SUBST[ch];continue;}}
    if(ch==='\n'){out+=ch;continue;}
@@ -130,8 +134,8 @@ class Doc{
  ensure(h,onBreak){if(this.y-h<M+28){this.page();onBreak?.();return true;}return false;}
 }
 
-const fmtDate=d=>new Intl.DateTimeFormat('fr-CA',{dateStyle:'long'}).format(d);
-const fmtDateTime=d=>new Intl.DateTimeFormat('fr-CA',{dateStyle:'long',timeStyle:'short',timeZone:'America/Toronto'}).format(d);
+const fmtDate=d=>new Intl.DateTimeFormat(LOC,{dateStyle:'long'}).format(d);
+const fmtDateTime=d=>new Intl.DateTimeFormat(LOC,{dateStyle:'long',timeStyle:'short',timeZone:'America/Toronto'}).format(d);
 const surveyDate=v=>v?fmtDate(new Date(v+'T12:00:00')):'';
 function preparedBy(user){
  const p=user.profile||{};
@@ -308,7 +312,7 @@ function applianceSection(d,panel,{limit=Infinity}={}){
  const cols=[['Électroménager',190],['Qté',30],['Puissance',64],['Tension',46],['Circuit',d.W-2*M-190-30-64-46]];
  const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white});x+=w;}d.y-=18;};
  head();
- const fmt=w=>w>=1000?(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW':w+' W';
+ const fmt=w=>w>=1000?(w/1000).toLocaleString(LOC,{maximumFractionDigits:2})+' kW':w+' W';
  for(const r of rows.slice(0,limit)){
   d.ensure(16,head);
   const vals=[r.name+(r.model?' · '+r.model:''),String(r.qty),fmt(r.total),r.v+' V',r.pending?'Non relié à un circuit':r.circuit+(r.circuitLabel?' · '+r.circuitLabel:'')];
@@ -383,8 +387,8 @@ async function panelPages(d,{panel,site,fedFromLabel,user,kind,generatedAt,versi
  signature(d,user);
 }
 
-export async function buildReport({kind='report',format='letter',user,site,panels,generatedAt=new Date(),version,brand=null}){
- const d=await Doc.create(format,(kind==='door'?'Aide-mémoire — ':'Rapport — ')+(panels.length===1?panelTitle(panels[0].panel):site.name),brand);
+export async function buildReport({kind='report',format='letter',user,site,panels,generatedAt=new Date(),version,brand=null,lang='fr'}){
+ const d=await Doc.create(format,(kind==='door'?'Aide-mémoire — ':'Rapport — ')+(panels.length===1?panelTitle(panels[0].panel):site.name),brand,lang);
  if(panels.length>1&&kind==='report'){
   d.page();
   await header(d,{overline:'RAPPORT DES PANNEAUX ÉLECTRIQUES',title:site.name,subtitle:siteAddress(site),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:[...new Set(panels.flatMap(x=>panelLogos(x.panel.details)))].slice(0,3)});
@@ -410,8 +414,8 @@ export async function buildReport({kind='report',format='letter',user,site,panel
 }
 
 // Étiquettes autocollantes : gabarit Avery 5160 / 8160 (30 par feuille Lettre, 2⅝ × 1 po).
-export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=null,qrUrl=''}){
- const d=await Doc.create('letter','Étiquettes — '+panelTitle(panel),brand);
+export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=null,qrUrl='',lang='fr'}){
+ const d=await Doc.create('letter','Étiquettes — '+panelTitle(panel),brand,lang);
  const W=189,H=72,left=13.5,top=36,pitchX=198;
  const items=[{type:'panel'},...(qrUrl?[{type:'qr'}]:[]),...sortCircuits(panel.circuits).filter(c=>!(skipFree&&c.status==='Libre')).map(c=>({type:'circuit',c}))];
  const logos=panelLogos(panel.details);
@@ -458,13 +462,14 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=
 }
 
 // Bilan de charges et liste de matériel d'un panneau (mode planification).
-export async function buildLoads({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null}){
+export async function buildLoads({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null,lang='fr'}){
+ globalThis.MP_LOCALE=localeFor(lang);
  const {panelReport,materials}=await import('../../public/loadcalc.js');
  const {LOADS_SOURCES}=await import('../../public/catalog.js');
  const rep=panelReport(panel,{children});
  const mat=materials(panel);
- const d=await Doc.create('letter','Bilan de charges — '+panelTitle(panel),brand);
- const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
+ const d=await Doc.create('letter','Bilan de charges — '+panelTitle(panel),brand,lang);
+ const kw=w=>(w/1000).toLocaleString(LOC,{maximumFractionDigits:2})+' kW';
  d.page();
  await header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version,(panel.details?.state||'Existant').toUpperCase()],logos:panelLogos(panel.details),model:panelModelLine(panel)});
  infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?rep.model.id+' — '+rep.model.label:[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—'],...(serviceLine(panel.details||{})?[['Conducteurs d’entrée',serviceLine(panel.details)]]:[])]);
@@ -501,7 +506,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
   const subLines=sub?d.wrap(sub,6.8,cols[1][1]-6).slice(0,4):[];
   const h=14+subLines.length*8.5;d.ensure(h+2,head);
   const err=r.issues.some(i=>i.level==='error'),warn=r.issues.some(i=>i.level==='warn');
-  const vals=[designation(c),c.label||'—',r.watts?(r.watts/1000).toLocaleString('fr-CA',{maximumFractionDigits:2}):'—',r.watts?String(r.demandAmps):'—',c.amps?c.amps+' A':'—',r.percent!=null?r.percent+' %':'—',c.wire?.gauge||(r.suggestedWire?'~ '+r.suggestedWire:'—'),r.volts===240?'L1+L2':legOf(parseInt(c.slots[0])),err?'À corriger':warn?'À surveiller':'OK'];
+  const vals=[designation(c),c.label||'—',r.watts?(r.watts/1000).toLocaleString(LOC,{maximumFractionDigits:2}):'—',r.watts?String(r.demandAmps):'—',c.amps?c.amps+' A':'—',r.percent!=null?r.percent+' %':'—',c.wire?.gauge||(r.suggestedWire?'~ '+r.suggestedWire:'—'),r.volts===240?'L1+L2':legOf(parseInt(c.slots[0])),err?'À corriger':warn?'À surveiller':'OK'];
   let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:7.6,f:i<2?d.bold:d.font,color:i===8?(err?rgb(.64,.24,.2):warn?C.amber:d.C.green):d.C.ink,max:cols[i][1]-5});x+=cols[i][1];});
   subLines.forEach((l,j)=>d.text(l,M+49,d.y-19-j*8.5,{size:6.8,color:d.C.muted}));
   d.y-=h;d.line(M,d.y,d.W-M,d.y);
@@ -524,13 +529,14 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
 }
 
 // Note de calcul de la charge d'un logement : étape par étape, en langage clair, avec références au Code.
-export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null}){
+export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null,lang='fr'}){
+ globalThis.MP_LOCALE=localeFor(lang);
  const {panelReport}=await import('../../public/loadcalc.js');
  const G=await import('../../public/loadguide.js');
  const rep=panelReport(panel,{children});
  const calc=rep.calc,det=panel.details||{};
- const d=await Doc.create('letter','Note de calcul — '+panelTitle(panel),brand);
- const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW';
+ const d=await Doc.create('letter','Note de calcul — '+panelTitle(panel),brand,lang);
+ const kw=w=>(w/1000).toLocaleString(LOC,{maximumFractionDigits:2})+' kW';
  const para=(t,{size=8.6,color=d.C.ink,f=d.font,indent=0}={})=>{for(const l of d.wrap(t,size,d.W-2*M-indent,f)){d.ensure(size+3);d.text(l,M+indent,d.y,{size,color,f});d.y-=size+2.6;}};
  d.page();
  await header(d,{overline:'NOTE DE CALCUL — CHARGE DU LOGEMENT',title:panelTitle(panel),subtitle:[site.name,siteAddress(site)].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:panelLogos(det),model:panelModelLine(panel)});

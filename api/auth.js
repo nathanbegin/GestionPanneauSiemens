@@ -3,6 +3,7 @@ import {getSql} from './_lib/db.js';
 import {route,body,HttpError,clientIp} from './_lib/http.js';
 import {hashPassword,verifyPassword,checkPassword,checkEmail,newId,createSession,destroySession,readToken,setSessionCookie,clearSessionCookie,publicUser,currentUser,rateLimit,recordAttempt,createResetToken,consumeResetToken} from './_lib/auth.js';
 import {sendMail,mailConfigured,appUrl} from './_lib/mail.js';
+import {mailText} from './_lib/mail-text.js';
 
 // Empreinte factice pour garder un temps de réponse comparable quand le compte n'existe pas.
 const DUMMY='scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$'+Buffer.alloc(64).toString('base64');
@@ -32,11 +33,12 @@ export default route(['GET','POST'],async(req,res)=>{
   if(!name)throw new HttpError(400,'Indiquez votre nom.');
   if(!data.acceptTerms)throw new HttpError(400,'Vous devez accepter les conditions d’utilisation.');
   const accountType=data.accountType==='pro'?'pro':'particulier';
+  const lang=data.lang==='en'?'en':'fr';
   await recordAttempt(sql,'signup:'+ip);
   const [exists]=await sql`SELECT 1 FROM app_users WHERE email=${email}`;
   if(exists)throw new HttpError(409,'Un compte existe déjà avec cette adresse. Connectez-vous ou réinitialisez votre mot de passe.');
   const id=newId(),hash=await hashPassword(data.password);
-  const [user]=await sql`INSERT INTO app_users(id,email,password_hash,name,profile) VALUES(${id},${email},${hash},${name},${JSON.stringify({accountType})}::jsonb) RETURNING *`;
+  const [user]=await sql`INSERT INTO app_users(id,email,password_hash,name,profile) VALUES(${id},${email},${hash},${name},${JSON.stringify({accountType,lang})}::jsonb) RETURNING *`;
   return startSession(req,res,sql,user,201);
  }
  if(action==='login'){
@@ -58,7 +60,7 @@ export default route(['GET','POST'],async(req,res)=>{
   const [user]=await sql`SELECT id,email,name FROM app_users WHERE email=${email}`;
   if(user){
    const token=await createResetToken(sql,user.id);
-   await sendMail({to:user.email,subject:'Mon Panneau — réinitialisation du mot de passe',text:`Bonjour ${user.name},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 heure) :\n${appUrl(req)}/app#/reinitialiser/${token}\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.\n\nMon Panneau`});
+   await sendMail({to:user.email,...mailText('reset',user.profile?.lang,{name:user.name,url:`${appUrl(req)}/app#/reinitialiser/${token}`})});
   }
   return res.status(200).json({ok:true});
  }

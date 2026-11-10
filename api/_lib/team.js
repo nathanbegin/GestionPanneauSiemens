@@ -5,6 +5,7 @@ import {HttpError} from './http.js';
 import {entitlement,LIVE} from './plans.js';
 import {sendMail,mailConfigured,appUrl} from './mail.js';
 import {rateLimit,recordAttempt} from './auth.js';
+import {mailText} from './mail-text.js';
 
 const sha=v=>createHash('sha256').update(String(v)).digest('hex');
 const INVITE_DAYS=14;
@@ -69,7 +70,7 @@ export async function teamAction(sql,req,res,user,action,data){
   await sql`INSERT INTO app_team_invites(id,owner_id,email,expires_at) VALUES(${sha(token)},${user.id},${email},now()+make_interval(days=>${INVITE_DAYS}))`;
   const url=`${appUrl(req)}/app#/rejoindre/${token}`;
   let mailed=false;
-  if(email&&mailConfigured()){try{await sendMail({to:email,subject:`${ownerName(user)} vous invite dans son équipe sur Mon Panneau`,text:`Bonjour,\n\n${user.name} (${ownerName(user)}) vous invite à rejoindre son équipe sur Mon Panneau.\n\nOuvrez ce lien (valide ${INVITE_DAYS} jours), puis connectez-vous ou créez un compte gratuit :\n${url}\n\nMon Panneau`});mailed=true;}catch(x){console.error('invite mail',x?.message);}}
+  if(email&&mailConfigured()){try{await sendMail({to:email,...mailText('invite',user.profile?.lang,{who:user.name,owner:ownerName(user),days:INVITE_DAYS,url})});mailed=true;}catch(x){console.error('invite mail',x?.message);}}
   return res.status(201).json({url,mailed,expiresDays:INVITE_DAYS});
  }
  if(req.method==='POST'&&action==='team-invite-revoke'){
@@ -134,7 +135,7 @@ export async function teamAction(sql,req,res,user,action,data){
   if(!owner)throw new HttpError(404,'Électricien introuvable dans l’annuaire.');
   await assertCanJoin(sql,user,owner);await ownerEntitlement(sql,owner.id);
   await sql`INSERT INTO app_team_members(user_id,owner_id,status) VALUES(${user.id},${owner.id},'pending') ON CONFLICT (user_id) DO UPDATE SET owner_id=EXCLUDED.owner_id,status='pending',updated_at=now()`;
-  if(mailConfigured()){try{await sendMail({to:owner.profile?.proEmail||owner.email,subject:`${user.name} demande à rejoindre votre équipe Mon Panneau`,text:`Bonjour,\n\n${user.name} (${user.email}) demande à rejoindre votre équipe.\nAcceptez ou refusez la demande dans Mon Panneau → Mon équipe :\n${appUrl(req)}/app#/equipe\n\nMon Panneau`});}catch{}}
+  if(mailConfigured()){try{await sendMail({to:owner.profile?.proEmail||owner.email,...mailText('joinRequest',owner.profile?.lang,{name:user.name,email:user.email,url:`${appUrl(req)}/app#/equipe`})});}catch{}}
   return res.status(200).json({ok:true,owner:ownerName(owner)});
  }
  if(req.method==='POST'&&action==='team-leave'){
