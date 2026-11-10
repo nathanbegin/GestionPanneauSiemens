@@ -260,7 +260,7 @@ dialog::backdrop{background:#152b2870;backdrop-filter:blur(3px)}
 .toast{position:fixed;left:50%;bottom:calc(24px + var(--safe-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:13px 20px;border-radius:10px;box-shadow:0 8px 30px #0003;z-index:100;max-width:min(560px,92vw);font-size:14px;display:none}
 .toast.show{display:block;animation:pop .18s ease-out}
 @keyframes pop{from{transform:translate(-50%,8px);opacity:0}}
-.save-state{font-size:12px;color:var(--muted)}
+.save-state{display:block;font-size:12px;color:var(--muted);min-height:0;margin-bottom:4px}
 .auth-wrap{min-height:calc(100vh - 140px);display:grid;place-items:center;padding:24px 0}
 .auth-card{width:min(460px,100%);padding:30px}
 .auth-card h1{font-size:28px}

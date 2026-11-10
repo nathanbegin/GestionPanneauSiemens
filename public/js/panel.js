@@ -125,11 +125,12 @@ export async function panelView({id,tab='panel',ctx}){
   const empty=data.access!=='view'&&!panel.circuits.some(c=>c.label||c.amps!=null||c.vacant);
   head.replaceChildren(ro||'',stepper(),empty&&stageOf()==='releve'?h('div',{class:'notice info'},h('b',{text:'Panneau vide. '}),'Prenez en photo le panneau ouvert (et son répertoire) : l’IA lit les disjoncteurs et garnit ce panneau pour vous. ',h('button',{type:'button',class:'primary sm',onclick:garnir},'📷 Garnir par photos (IA)')):'',h('div',{class:'page-head'},
    h('div',{},
+    saveState,
     h('div',{class:'panel-hero'},panel.tag&&h('span',{class:'badge tag',text:panel.tag}),h('h1',{text:panel.name})),
     h('div',{class:'sub'},[panel.kind,panel.location||'Emplacement à préciser',det.building].filter(Boolean).join(' · ')),
     h('div',{class:'progress-line'},h('div',{class:'progress','aria-hidden':'true'},h('i',{style:{width:s.progress+'%'}})),h('span',{text:`${s.identified} identifiés · ${s.free} libres · ${s.toConfirm} à confirmer`})),
     fed&&h('div',{class:'sub small'},'Alimenté par ',h('a',{href:'#/panneaux/'+fed.id,text:panelTitle(fed)}),det.fedFromCircuit?` (circuit ${det.fedFromCircuit})`:'')),
-   h('div',{class:'page-actions'},saveState,
+   h('div',{class:'page-actions'},
     data.access&&data.access!=='owner'?h('span',{class:'badge shared',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})},'👥 Partager'),
     data.access!=='view'&&h('button',{type:'button',onclick:garnir},'📷 Garnir par photos (IA)'),
     qr&&h('button',{type:'button',onclick:qrDialog},'▦ Code QR'),

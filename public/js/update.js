@@ -3,6 +3,9 @@ import {h,toast,confirmDialog} from './dom.js';
 import {NATIVE,webUrl} from './api.js';
 import {APP_VERSION} from '../model.js';
 
+// Après une mise à jour, le paramètre ?v=… (contournement du cache) n'a plus à rester dans l'adresse.
+try{const u=new URL(location.href);if(u.searchParams.has('v')){u.searchParams.delete('v');history.replaceState(history.state,'',u.pathname+u.search+u.hash);}}catch{}
+
 const VERSION_RE=/^\d+\.\d+\.\d+$/;
 export const isNewer=(a,b)=>{const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return(x[i]||0)>(y[i]||0);}return false;};
 
