@@ -43,13 +43,18 @@ export function validStarts(panel,b,isFree){
 // ---------- Suggestion de modèles selon le nombre de circuits ----------
 /** Espaces nécessaires pour `circuits` disjoncteurs dont `bipolar` bipolaires (2 espaces chacun), avec ou sans jumelés. */
 export const spacesNeeded=(circuits,bipolar,tandem)=>tandem?2*bipolar+Math.ceil((circuits-bipolar)/2):circuits+bipolar;
+/**
+ * Circuits au sens du catalogue des fabricants : un pôle = un circuit (une moitié A ou B d'un jumelé = 1, un bipolaire = 2),
+ * disjoncteur principal exclu.
+ */
+export const catalogCircuits=(circuits,bipolar)=>circuits+Math.min(bipolar||0,circuits);
 /** Le panneau `p` loge-t-il ces circuits ? Les jumelés ne sont possibles que si le modèle en accepte (circuits max > espaces). */
 export function fits(p,circuits,bipolar){
  if(circuits>0&&bipolar>circuits)bipolar=circuits;
+ const poles=catalogCircuits(circuits,bipolar),cap=p.circuits??p.espaces;
  const tandemOk=p.circuits!=null&&p.circuits>p.espaces;
- const plain=p.espaces>=spacesNeeded(circuits,bipolar,false);
- if(plain)return {ok:true,tandem:false,spare:p.espaces-spacesNeeded(circuits,bipolar,false)};
- if(tandemOk&&p.circuits>=circuits&&p.espaces>=spacesNeeded(circuits,bipolar,true))return {ok:true,tandem:true,spare:p.espaces-spacesNeeded(circuits,bipolar,true)};
+ if(cap>=poles&&p.espaces>=spacesNeeded(circuits,bipolar,false))return {ok:true,tandem:false,spare:p.espaces-spacesNeeded(circuits,bipolar,false)};
+ if(tandemOk&&cap>=poles&&p.espaces>=spacesNeeded(circuits,bipolar,true))return {ok:true,tandem:true,spare:p.espaces-spacesNeeded(circuits,bipolar,true)};
  return {ok:false};
 }
 /**
@@ -69,7 +74,7 @@ export function suggestModels(panels,{circuits,bipolar=0,margin=0.2,family='',ma
   const wide=fits(p,cm,bm);
   const tight=wide.ok?wide:fits(p,circuits,bipolar);
   if(!tight.ok)continue;
-  out.push({p,tier:wide.ok?'marge':'juste',tandem:tight.tandem,spare:tight.spare,spareCircuits:(p.circuits??p.espaces)-circuits});
+  out.push({p,tier:wide.ok?'marge':'juste',tandem:tight.tandem,spare:tight.spare,spareCircuits:(p.circuits??p.espaces)-catalogCircuits(circuits,bipolar)});
  }
  out.sort((a,b)=>(a.tier==='marge'?0:1)-(b.tier==='marge'?0:1)||a.p.espaces-b.p.espaces||(a.p.main||0)-(b.p.main||0)||a.p.cat.localeCompare(b.p.cat));
  if(family)return out.slice(0,limit);
@@ -151,7 +156,7 @@ export async function modelPicker({current,onPick}){
  function drawSug(){
   const list=suggestModels(lib.panels,{circuits:Number(state.circuits),bipolar:state.bipolar,margin:state.margin,family:state.family,mainAmps:state.main||null});
   if(!Number(state.circuits)){sugNote.textContent='Entrez le nombre de circuits pour obtenir des modèles adaptés.';sugGrid.replaceChildren();cmpBox.replaceChildren();return;}
-  sugNote.textContent=list.length?`${list.length} modèle(s) adapté(s) à ${state.circuits} circuit(s)${state.bipolar?` dont ${state.bipolar} bipolaire(s)`:''}${state.family?` · ${lib.familyInfo[state.family]?.gamme?.split(' (')[0]||state.family}`:' · deux meilleurs par marque (choisissez une marque pour en voir plus)'} :`:'Aucun modèle du catalogue ne loge autant de circuits pour cette marque : choisissez une autre marque ou répartissez sur un sous-panneau.';
+  sugNote.textContent=list.length?`${list.length} modèle(s) adapté(s) à ${state.circuits} circuit(s)${state.bipolar?` dont ${state.bipolar} bipolaire(s)`:''} (= ${catalogCircuits(Number(state.circuits),state.bipolar)} circuits au sens du catalogue : A/B = 1, bipolaire = 2, principal exclu)${state.family?` · ${lib.familyInfo[state.family]?.gamme?.split(' (')[0]||state.family}`:' · deux meilleurs par marque (choisissez une marque pour en voir plus)'} :`:'Aucun modèle du catalogue ne loge autant de circuits pour cette marque : choisissez une autre marque ou répartissez sur un sous-panneau.';
   for(const k of [...state.cmp])if(!list.some(s=>s.p.cat===k))state.cmp.delete(k);
   sugGrid.replaceChildren(...list.map(s=>{
    const c=card(s.p);
@@ -171,7 +176,7 @@ export async function modelPicker({current,onPick}){
     h('tr',{},h('th'),...chosen.map(s=>h('td',{},h('button',{type:'button',class:'primary sm',onclick:()=>{d.close();onPick(s.p,lib);}},'Choisir ce modèle'))))))));
  }
  const suggest=h('details',{class:'suggest',open:true},h('summary',{text:'💡 Suggérer des modèles selon mes circuits'}),
-  h('div',{class:'fields'},h('label',{class:'f'},h('span',{text:'Nombre de circuits'}),circIn),h('label',{class:'f'},h('span',{text:'Dont bipolaires (240 V)'}),bipIn),h('label',{class:'f'},h('span',{text:'Principal'}),mainSel),h('label',{class:'f'},h('span',{text:'Marge'}),marSel)),sugNote,sugGrid,cmpBox);
+  h('div',{class:'fields'},h('label',{class:'f'},h('span',{text:'Nombre de circuits (sans le principal)'}),circIn),h('label',{class:'f'},h('span',{text:'Dont bipolaires (240 V, comptent pour 2)'}),bipIn),h('label',{class:'f'},h('span',{text:'Principal'}),mainSel),h('label',{class:'f'},h('span',{text:'Marge'}),marSel)),sugNote,sugGrid,cmpBox);
  drawChips();
  d=dialog({title:'Bibliothèque de panneaux',eyebrow:`${lib.panels.filter(p=>p.designable).length} modèles · catalogues canadiens des fabricants`,wide:true,
   body:[chips,suggest,h('div',{class:'toolbar-row mt'},h('label',{class:'search'},h('span',{'aria-hidden':'true',text:'⌕'}),search),typeSel,busSel),h('div',{class:'row-between'},old,count),grid,

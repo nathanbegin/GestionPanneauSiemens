@@ -21,7 +21,7 @@ test('comparaison circuit par circuit',()=>{
  assert.equal(diffCircuits(a,a).every(r=>r.state==='same'),true);
 });
 
-import {suggestModels,fits,spacesNeeded} from '../public/js/library.js';
+import {suggestModels,fits,spacesNeeded,catalogCircuits} from '../public/js/library.js';
 import {normalizePanel} from '../api/_lib/library.js';
 import catalogue from '../api/_data/catalogue.js';
 test('suggestion de modèles selon les circuits et la marque',()=>{
@@ -40,6 +40,9 @@ test('suggestion de modèles selon les circuits et la marque',()=>{
  // trop petit sans jumelés, mais loge avec jumelés
  const small={cat:'X',family:'SIE',espaces:12,circuits:24,designable:true,statut:'Catalogue'};
  assert.equal(fits(small,20,0).tandem,true);assert.equal(fits(small,10,0).tandem,false);assert.equal(fits(small,30,0).ok,false);
+ assert.equal(catalogCircuits(28,4),32,'bipolaire = 2 circuits');
+ assert.equal(fits(small,19,2).ok,false,'4 espaces de bipolaires + 9 = 13 > 12');
+ assert.equal(fits(small,18,2).ok,true,'20 circuits catalogue, 4 + 8 = 12 espaces');
 });
 test('principal demandé',()=>{
  const panels=catalogue.panneaux.map(normalizePanel);

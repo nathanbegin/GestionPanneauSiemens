@@ -671,3 +671,9 @@ body.app .container{max-width:min(1760px,96vw)}
 .sug-compare{margin-top:14px}
 .sug-compare h4{margin:0 0 8px}
 .suggest .cmp-table{background:#fff;border-radius:8px}
+.ai-table td.ai-label{min-width:230px}
+.ai-grp{margin-top:4px;font-size:12px}
+.ai-grp summary{cursor:pointer;color:var(--green);list-style:none}
+.ai-grp summary::-webkit-details-marker{display:none}
+.ai-grp summary.linked{font-weight:600;color:#245c3a}
+.ai-grp-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
