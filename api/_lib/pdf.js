@@ -4,6 +4,7 @@ import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,
 import {FAMILIES,serviceCheck} from '../../public/catalog.js';
 import LOGOS from '../_data/logos.js';
 import {qrMatrix} from '../../public/qr.js';
+import {listAppliances} from '../../public/appliances.js';
 
 // ---------- Logos et modèle du panneau ----------
 const slug=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -298,6 +299,25 @@ function detailTable(d,panel){
  d.y-=10;
 }
 
+// Électroménagers qui consomment le plus, avec le circuit auquel ils sont reliés (rien d'imprimé s'il n'y en a pas).
+function applianceSection(d,panel,{limit=14}={}){
+ const rows=listAppliances(panel);
+ if(!rows.length)return;
+ d.ensure(70);
+ sectionTitle(d,'Électroménagers qui consomment le plus','Plaque signalétique ou valeur typique, et circuit relié. Seuls les appareils reliés comptent dans le calcul.');
+ const cols=[['Électroménager',190],['Qté',30],['Puissance',64],['Tension',46],['Circuit',d.W-2*M-190-30-64-46]];
+ const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white});x+=w;}d.y-=18;};
+ head();
+ const fmt=w=>w>=1000?(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW':w+' W';
+ for(const r of rows.slice(0,limit)){
+  d.ensure(16,head);
+  const vals=[r.name,String(r.qty),fmt(r.total),r.v+' V',r.pending?'Non relié à un circuit':r.circuit+(r.circuitLabel?' · '+r.circuitLabel:'')];
+  let x=M+5;vals.forEach((v,i)=>{d.text(v,x,d.y-10,{size:8,f:i===0?d.bold:d.font,color:i===4&&r.pending?C.amber:d.C.ink,max:cols[i][1]-6});x+=cols[i][1];});
+  d.y-=15;d.line(M,d.y,d.W-M,d.y);
+ }
+ if(rows.length>limit){d.ensure(14);d.text(`… et ${rows.length-limit} autre(s) appareil(s).`,M,d.y-10,{size:7.5,color:d.C.muted});d.y-=14;}
+ d.y-=8;
+}
 function signature(d,user){
  const pb=preparedBy(user);
  d.ensure(70);
@@ -359,6 +379,7 @@ async function panelPages(d,{panel,site,fedFromLabel,user,kind,generatedAt,versi
  d.page();
  sectionTitle(d,'Détail des circuits — '+panelTitle(panel),'Désignation, pièce desservie, calibre, protection, notes et exceptions.');
  detailTable(d,panel);
+ applianceSection(d,panel);
  signature(d,user);
 }
 
@@ -484,8 +505,11 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
   subLines.forEach((l,j)=>d.text(l,M+49,d.y-19-j*8.5,{size:6.8,color:d.C.muted}));
   d.y-=h;d.line(M,d.y,d.W-M,d.y);
  }
+ // Électroménagers.
+ d.y-=10;
+ applianceSection(d,panel);
  // Matériel.
- d.y-=16;
+ d.y-=6;
  sectionTitle(d,'Liste de matériel — disjoncteurs','Famille : '+mat.family+'. Numéros de catalogue de la bibliothèque de produits ; vérifiez la compatibilité sur l’étiquette du panneau.');
  if(!mat.items.length){d.text('Aucun disjoncteur avec calibre.',M,d.y,{size:8.5,color:d.C.muted});d.y-=14;}
  for(const i of mat.items){d.ensure(14);d.text(String(i.qty)+' ×',M,d.y,{size:9,f:d.bold});d.text(`${i.tandem?'Jumelé 2 × ':i.poles===3?'Tripolaire ':i.poles===2?'Bipolaire ':'Unipolaire '}${i.amps} A${i.protection!=='Standard'?' · '+i.protection:''}`,M+34,d.y,{size:9});if(i.ref)d.text(i.ref,d.W-M-d.width(i.ref,9,d.bold),d.y,{size:9,f:d.bold,color:d.C.green});d.line(M,d.y-4,d.W-M,d.y-4);d.y-=16;}

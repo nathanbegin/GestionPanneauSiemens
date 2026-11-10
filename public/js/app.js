@@ -12,6 +12,7 @@ import {panelView} from './panel.js';
 import {billingView} from './billing.js';
 import {updateCard,checkUpdateQuietly} from './update.js';
 import {compareView} from './compare.js';
+import {designDialog} from './design.js';
 import {adminView} from './admin.js';
 
 const view=document.getElementById('view'),topbar=document.getElementById('topbar');
@@ -163,7 +164,7 @@ async function siteView(id){
   const sel=select('p',panels.map(p=>[p.id,panelTitle(p)]),panels[0].id);
   const d=dialog({title:'Vérifier la charge d’un panneau',eyebrow:site.name,body:[h('p',{class:'muted',text:'Inscrivez les gros électroménagers (avec la plaque signalétique en photo) et reliez-les au bon circuit. Le calcul de charge se base sur le relevé déjà fait.'}),field('Panneau',sel)],actions:[{label:'Annuler',kind:'ghost'},{label:'Ouvrir la vérification',kind:'primary',onClick:()=>{location.hash=`#/panneaux/${sel.value}/appliances`;}}]});};
  const addPanel=()=>{const d=dialog({title:'Que souhaitez-vous faire ?',eyebrow:'Nouveau projet de panneau · '+site.name,wide:true,body:[h('div',{class:'stage-choices'},
-   choice('✏️','1. Concevoir','Pas encore de panneau : planifiez le modèle, les disjoncteurs et la capacité.',()=>{d.close();createPanel({stage:'conception',state:'Planifié'},'Nouveau panneau à concevoir');}),
+   choice('✏️','1. Concevoir','Assistant : bâtiment, gros appareils, calcul de l’entrée, modèle et disposition des circuits.',()=>{d.close();designDialog({site,onCreated:p=>{location.hash='#/panneaux/'+p.id;},onManual:()=>createPanel({stage:'conception',state:'Planifié'},'Nouveau panneau à concevoir')});}),
    choice('📋','2. Relever l’existant','Un panneau est en place : photos (IA), questions ou saisie, pour clarifier ou agrandir.',()=>{d.close();releveChoices();}),
    choice('🔌','3. Vérifier la charge','Inscrire les gros électroménagers et les relier aux circuits.',()=>{d.close();verifyChoices();})),
    h('p',{class:'small muted',text:'Ces trois étapes se suivent : vous pouvez passer de l’une à l’autre sur le même panneau, sans rien ressaisir.'})],actions:[{label:'Annuler',kind:'ghost'}]});};
