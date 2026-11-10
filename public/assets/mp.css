@@ -697,3 +697,20 @@ body.app .container{max-width:min(1760px,96vw)}
 .cards.list .panel-card h2{font-size:17px}
 .cards.list .add-card{min-height:0;padding:12px}
 @media (max-width:720px){.cards.list .panel-card{grid-template-columns:1fr}.cards.list .site-card{flex-direction:column;align-items:stretch}}
+
+/* Étapes du projet */
+.stage-bar{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.stepper{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;list-style:none;margin:0 0 10px;padding:0}
+.stepper button{width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start;text-align:left;padding:8px 12px;border-radius:10px}
+.stepper .n{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--soft);font-weight:700;flex:none}
+.stepper b{display:block;font-size:14px}.stepper small{display:block;color:var(--muted);font-size:11px}
+.stepper li.on button{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stepper li.on .n{background:var(--lime);color:var(--ink)}.stepper li.on small{color:#cfe0d4}
+.stage-hint{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.stage-actions{display:flex;flex-wrap:wrap;gap:8px}
+.app-table td,.app-table th{vertical-align:middle}.app-table select{max-width:360px;width:100%}
+.container-narrow{max-width:960px}
+@media (max-width:720px){.stepper{grid-template-columns:1fr}}
+.stage-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.stage-choice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:16px;border-radius:12px;height:100%}
+.stage-choice .ico{font-size:26px}.stage-choice b{font-size:16px}

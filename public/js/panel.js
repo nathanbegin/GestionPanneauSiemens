@@ -17,10 +17,15 @@ import {breakerUnits} from '../units.js';
 import {panelDialog} from './forms.js';
 import {shareDialog} from './team.js';
 import {aiImportDialog} from './aiimport.js';
+import {appliancesView} from './appliances.js';
+import {PANEL_STAGES,STAGE_IDS,stageFromState} from '../catalog.js';
 
 const statusClass=c=>c.vacant?'free vacant':c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
 const shortText=c=>c.vacant?'Espace inutilisé':c.status==='Libre'?'Libre':c.label||'';
-const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
+const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',appliances:'🔌 Électroménagers',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
+// Onglets de chaque étape du projet (l'onglet ouvert reste toujours accessible).
+const STAGE_TABS={conception:['plan','panel','docs','info'],releve:['panel','list','docs','info'],verification:['appliances','plan','panel','list','docs','info']};
+const NEXT_STAGE={conception:['releve','Le panneau est installé : relever ses circuits'],releve:['verification','Vérifier la charge et les électroménagers'],verification:['releve','Retour au relevé des circuits']};
 
 export async function panelView({id,tab='panel',ctx}){
  const [data,ent]=await Promise.all([api('/api/panels?id='+encodeURIComponent(id)),api('/api/billing').catch(()=>null)]);
@@ -32,7 +37,9 @@ export async function panelView({id,tab='panel',ctx}){
  // Bibliothèque de produits (abonnés seulement).
  const lib=planning?await loadLibrary().catch(()=>null):null;
  let saving=Promise.resolve();
- const state={tab:tabNames[tab]?tab:'panel',q:'',status:'',tag:'',place:null,select:null};
+ const stageOf=()=>panel.details?.stage||stageFromState(panel.details?.state);
+ const defaultTab=()=>({conception:planning?'plan':'panel',releve:'panel',verification:'appliances'}[stageOf()]);
+ const state={tab:tabNames[tab]?tab:defaultTab(),q:'',status:'',tag:'',place:null,select:null};
  // Vue du panneau : schéma (par défaut) ou réaliste ; préférence gardée sur l'appareil.
  const pref=k=>{try{return localStorage.getItem(k);}catch{return null;}};
  const setPref=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
@@ -66,6 +73,36 @@ export async function panelView({id,tab='panel',ctx}){
   return run;
  }
 
+ // ---------- Étapes du projet : conception, relevé, vérification ----------
+ const metaWith=details=>({name:panel.name,tag:panel.tag,kind:panel.kind,location:panel.location,details:{...panel.details,...details}});
+ async function setStage(next,{keepTab=false}={}){
+  try{
+   const details={stage:next};
+   const st=panel.details?.state;if(next==='conception'&&st==='Existant')details.state='Planifié';else if(next==='releve'&&st==='Planifié')details.state='Existant';
+   await persist({meta:metaWith(details)});
+   if(!keepTab)state.tab=defaultTab();
+   history.replaceState(null,'',`#/panneaux/${panel.id}/${state.tab}`);
+   renderHead();renderTabs();renderBody();
+  }catch(e){toast(e.message,7000);}
+ }
+ // Copie du relevé en projet de conception (agrandissement, remplacement) : le panneau existant reste intact.
+ async function conceptionCopy(){
+  if(!await confirmDialog(`Créer une copie de « ${panel.name} » en conception ? Vous pourrez y planifier l’agrandissement sans toucher au relevé.`,{title:'Planifier un agrandissement',confirm:'Créer la copie'}))return;
+  try{
+   const meta=metaWith({stage:'conception',state:'Planifié'});meta.name=(panel.name+' — projet').slice(0,100);
+   const {details:{appliances,...det},...rest}=meta;
+   const out=await api('/api/panels',{method:'POST',body:{siteId:site.id,...rest,details:det,positions:panel.positions,copyFrom:panel.id}});
+   toast('Copie créée : concevez-y votre agrandissement.');location.hash='#/panneaux/'+out.panel.id;
+  }catch(e){toast(e.message,8000);}
+ }
+ function stepper(){
+  const cur=stageOf(),canEdit=data.access!=='view';
+  const [nextId,nextLabel]=NEXT_STAGE[cur];
+  return h('div',{class:'stage-bar'},
+   h('ol',{class:'stepper','aria-label':'Étapes du projet'},...STAGE_IDS.map(k=>{const s=PANEL_STAGES[k];return h('li',{class:k===cur?'on':''},h('button',{type:'button',disabled:!canEdit&&k!==cur,'aria-current':k===cur?'step':null,onclick:()=>k!==cur&&setStage(k)},h('span',{class:'n',text:s.n}),h('span',{},h('b',{text:s.label}),h('small',{text:s.short}))));})),
+   h('div',{class:'stage-hint'},h('span',{class:'small muted',text:PANEL_STAGES[cur].hint}),
+    canEdit&&h('span',{class:'stage-actions'},cur==='releve'&&h('button',{type:'button',class:'sm',onclick:conceptionCopy},'✏️ Planifier un agrandissement (copie)'),h('button',{type:'button',class:'sm',onclick:()=>setStage(nextId)},nextLabel+' →'))));
+ }
  // Code QR : ouvre ce panneau dans l'application (connexion requise).
  function qrDialog(){
   const url=panelLink(NATIVE?webUrl(''):location.origin,panel.id);
@@ -85,7 +122,7 @@ export async function panelView({id,tab='panel',ctx}){
   const fed=siblings.find(x=>x.id===det.fedFrom);
   const ro=data.access==='view'?h('p',{class:'notice info',text:`Panneau partagé en lecture seule par ${data.sharedBy} : vous pouvez le consulter et générer ses documents, mais pas le modifier.`}):null;
   const empty=data.access!=='view'&&!panel.circuits.some(c=>c.label||c.amps!=null||c.vacant);
-  head.replaceChildren(ro||'',empty?h('div',{class:'notice info'},h('b',{text:'Panneau vide. '}),'Prenez en photo le panneau ouvert (et son répertoire) : l’IA lit les disjoncteurs et garnit ce panneau pour vous. ',h('button',{type:'button',class:'primary sm',onclick:garnir},'📷 Garnir par photos (IA)')):'',h('div',{class:'page-head'},
+  head.replaceChildren(ro||'',stepper(),empty&&stageOf()==='releve'?h('div',{class:'notice info'},h('b',{text:'Panneau vide. '}),'Prenez en photo le panneau ouvert (et son répertoire) : l’IA lit les disjoncteurs et garnit ce panneau pour vous. ',h('button',{type:'button',class:'primary sm',onclick:garnir},'📷 Garnir par photos (IA)')):'',h('div',{class:'page-head'},
    h('div',{},
     h('div',{class:'panel-hero'},panel.tag&&h('span',{class:'badge tag',text:panel.tag}),h('h1',{text:panel.name})),
     h('div',{class:'sub'},[panel.kind,panel.location||'Emplacement à préciser',det.building].filter(Boolean).join(' · ')),
@@ -99,7 +136,8 @@ export async function panelView({id,tab='panel',ctx}){
     h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes'))));
  }
  function renderTabs(){
-  tabs.replaceChildren(...Object.entries(tabNames).map(([k,label])=>h('button',{type:'button',role:'tab','aria-selected':String(state.tab===k),onclick:()=>go(k)},label)));
+  const keys=[...new Set([...STAGE_TABS[stageOf()],state.tab])];
+  tabs.replaceChildren(...keys.map(k=>h('button',{type:'button',role:'tab','aria-selected':String(state.tab===k),onclick:()=>go(k)},tabNames[k])));
  }
  function go(t){state.tab=t;history.replaceState(null,'',`#/panneaux/${panel.id}/${t}`);renderTabs();renderBody();}
  const doc=async params=>{try{toast('Génération du PDF…');await openDocument({panel:panel.id,...params});}catch(e){toast(e.message);}};
@@ -211,7 +249,9 @@ export async function panelView({id,tab='panel',ctx}){
    const listBox=h('div',{class:'circuit-list'});
    body.replaceChildren(h('div',{class:'list-wide'},bulkBar(),filters(()=>circuitList(listBox)),listBox,legend()));
    circuitList(listBox);
-  }else if(state.tab==='plan')renderPlan();
+  }else if(state.tab==='appliances')body.replaceChildren(appliancesView({panel,children,canEdit:data.access!=='view',onChange:()=>{renderHead();renderBody();},
+   save:async({circuits,appliances})=>{await persist({circuits,meta:metaWith({appliances})});}}));
+  else if(state.tab==='plan')renderPlan();
   else if(state.tab==='docs')renderDocs();
   else renderInfo();
  }
@@ -381,5 +421,7 @@ export async function panelView({id,tab='panel',ctx}){
  }
 
  renderHead();renderTabs();renderBody();
+ // Lien direct vers les électroménagers : le projet passe à l'étape Vérification.
+ if(state.tab==='appliances'&&stageOf()!=='verification'&&data.access!=='view')setStage('verification',{keepTab:true});
  return root;
 }

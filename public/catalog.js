@@ -138,6 +138,14 @@ export const FAMILY_IDS=Object.keys(FAMILIES);
 export const familyOf=id=>FAMILIES[id]||FAMILIES.generic;
 
 export const PANEL_STATES=['Existant','Planifié','Installé','Vérifié'];
+// Étapes d'un projet de panneau : on peut passer de l'une à l'autre en gardant les données.
+export const PANEL_STAGES={
+ conception:{n:1,label:'Conception',short:'Planifier',icon:'✏️',hint:'Pas encore de panneau : concevez-le (modèle, disjoncteurs, capacité) avant de l’installer.'},
+ releve:{n:2,label:'Relevé',short:'Relever',icon:'📋',hint:'Un panneau existe : relevez ses circuits (photos, questions) pour clarifier ou préparer un agrandissement.'},
+ verification:{n:3,label:'Vérification',short:'Vérifier',icon:'🔌',hint:'Vérifiez la charge : inscrivez les gros électroménagers et reliez-les au bon circuit.'},
+};
+export const STAGE_IDS=Object.keys(PANEL_STAGES);
+export const stageFromState=s=>s==='Planifié'?'conception':s==='Vérifié'?'verification':'releve';
 export const LOADS_SOURCES=[
  'Gouvernement du Québec — Guide sur les bornes de recharge (niveaux 1, 2 et 3)',
  'Ressources naturelles Canada — Recharge des véhicules électriques',

@@ -161,6 +161,11 @@ export async function scanPanel({files,hint={},settings={},lite=false},{fetchImp
  }
  if(!aiConfigured())throw new HttpError(503,'L’analyse par IA n’est pas configurée sur ce serveur (OPENAI_API_KEY manquante).');
  const content=[{type:'input_text',text:scanPrompt(hint)},...toInputParts(files,imageDetail(settings))];
+ return runModel({content,schema:SCAN_SCHEMA,schemaName:'panneau_electrique',settings,fetchImpl,timeoutMs});
+}
+
+// Appel du modèle avec repli automatique sur les modèles suivants (modèle inexistant ou non autorisé).
+async function runModel({content,schema,schemaName,settings={},fetchImpl=fetch,timeoutMs=55000}){
  const order=modelOrder(settings);
  const denied=[];
  const started=Date.now();
@@ -170,7 +175,7 @@ export async function scanPanel({files,hint={},settings={},lite=false},{fetchImp
    res=await fetchImpl('https://api.openai.com/v1/responses',{method:'POST',
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+process.env.OPENAI_API_KEY},
     body:JSON.stringify({model,input:[{role:'user',content}],store:false,
-     text:{format:{type:'json_schema',name:'panneau_electrique',strict:true,schema:SCAN_SCHEMA}}}),
+     text:{format:{type:'json_schema',name:schemaName,strict:true,schema}}}),
     signal:AbortSignal.timeout(Math.max(5000,timeoutMs-(Date.now()-started)))});
   }catch(e){throw new HttpError(504,e?.name==='TimeoutError'?'L’analyse a pris trop de temps. Réessayez avec moins de photos ou des photos plus nettes.':'Service d’IA injoignable. Réessayez dans un instant.');}
   const data=await res.json().catch(()=>({}));
@@ -189,6 +194,39 @@ export async function scanPanel({files,hint={},settings={},lite=false},{fetchImp
   return {scan,model,denied,usage:{input:data.usage?.input_tokens||0,output:data.usage?.output_tokens||0}};
  }
  throw new HttpError(503,`Votre projet OpenAI n’a accès à aucun de ces modèles : ${denied.join(', ')}. Autorisez-en un dans platform.openai.com (Settings → Project → Limits → modèles permis), ou choisissez un modèle accessible dans Administration → Intelligence artificielle.`);
+}
+
+
+// ---------- Plaque signalétique d'un appareil : puissance requise ----------
+export const NAMEPLATE_SCHEMA={type:'object',additionalProperties:false,
+ required:['is_nameplate','name','brand','model','watts','volts','amps','phases','hz','confidence','notes'],
+ properties:{
+  is_nameplate:{type:'boolean',description:'false si l’image ne montre pas une plaque signalétique ou une étiquette électrique lisible.'},
+  name:{type:'string',description:'Nature de l’appareil en français (ex. Sécheuse, Lave-vaisselle, Chauffe-eau, Thermopompe), vide si inconnue.'},
+  brand:{type:'string'},model:{type:'string',description:'Numéro de modèle lu sur la plaque.'},
+  watts:{...nullable('integer'),description:'Puissance électrique absorbée en watts. Si la plaque donne des kW, convertis. Si elle donne seulement volts et ampères, calcule V × A. null si impossible.'},
+  volts:{...nullable('integer'),description:'Tension nominale (120, 208, 240, 347 ou 600), null si illisible.'},
+  amps:{...nullable('number'),description:'Intensité nominale en ampères, null si absente.'},
+  phases:{type:'string',enum:['','1','3']},
+  hz:{...nullable('integer')},
+  confidence:{type:'number',description:'Confiance de 0 à 1 dans la puissance retenue.'},
+  notes:{type:'string',description:'Doutes, valeur dérivée (ex. calculée à partir de V × A), plusieurs puissances (élément et moteur), en français.'},
+ }};
+export function nameplatePrompt(){
+ return [
+  'Tu lis la plaque signalétique électrique d’un appareil (électroménager, chauffage, borne, etc.) au Canada.',
+  'Objectif : trouver la puissance électrique requise en watts, la tension et l’intensité. Recopie ce qui est écrit, ne devine jamais.',
+  'Si la plaque indique la puissance (W ou kW), utilise-la. Sinon, si elle indique les volts et les ampères, calcule watts = volts × ampères et précise-le dans notes. Pour une plaque triphasée, tiens-en compte (√3).',
+  'Si plusieurs puissances sont indiquées (élément chauffant, moteur, total), donne le total ou la plus grande et explique dans notes.',
+  'Mets null et une confiance basse quand la valeur est illisible. Réponds en français.',
+ ].join('\n');
+}
+/** Plaque signalétique : une à deux photos. Retourne {scan:{…}, model, usage}. */
+export async function scanNameplate({files,settings={}},{fetchImpl=fetch,timeoutMs=45000}={}){
+ if(!aiConfigured())throw new HttpError(503,'L’analyse par IA n’est pas configurée sur ce serveur (OPENAI_API_KEY manquante).');
+ if(!Array.isArray(files)||files.length<1||files.length>2)throw new HttpError(400,'Fournissez une ou deux photos de la plaque signalétique.');
+ const content=[{type:'input_text',text:nameplatePrompt()},...toInputParts(files,imageDetail(settings))];
+ return runModel({content,schema:NAMEPLATE_SCHEMA,schemaName:'plaque_signaletique',settings,fetchImpl,timeoutMs});
 }
 
 // Test d'accès à un modèle (console d'administration) : petite requête texte, sans image.

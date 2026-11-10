@@ -30,7 +30,7 @@ function shrinkImage(file){
   readAsDataUrl(file).then(u=>{img.src=u;},reject);
  });
 }
-async function prepare(file){
+export async function prepare(file){
  if(file.type.startsWith('image/'))return {name:file.name,data:await shrinkImage(file),thumb:true};
  const type=file.type||(/\.csv$/i.test(file.name)?'text/csv':/\.(txt|md)$/i.test(file.name)?'text/plain':/\.json$/i.test(file.name)?'application/json':'');
  if(!/^(application\/pdf|text\/(plain|csv|tab-separated-values)|application\/json)$/.test(type))throw Error(`« ${file.name} » : type non pris en charge (photo, PDF, CSV ou texte).`);

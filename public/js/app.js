@@ -4,7 +4,7 @@ import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
 import {teamView,joinInviteView,shareDialog} from './team.js';
-import {h,toast,confirmDialog,fmtRelative,field} from './dom.js';
+import {h,toast,confirmDialog,fmtRelative,field,dialog,select} from './dom.js';
 import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
 import {siteDialog,panelDialog,siteFields,formData} from './forms.js';
@@ -151,7 +151,22 @@ async function siteView(id){
  const library=!!(ent?.plan?.features?.planning||state.user.isAdmin);
  const addGuided=()=>guidedDialog({site,siblings:panels,library,onCreated:p=>{location.hash='#/panneaux/'+p.id;}});
  const addByPhoto=()=>aiImportDialog({site,siblings:panels,onCreated:p=>{location.hash='#/panneaux/'+p.id;}});
- const addPanel=()=>panelDialog({siblings:panels,library,onSave:async f=>{const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});toast('Panneau créé. Touchez un disjoncteur pour commencer.');location.hash='#/panneaux/'+panel.id;}});
+ const createPanel=(details={},title='Nouveau panneau')=>panelDialog({siblings:panels,library,title,initial:{details},onSave:async f=>{const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...f}});toast('Panneau créé. Touchez un disjoncteur pour commencer.');location.hash='#/panneaux/'+panel.id;}});
+ // Un projet de panneau passe par trois étapes : conception, relevé, vérification. On choisit par où commencer.
+ const choice=(ico,title,text,onclick)=>h('button',{type:'button',class:'stage-choice',onclick},h('span',{class:'ico','aria-hidden':'true',text:ico}),h('b',{text:title}),h('span',{class:'small muted',text}));
+ const releveChoices=()=>{const d=dialog({title:'Relever un panneau existant',eyebrow:site.name,wide:true,body:[h('div',{class:'stage-choices'},
+   choice('📷','Par photo (IA)','Photographiez le panneau ouvert : l’IA lit les disjoncteurs.',()=>{d.close();addByPhoto();}),
+   choice('🧭','Mode guidé','Répondez à des questions, position par position.',()=>{d.close();addGuided();}),
+   choice('✍️','Saisie manuelle','Créez le panneau vide et décrivez chaque disjoncteur.',()=>{d.close();createPanel({stage:'releve',state:'Existant'},'Nouveau panneau à relever');}))],actions:[{label:'Retour',kind:'ghost'}]});};
+ const verifyChoices=()=>{
+  if(!panels.length){toast('Relevez d’abord un panneau : la vérification se base sur ses circuits.');return releveChoices();}
+  const sel=select('p',panels.map(p=>[p.id,panelTitle(p)]),panels[0].id);
+  const d=dialog({title:'Vérifier la charge d’un panneau',eyebrow:site.name,body:[h('p',{class:'muted',text:'Inscrivez les gros électroménagers (avec la plaque signalétique en photo) et reliez-les au bon circuit. Le calcul de charge se base sur le relevé déjà fait.'}),field('Panneau',sel)],actions:[{label:'Annuler',kind:'ghost'},{label:'Ouvrir la vérification',kind:'primary',onClick:()=>{location.hash=`#/panneaux/${sel.value}/appliances`;}}]});};
+ const addPanel=()=>{const d=dialog({title:'Que souhaitez-vous faire ?',eyebrow:'Nouveau projet de panneau · '+site.name,wide:true,body:[h('div',{class:'stage-choices'},
+   choice('✏️','1. Concevoir','Pas encore de panneau : planifiez le modèle, les disjoncteurs et la capacité.',()=>{d.close();createPanel({stage:'conception',state:'Planifié'},'Nouveau panneau à concevoir');}),
+   choice('📋','2. Relever l’existant','Un panneau est en place : photos (IA), questions ou saisie, pour clarifier ou agrandir.',()=>{d.close();releveChoices();}),
+   choice('🔌','3. Vérifier la charge','Inscrire les gros électroménagers et les relier aux circuits.',()=>{d.close();verifyChoices();})),
+   h('p',{class:'small muted',text:'Ces trois étapes se suivent : vous pouvez passer de l’une à l’autre sur le même panneau, sans rien ressaisir.'})],actions:[{label:'Annuler',kind:'ghost'}]});};
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
  const remove=async()=>{if(!await confirmDialog(`Supprimer « ${site.name} », ses ${panels.length} panneau(x) et tous leurs circuits ? Cette action est irréversible.`,{title:'Supprimer le site',confirm:'Supprimer définitivement',danger:true}))return;await api('/api/sites?id='+site.id,{method:'DELETE'});toast('Site supprimé.');location.hash='#/sites';};
  const report=async()=>{try{toast('Génération du rapport du site…');await openDocument({site:site.id,kind:'report'});}catch(e){toast(e.message);}};

@@ -127,3 +127,20 @@ test('forfait gratuit : analyse allégée et coût estimé',async()=>{
  assert.ok(estimateScanCost({model:'gpt-6-astra',photos:3}).usd>estimateScanCost({model:'gpt-6.1-terra',photos:3}).usd*5);
  assert.equal(estimateScanCost({model:'gpt-5.6-terra'}),null);
 });
+
+test('plaque signalétique : schéma strict et appel simulé',async()=>{
+ const {scanNameplate,NAMEPLATE_SCHEMA,nameplatePrompt}=await import('../api/_lib/ai.js');
+ assert.equal(NAMEPLATE_SCHEMA.additionalProperties,false);
+ assert.deepEqual([...NAMEPLATE_SCHEMA.required].sort(),Object.keys(NAMEPLATE_SCHEMA.properties).sort());
+ assert.match(nameplatePrompt(),/watts = volts × ampères/);
+ process.env.OPENAI_API_KEY='k';
+ let sent;
+ const plate={is_nameplate:true,name:'Sécheuse',brand:'Whirlpool',model:'WED5000',watts:5600,volts:240,amps:23.3,phases:'1',hz:60,confidence:.9,notes:''};
+ const fetchImpl=async(url,opts)=>{sent=JSON.parse(opts.body);return {ok:true,status:200,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(plate)}]}],usage:{input_tokens:900,output_tokens:150}})};};
+ const img={name:'p.jpg',data:'data:image/jpeg;base64,/9j/'};
+ const out=await scanNameplate({files:[img]},{fetchImpl});
+ assert.equal(out.scan.watts,5600);assert.equal(out.usage.input,900);assert.equal(sent.text.format.name,'plaque_signaletique');assert.equal(sent.text.format.strict,true);
+ await assert.rejects(()=>scanNameplate({files:[]},{fetchImpl}),e=>e.status===400);
+ await assert.rejects(()=>scanNameplate({files:[img,img,img]},{fetchImpl}),e=>e.status===400);
+ delete process.env.OPENAI_API_KEY;
+});

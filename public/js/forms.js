@@ -1,6 +1,6 @@
 // Formulaires : site, panneau, fiche de circuit.
 import {h,field,select,dialog,toast,confirmDialog} from './dom.js';
-import {FAMILIES,PANEL_STATES,LOAD_LIBRARY,LOAD_CATEGORIES,WIRE_TABLE,WIRE_TYPES,familyOf,wireAmps,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,serviceCheck} from '../catalog.js';
+import {FAMILIES,PANEL_STATES,PANEL_STAGES,stageFromState,LOAD_LIBRARY,LOAD_CATEGORIES,WIRE_TABLE,WIRE_TYPES,familyOf,wireAmps,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,serviceCheck} from '../catalog.js';
 import {modelPicker,panelDemand} from './library.js';
 import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
@@ -58,6 +58,7 @@ export function panelFields(panel={},siblings=[],{library=false}={}){
    field('Tension',select('voltage',voltages,d.voltage||voltages[0])),
    field('Superficie hors sol (m²)',input('livingArea',d.livingArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 140'}),{hint:'Rez-de-chaussée et étages, mesurés par l’extérieur (calcul de charge, règle 8-110).'}),
    field('Superficie du sous-sol (m²)',input('basementArea',d.basementArea??'',{type:'number',min:0,max:10000,inputmode:'numeric',placeholder:'Ex. 80'}),{hint:'Compte à 75 % (parties de plus de 1,8 m de hauteur).'}),
+   field('Étape du projet',select('stage',Object.entries(PANEL_STAGES).map(([k,s])=>[k,`${s.n}. ${s.label}`]),d.stage||stageFromState(d.state)),{hint:'Conception : pas encore de panneau. Relevé : panneau existant. Vérification : charges et électroménagers.'}),
    field('État',select('state',PANEL_STATES,d.state||'Existant'),{hint:'Planifié : panneau à construire ou à modifier.'}),
    h('datalist',{id:'brands'},['Siemens','Square D','Eaton','Cutler-Hammer','Schneider Electric','Federal Pioneer','Stab-Lok','Westinghouse','Commander','GE','Leviton'].map(b=>h('option',{value:b}))))),
   h('fieldset',{class:'form-section'},h('legend',{text:'Alimentation'}),h('div',{class:'fields'},
@@ -139,7 +140,7 @@ function fedCircuitInput(fedSelect,value){
 }
 export function panelPayload(form){
  const f=formData(form);
- return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),basementArea:f.basementArea===''||f.basementArea==null?null:Number(f.basementArea),state:f.state,...(f.fedFrom?{}:{serviceGauge:f.serviceGauge,serviceMaterial:f.serviceMaterial,serviceRoute:f.serviceRoute,serviceNotes:f.serviceNotes})}},positions:Number(f.positions)};
+ return {meta:{name:f.name,tag:f.tag,kind:f.kind,location:f.location,details:{building:f.building,brand:f.brand,model:f.model,mainAmps:f.mainAmps===''?null:Number(f.mainAmps),voltage:f.voltage,fedFrom:f.fedFrom,fedFromCircuit:f.fedFromCircuit,surveyDate:f.surveyDate,surveyedBy:f.surveyedBy,notes:f.notes,modelId:f.modelId,family:f.family,livingArea:f.livingArea===''?null:Number(f.livingArea),basementArea:f.basementArea===''||f.basementArea==null?null:Number(f.basementArea),state:f.state,stage:f.stage,...(f.fedFrom?{}:{serviceGauge:f.serviceGauge,serviceMaterial:f.serviceMaterial,serviceRoute:f.serviceRoute,serviceNotes:f.serviceNotes})}},positions:Number(f.positions)};
 }
 export function panelDialog({siblings=[],onSave,library=false,initial={},title='Nouveau panneau',eyebrow='Étape 2 · un panneau dans ce site'}){
  const e=err();

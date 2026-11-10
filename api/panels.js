@@ -8,7 +8,7 @@ import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
 import {siteAccess,panelAccess,need} from './_lib/shares.js';
-import {scanPanel,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
+import {scanPanel,scanNameplate,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
 import {scanToPanel} from '../public/aiscan.js';
 import {rateLimit,recordAttempt} from './_lib/auth.js';
 
@@ -50,7 +50,8 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   return res.status(200).json(library());
  }
  // Ajout de panneau assisté par IA : statut (GET) et analyse de photos / fichiers (POST).
- if(req.query?.action==='scan'){
+ if(req.query?.action==='scan'||req.query?.action==='nameplate'){
+  const isPlate=req.query.action==='nameplate';
   const isAdmin=adminEmails().includes(user.email);
   const e=await entitlement(sql,user.id);
   const allow=aiAllowance(e,isAdmin);
@@ -64,6 +65,14 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   await rateLimit(sql,'ai:'+user.id,6,5);
   await recordAttempt(sql,'ai:'+user.id);
   const data=body(req);
+  if(isPlate){
+   // Plaque signalétique d'un appareil : puissance requise. Compte dans le quota d'analyses.
+   let plate;
+   try{plate=await scanNameplate({files:data.files,settings});}
+   catch(x){await sql`INSERT INTO app_ai_scans(user_id,model,ok) VALUES(${user.id},${aiModel(settings)},false)`;throw x;}
+   await sql`INSERT INTO app_ai_scans(user_id,model,input_tokens,output_tokens) VALUES(${user.id},${plate.model},${plate.usage.input},${plate.usage.output})`;
+   return res.status(200).json({plate:plate.scan,model:plate.model,used:used+1,monthly:allow.monthly});
+  }
   let out;
   try{out=await scanPanel({files:data.files,hint:data.hint||{},settings,lite:allow.lite});}
   catch(x){await sql`INSERT INTO app_ai_scans(user_id,model,ok) VALUES(${user.id},${aiModel(settings)},false)`;throw x;}
@@ -142,7 +151,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  }
  if(!Number.isInteger(data.revision))throw new HttpError(400,'Révision manquante.');
  let {name,tag,kind,location,details,positions,circuits}=row;
- if(data.meta){const m=check(()=>cleanPanelMeta(data.meta));await checkFedFrom(sql,m,row.site_id,id);await applyModel(sql,user,m,row.details);({name,tag,kind,location,details}=m);}
+ if(data.meta){const m=check(()=>cleanPanelMeta(data.meta));if(m.details.appliances===undefined&&row.details?.appliances)m.details.appliances=row.details.appliances;await checkFedFrom(sql,m,row.site_id,id);await applyModel(sql,user,m,row.details);({name,tag,kind,location,details}=m);}
  if(data.circuits!==undefined)circuits=check(()=>validate(normalize(data.circuits,{positions}),{positions}));
  if(data.positions!==undefined&&data.positions!==positions){positions=checkPositions(data.positions);circuits=check(()=>resize(circuits,positions));}
  const [u]=await sql`UPDATE app_panels SET name=${name},tag=${tag},kind=${kind},location=${location},details=${JSON.stringify(details)}::jsonb,positions=${positions},circuits=${JSON.stringify(circuits)}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND revision=${data.revision} RETURNING *`;
