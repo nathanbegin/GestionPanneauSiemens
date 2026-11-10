@@ -660,3 +660,9 @@ body.app .container{max-width:min(1760px,96vw)}
 .cmp-table tr.cmp-diff td{font-weight:600}
 .cmp-cell small{display:block;color:var(--muted)}
 @media (max-width:720px){.cmp-pick{grid-template-columns:1fr}}
+
+/* Suggestions de modèles */
+.suggest{margin:12px 0;padding:12px;border:1px solid #cfe0d4;background:#eef5ef;border-radius:10px}
+.suggest summary{font-weight:600;cursor:pointer}
+.suggest .fields{margin:12px 0 8px}
+.suggest .small.ok{color:#245c3a;font-weight:600}

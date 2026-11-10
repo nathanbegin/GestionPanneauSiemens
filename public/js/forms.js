@@ -49,7 +49,7 @@ export function panelFields(panel={},siblings=[],{library=false}={}){
    field('Type',select('kind',panelKinds,panel.kind||'Principal')),
    field('Bâtiment',input('building',d.building,{maxlength:80,placeholder:'Ex. Maison, Garage détaché'})),
    field('Emplacement précis',input('location',panel.location,{maxlength:140,placeholder:'Ex. Sous-sol, salle mécanique, mur nord'}),{full:true,hint:'Où trouver le panneau rapidement.'}))),
-  catalogFieldset(d,library),
+  catalogFieldset(d,library,panel.circuits),
   h('fieldset',{class:'form-section'},h('legend',{text:'Caractéristiques'}),h('div',{class:'fields'},
    field('Nombre de positions',select('positions',choices.map(n=>[n,n+' positions']),positions),{hint:'Emplacements numérotés du panneau.'}),
    field('Calibre principal (A)',input('mainAmps',d.mainAmps??'',{type:'number',min:15,max:1200,step:5,inputmode:'numeric',placeholder:'Ex. 200'})),
@@ -96,7 +96,8 @@ function serviceFieldset(d,fed){
  return box;
 }
 // Modèle de la bibliothèque (abonnés) : remplit marque, gamme, calibre, positions et famille.
-function catalogFieldset(d,library){
+function catalogFieldset(d,library,circuits=[]){
+ const used=circuits.filter(c=>!c.vacant&&(c.label||c.amps!=null));
  const hidden=h('input',{type:'hidden',name:'modelId',value:d.modelId||''});
  const fam=select('family',[['','— Autre / non précisée —'],...Object.entries(FAMILIES).filter(([k])=>k!=='generic').map(([k,f])=>[k,f.name])],d.family||d.breakerFamily||'');
  const summary=h('div',{class:'model-summary'});
@@ -104,7 +105,7 @@ function catalogFieldset(d,library){
  show(d.modelInfo,d.modelId,d.family);
  const choose=h('button',{type:'button',class:library?'primary':'',onclick:()=>{
   if(!library){location.hash='#/abonnement';return;}
-  modelPicker({current:{modelId:hidden.value,family:fam.value},onPick:(p,lib)=>{
+  modelPicker({current:{modelId:hidden.value,family:fam.value,circuits:used.length||'',bipolar:used.filter(c=>formatOf(c)==='double').length,mainAmps:hidden.closest('form')?.elements.mainAmps?.value},onPick:(p,lib)=>{
    const f=hidden.closest('form');const info=lib.familyInfo[p.family];
    hidden.value=p.cat;fam.value=p.family;
    f.elements.brand.value=familyOf(p.family).brand||info?.marque||'';f.elements.model.value=(info?.gamme||'').split(' (')[0];
