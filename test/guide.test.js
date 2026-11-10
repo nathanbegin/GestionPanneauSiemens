@@ -60,3 +60,25 @@ test('appareils à moteur : démarrage ≠ surcharge',()=>{
  assert.ok(r.issues.some(i=>i.level==='info'&&/démarrage/.test(i.text)&&/MCA/.test(i.text)));
  assert.ok(!circuitLoad(circ(20,[load('Plinthe',1500,240,'heating',true)])).issues.some(i=>/démarrage/.test(i.text)));
 });
+
+import {breakerBehavior} from '../public/loadcalc.js';
+test('comportement d’un disjoncteur de 40 A (essais UL 489 / CSA C22.2 nº 5)',()=>{
+ const rows=breakerBehavior(40,{demandAmps:35.5,fullAmps:55.4});
+ const by=a=>rows.find(r=>Math.abs(r.amps-a)<0.05);
+ assert.deepEqual(rows.map(r=>r.amps),[32,35.5,40,48,54,55.4,80]);
+ assert.equal(by(32).pct,80);assert.match(by(32).text,/Aucun déclenchement/);
+ assert.equal(by(35.5).pct,88.8);assert.equal(by(35.5).tag,'calc');
+ assert.match(by(40).text,/nominal/);assert.match(by(48).text,/selon la durée/);
+ assert.match(by(54).text,/1 heure au maximum/);
+ assert.equal(by(55.4).tag,'full');assert.equal(by(55.4).pct,138.5);assert.match(by(55.4).text,/si elle persiste/);
+ assert.match(by(80).text,/plus rapide/);
+ // au-delà de 50 A : pas de promesse d'une heure
+ assert.doesNotMatch(breakerBehavior(60).find(r=>Math.abs(r.pct-135)<0.1).text,/1 heure/);
+});
+test('cuisinière à pleine puissance : information, pas d’erreur',()=>{
+ const r=circuitLoad(circ(40,[load('Maytag',13300,240,'range',false)]));
+ const i=r.issues.find(x=>/pleine puissance/.test(x.text));
+ assert.ok(i&&i.level==='info');assert.match(i.text,/55,4 A|55\.4 A/);assert.match(i.text,/139 %|138,5 %|138 %/);assert.match(i.text,/n’est pas conçu pour supporter/);
+ assert.ok(!r.issues.some(x=>x.level==='error'));
+ assert.ok(!circuitLoad(circ(50,[load('Cuisinière',9600,240,'range',false)])).issues.some(x=>/pleine puissance/.test(x.text)),'50 A couvre la pleine puissance de 40 A');
+});

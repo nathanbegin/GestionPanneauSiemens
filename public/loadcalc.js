@@ -17,6 +17,23 @@ export const wireFor=amps=>WIRE_TABLE.find(w=>w.amps>=amps)?.gauge??null;
 // Cuisinière sur son propre circuit : règle 8-300 — 8 000 W jusqu'à 12 kW, plus 40 % de l'excédent (jamais plus que la puissance de plaque).
 // Pour l'entrée de la maison, la règle 8-200 est différente : 6 000 W + 40 % de l'excédent (voir dwellingCalc).
 export const rangeCircuitDemand=w=>Math.min(w,8000+0.4*Math.max(0,w-12000));
+/**
+ * Comportement d'un disjoncteur selon le courant (essais UL 489 / CSA C22.2 nº 5). Ce n'est PAS la courbe temps-courant du fabricant.
+ * Retourne [{amps, pct, text, tag?}] du plus faible au plus fort ; `demandAmps` (charge calculée) et `fullAmps` (pleine puissance) sont ajoutés s'ils sont fournis.
+ */
+export function breakerBehavior(breaker,{demandAmps=null,fullAmps=null}={}){
+ const r=n=>Math.round(n*10)/10,row=(amps,text,tag)=>({amps:r(amps),pct:Math.round(amps/breaker*1000)/10,text,...(tag?{tag}:{})});
+ const rows=[
+  row(breaker*0.8,'Aucun déclenchement normalement'),
+  row(breaker,'Doit supporter son courant nominal dans les conditions d’essai'),
+  row(breaker*1.2,'Déclenchement possible selon la durée'),
+  row(breaker*1.35,breaker<=50?'Doit déclencher en 1 heure au maximum lors de l’essai normalisé':'Doit déclencher lors de l’essai normalisé (délai plus long au-delà de 50 A)'),
+  row(breaker*2,'Déclenchement nettement plus rapide'),
+ ];
+ if(demandAmps&&demandAmps>breaker*0.8&&demandAmps<breaker)rows.push(row(demandAmps,'Charge calculée du circuit : aucun déclenchement normalement','calc'));
+ if(fullAmps&&fullAmps>breaker*1.0&&Math.abs(fullAmps-breaker*1.2)>0.05&&Math.abs(fullAmps-breaker*1.35)>0.05)rows.push(row(fullAmps,fullAmps>=breaker*1.2?'Courant théorique à pleine puissance : surcharge qui devrait entraîner un déclenchement si elle persiste':'Courant théorique à pleine puissance : déclenchement possible selon la durée','full'));
+ return rows.sort((a,b)=>a.amps-b.amps);
+}
 // Appareils à moteur ou à compresseur : le courant de démarrage dépasse le nominal sans être une surcharge (section 28).
 const MOTOR_RE=/pompe|thermopompe|climati|compresseur|moteur|ouvre-porte|aspirateur|r[ée]frig[ée]rateur|cong[ée]lateur|ventilat|vrc|vre|scie|perceuse/i;
 // Puissance d'une charge en watts.
@@ -43,6 +60,7 @@ export function circuitLoad(c,vs=DEFAULT_VOLTS){
   else if(!contW&&demandAmps>breaker*CONTINUOUS_FACTOR)issues.push({level:'info',text:`Charge non continue à ${round(demandAmps/breaker*100,0)} % du disjoncteur : admissible jusqu’à 100 %. Vérifiez qu’aucun appareil du circuit ne fonctionne en continu (3 heures ou plus).`});
  }
  if(watts&&!breaker)issues.push({level:'warn',text:'Calibre du disjoncteur à préciser.'});
+ if(rangeW&&breaker&&amps>breaker)issues.push({level:'info',text:`À pleine puissance (tous les éléments), la cuisinière appellerait ${round(amps)} A, soit ${round(amps/breaker*100,0)} % du disjoncteur de ${breaker} A. Le facteur de demande de la règle 8-300 dimensionne le circuit selon l’usage prévu (${round(demandAmps)} A) ; il ne modifie pas la courbe de déclenchement : le disjoncteur n’est pas conçu pour supporter cette intensité en permanence.`});
  if(loads.some(l=>MOTOR_RE.test(l.name||'')))issues.push({level:'info',text:'Appareil à moteur ou à compresseur : le courant de démarrage dépasse le nominal sans être une surcharge. Se fier à la plaque (MCA / MOCP) et, si le disjoncteur déclenche, chercher la cause plutôt qu’augmenter le calibre.'});
  const loadVolts=new Set(loads.map(l=>Number(l.v)||0).filter(Boolean));
  if([...loadVolts].some(v=>v>=208)&&volts===vs.uni)issues.push({level:'error',text:`Appareil ${[...loadVolts].find(v=>v>=208)} V sur un disjoncteur unipolaire : un bipolaire est requis.`});

@@ -5,7 +5,7 @@ import {modelPicker,panelDemand} from './library.js';
 import {brandBadge} from './panelart.js';
 import {subpanelLink} from './feeds.js';
 import {api} from './api.js';
-import {circuitLoad,polesOf} from '../loadcalc.js';
+import {circuitLoad,polesOf,breakerBehavior} from '../loadcalc.js';
 import {voltsOf,voltageLabel,siteBipolar,UNIPOLAR_VOLTS} from '../voltage.js';
 import {usageOrder,states,ampsList,protections,panelKinds,voltages,breakerFormats,designation,formatOf,reshape,validate,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,tagGroups,panelTitle,MAX_POSITIONS} from '../model.js';
 
@@ -332,6 +332,9 @@ function planningSection(c,panel,markDirty,root,lib){
     h('span',{},h('b',{text:r.suggestedWire||(r.minBreaker?WIRE_TABLE.find(w=>w.amps>=r.minBreaker)?.gauge:'—')||'—'}),'fil suggéré')),
    r.percent!=null&&h('div',{class:'progress'+(r.percent>100?' over':r.percent>80?' high':'')},h('i',{style:{width:Math.min(100,r.percent)+'%'}})),
    ...r.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.level==='error'?'⛔ ':i.level==='warn'?'⚠ ':'ℹ ')+i.text})),
+   draft().amps&&r.watts>0&&h('details',{class:'trip-table'},h('summary',{text:`Comportement d’un disjoncteur de ${draft().amps} A (essais UL 489)`}),
+    h('table',{class:'cmp-table'},h('thead',{},h('tr',{},h('th',{text:'Courant'}),h('th',{text:'% du calibre'}),h('th',{text:'Comportement'}))),h('tbody',{},breakerBehavior(draft().amps,{demandAmps:r.demandAmps,fullAmps:r.amps}).map(x=>h('tr',{class:x.tag?'cmp-diff':''},h('td',{text:x.amps+' A'}),h('td',{text:x.pct+' %'}),h('td',{text:x.text}))))),
+    h('p',{class:'small muted',text:'Valeurs normalisées génériques, pas la courbe temps-courant du fabricant : consultez la fiche technique du modèle pour les durées exactes.'})),
    note&&h('p',{class:'small muted',text:'ℹ '+note}),
    r.watts>0&&h('button',{type:'button',class:'sm',onclick:()=>{
     const f=form();if(!f)return;const needs240=loads.some(l=>l.v>=208);

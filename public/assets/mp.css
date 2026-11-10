@@ -749,3 +749,4 @@ body.app .container{max-width:min(1760px,96vw)}
 }
 .app-model{color:#245c3a;font-weight:500}
 @media (max-width:720px){.app-model{font-size:10.5px}}
+.trip-table{margin:10px 0}.trip-table summary{cursor:pointer;font-weight:600;font-size:13px}.trip-table .cmp-table{margin:8px 0}
