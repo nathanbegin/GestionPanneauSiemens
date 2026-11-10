@@ -11,6 +11,7 @@ import {siteDialog,panelDialog,siteFields,formData} from './forms.js';
 import {panelView} from './panel.js';
 import {billingView} from './billing.js';
 import {updateCard,checkUpdateQuietly} from './update.js';
+import {compareView} from './compare.js';
 import {adminView} from './admin.js';
 
 const view=document.getElementById('view'),topbar=document.getElementById('topbar');
@@ -30,6 +31,7 @@ function crumbs(items){
    h('a',{href:'#/sites',role:'menuitem'},'🏠 Mes sites'),
    h('a',{href:'#/compte',role:'menuitem'},'👤 Mon compte'),
    h('a',{href:'#/compte',role:'menuitem',onclick:()=>setTimeout(()=>document.getElementById('miseajour')?.scrollIntoView({behavior:'smooth'}),150)},'🔄 Mise à jour',h('i',{class:'update-dot','aria-label':'Nouvelle version disponible'})),
+   h('a',{href:'#/comparer',role:'menuitem'},'⇄ Comparer des panneaux'),
    h('a',{href:'#/abonnement',role:'menuitem'},'⭐ Mon abonnement'),
    h('a',{href:'#/equipe',role:'menuitem'},'👥 Mon équipe'),
    state.user.isAdmin&&h('a',{href:'#/admin',role:'menuitem'},'🛠 Administration'),
@@ -157,6 +159,7 @@ async function siteView(id){
    h('aside',{class:'stack'},
     panels.length>0&&h('div',{class:'card side-card'},h('h3',{text:'Hiérarchie d’alimentation'}),tree(panels)),
     h('div',{class:'card side-card'},h('h3',{text:'Informations'}),h('dl',{class:'facts'},h('dt',{text:'Adresse'}),h('dd',{text:siteAddress(site)||'—'}),h('dt',{text:'Client'}),h('dd',{text:site.client||'—'}),h('dt',{text:'Panneaux'}),h('dd',{text:String(panels.length)}),h('dt',{text:'Modifié'}),h('dd',{text:fmtRelative(site.updatedAt)})),site.notes&&h('p',{class:'small muted mt',text:site.notes})),
+    panels.length>=2&&library&&h('a',{class:'btn',href:`#/comparer/${panels[0].id}/${panels[1].id}`},'⇄ Comparer des panneaux'),
     site.shared?null:h('button',{type:'button',class:'danger',onclick:remove},'Supprimer ce site'))));
 }
 
@@ -223,6 +226,7 @@ async function route(){
   else if(name==='reinitialiser')node=resetView(id);
   else if(name==='sites'&&id)node=await siteView(id);
   else if(name==='panneaux'&&id)node=await panelView({id,tab:sub,ctx});
+  else if(name==='comparer')node=await compareView({ctx,a:id,b:sub});
   else if(name==='compte')node=accountView();
   else if(name==='equipe')node=await teamView({ctx});
   else if(name==='rejoindre'&&id)node=await joinInviteView({ctx,token:id});
