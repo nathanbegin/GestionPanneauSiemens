@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,STAGE_IDS,stageFromState} from './catalog.js';
-export const APP_VERSION='2.24.0';
+export const APP_VERSION='2.24.1';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -320,7 +320,8 @@ export function cleanAppliances(list){
   const qty=a?.qty==null?1:Number(a.qty);if(!Number.isInteger(qty)||qty<1||qty>100)throw Error('Quantité invalide : '+name);
   const source=['liste','plaque','manuel'].includes(a?.source)?a.source:'manuel';
   const model=str(a?.model,60,'Numéro de modèle');
-  return {id:str(a?.id,40,'Identifiant')||('a'+Math.random().toString(36).slice(2,10)),name,...(model?{model}:{}),w:Math.round(w),v,qty,source,cont:a?.cont===true};
+  const cat=LOAD_CATEGORIES[a?.cat]?a.cat:'other';
+  return {id:str(a?.id,40,'Identifiant')||('a'+Math.random().toString(36).slice(2,10)),name,...(model?{model}:{}),w:Math.round(w),v,qty,source,cat,cont:a?.cont===true};
  });
 }
 export function cleanSite(input={}){

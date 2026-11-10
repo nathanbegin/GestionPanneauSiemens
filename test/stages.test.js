@@ -128,3 +128,38 @@ test('PDF : la liste complète des électroménagers, du plus gros au plus petit
  const all=await buildLoads({user:{name:'N',email:'n@x.ca'},site:{name:'M'},panel:p,fedFromLabel:'',version:'t'});
  assert.ok(all.length>few.length,'les 30 appareils sont imprimés (pas seulement les 14 premiers)');
 });
+
+import {inferLoad} from '../public/appliances.js';
+import {circuitLoad} from '../public/loadcalc.js';
+test('catégorie et caractère continu déduits du nom',()=>{
+ assert.deepEqual(inferLoad('Cuisinière Maytag',13300),{cat:'range',cont:false});
+ assert.deepEqual(inferLoad('Sécheuse',5600),{cat:'other',cont:true});
+ assert.deepEqual(inferLoad('Chauffe-eau 60 gal',4500),{cat:'other',cont:true});
+ assert.deepEqual(inferLoad('Borne de recharge',7200),{cat:'ev',cont:true});
+ assert.deepEqual(inferLoad('Plinthe électrique',1500),{cat:'heating',cont:true});
+ assert.deepEqual(inferLoad('Fournaise électrique',10000),{cat:'heating100',cont:true});
+ assert.deepEqual(inferLoad('Thermopompe centrale',4200),{cat:'cooling',cont:true});
+ assert.deepEqual(inferLoad('Spa',9600),{cat:'water100',cont:true});
+ assert.deepEqual(inferLoad('Chauffe-eau instantané',18000),{cat:'water100',cont:true});
+ assert.deepEqual(inferLoad('Lave-vaisselle',1200),{cat:'basic',cont:false});
+ assert.deepEqual(inferLoad('Appareil inconnu',3000),{cat:'other',cont:false});
+});
+test('une cuisinière ajoutée par l’onglet Électroménagers suit la règle 8-300 (35,5 A, pas 55,4 A)',()=>{
+ const p=panel();const cuis=p.circuits.find(c=>c.label==='Cuisinière');
+ const r=addAppliance(p,{name:'Cuisinière Maytag',w:13300,v:240,qty:1,source:'plaque'},cuis.id);
+ const circ=r.circuits.find(c=>c.id===cuis.id);
+ assert.equal(circ.loads[0].cat,'range');assert.equal(circ.loads[0].cont,false);
+ const res=circuitLoad({...circ,amps:40});
+ assert.equal(res.demandAmps,35.5);assert.ok(!res.issues.some(i=>i.level==='error'),'pas d’erreur sur 40 A');
+ // en attente puis reliée : la catégorie suit
+ const pend=addAppliance(p,{name:'Cuisinière Maytag',w:13300,v:240,qty:1},null);
+ assert.equal(pend.appliances[0].cat,'range');
+ const p2={...p,details:{...p.details,appliances:pend.appliances}};
+ const mv=moveAppliance(p2,pend.appliances[0].id,cuis.id);
+ assert.equal(mv.circuits.find(c=>c.id===cuis.id).loads[0].cat,'range');
+ // catégorie imposée par l'utilisateur : conservée
+ assert.equal(addAppliance(p,{name:'Cuisinière',w:9000,v:240,cat:'other',cont:true},cuis.id).circuits.find(c=>c.id===cuis.id).loads[0].cat,'other');
+ // ancienne charge « Cuisinière » en catégorie « other » : conseil
+ const old=circuitLoad({...circ,amps:40,loads:[{id:'x',name:'Cuisinière Maytag',w:13300,v:240,qty:1,cat:'other',cont:false}]});
+ assert.ok(old.issues.some(i=>i.level==='error'));assert.ok(old.issues.some(i=>i.level==='info'&&/choisissez la catégorie « Cuisinière »/.test(i.text)));
+});

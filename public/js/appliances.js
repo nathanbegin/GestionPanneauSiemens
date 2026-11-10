@@ -4,12 +4,12 @@
 import {h,dialog,toast,field,select} from './dom.js';
 import {api} from './api.js';
 import {prepare} from './aiimport.js';
-import {LOAD_LIBRARY,VOLTAGES} from '../catalog.js';
+import {LOAD_LIBRARY,LOAD_CATEGORIES,VOLTAGES} from '../catalog.js';
 import {designation} from '../model.js';
 import {voltsOf} from '../voltage.js';
 import {panelReport} from '../loadcalc.js';
-import {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance} from '../appliances.js';
-export {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance};
+import {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance,inferLoad} from '../appliances.js';
+export {listAppliances,suggestCircuits,addAppliance,moveAppliance,removeAppliance,updateAppliance,inferLoad};
 
 const fmtW=w=>w>=1000?(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:2})+' kW':w+' W';
 
@@ -32,7 +32,7 @@ export function appliancesView({panel,children=[],save,onChange,canEdit=true}){
    const sel=circuitOptions(r,r.circuitId);sel.disabled=!canEdit;
    sel.addEventListener('change',()=>apply(()=>moveAppliance(panel,r.id,sel.value||null)));
    return h('tr',{class:r.pending?'cmp-diff':''},
-    h('td',{},h('b',{text:r.name}),r.qty>1&&h('span',{class:'small muted',text:' × '+r.qty}),r.model&&h('div',{class:'small app-model',text:'Modèle : '+r.model}),h('div',{class:'small muted',text:r.v+' V'})),
+    h('td',{},h('b',{text:r.name}),r.qty>1&&h('span',{class:'small muted',text:' × '+r.qty}),r.model&&h('div',{class:'small app-model',text:'Modèle : '+r.model}),inferLoad(r.name,r.w).cat==='range'&&r.cat!=='range'&&h('div',{class:'app-warn'},'⚠ ',h('span',{class:'long',text:'Catégorie à corriger : « Cuisinière » (touchez ✎) pour appliquer la règle 8-300.'}),h('span',{class:'short',text:'Catégorie à corriger ✎'})),h('div',{class:'small muted',text:r.v+' V'})),
     h('td',{text:fmtW(r.total)}),h('td',{},sel,r.pending&&h('div',{class:'app-warn'},'⚠ ',h('span',{class:'long',text:'À relier à un circuit pour compter dans le calcul.'}),h('span',{class:'short',text:'À relier'}))),
     h('td',{class:'app-actions'},canEdit&&h('button',{type:'button',class:'ghost sm','aria-label':'Modifier '+r.name,title:'Modifier',onclick:()=>addDialog({panel,save,onChange,edit:r})},'✎'),canEdit&&h('button',{type:'button',class:'ghost sm','aria-label':'Retirer '+r.name,title:'Retirer',onclick:()=>apply(()=>removeAppliance(panel,r.id))},'✕')));
   }))))
@@ -53,7 +53,12 @@ export async function addDialog({panel,save,onChange,edit=null}){
  let status={allowed:false,configured:false};
  try{status=await api('/api/panels?action=scan');}catch{}
  const f={name:h('input',{maxlength:80,placeholder:'Ex. Sécheuse',required:true,value:edit?.name||''}),w:h('input',{type:'number',min:0,max:200000,step:10,placeholder:'Watts',value:edit?.w??''}),
-  v:select('v',VOLTAGES.map(v=>[v,v+' V']),edit?.v||voltsOf(panel.details).bi),model:h('input',{maxlength:60,placeholder:'Lu sur la plaque (facultatif)',value:edit?.model||''}),qty:h('input',{type:'number',min:1,max:100,step:1,value:edit?.qty||1}),cont:h('input',{type:'checkbox',checked:!!edit?.cont})};
+  v:select('v',VOLTAGES.map(v=>[v,v+' V']),edit?.v||voltsOf(panel.details).bi),model:h('input',{maxlength:60,placeholder:'Lu sur la plaque (facultatif)',value:edit?.model||''}),qty:h('input',{type:'number',min:1,max:100,step:1,value:edit?.qty||1}),cont:h('input',{type:'checkbox',checked:!!edit?.cont}),cat:select('cat',Object.entries(LOAD_CATEGORIES),edit?.cat||'other')};
+ // Catégorie et caractère continu : déduits du nom tant que l'utilisateur n'y a pas touché.
+ let catTouched=!!edit;
+ const autoCat=()=>{if(catTouched)return;const g=inferLoad(f.name.value,Number(f.w.value)||0);f.cat.value=g.cat;f.cont.checked=g.cont;};
+ f.cat.addEventListener('change',()=>{catTouched=true;});f.cont.addEventListener('change',()=>{catTouched=true;});
+ for(const el of [f.name,f.w])el.addEventListener('input',autoCat);
  let source=edit?.source||'manuel';
  // Circuit choisi : en modification, le circuit actuel ; sinon la meilleure suggestion tant que rien n'est choisi à la main.
  let chosen=edit?(edit.circuitId||''):null;
@@ -65,7 +70,7 @@ export async function addDialog({panel,save,onChange,edit=null}){
   circuitBox.replaceChildren(field('Relier au circuit',sel,{hint:'★ = suggestion selon le nom, la tension et le calibre.'}));};
  for(const el of [f.name,f.w,f.v,f.qty])el.addEventListener('change',drawCircuit);
  const lib=select('lib',[['','— Choisir dans la liste —'],...LOAD_LIBRARY.map(l=>[l.id,`${l.g} · ${l.name}`])],'');
- lib.addEventListener('change',()=>{const l=LOAD_LIBRARY.find(x=>x.id===lib.value);if(!l)return;f.name.value=l.name;f.w.value=l.w;f.v.value=String(l.v);f.cont.checked=!!l.cont;source='liste';note.textContent='Valeur typique : vérifiez la plaque de votre appareil.';drawCircuit();});
+ lib.addEventListener('change',()=>{const l=LOAD_LIBRARY.find(x=>x.id===lib.value);if(!l)return;f.name.value=l.name;f.w.value=l.w;f.v.value=String(l.v);f.cont.checked=!!l.cont;f.cat.value=l.cat;catTouched=true;source='liste';note.textContent='Valeur typique : vérifiez la plaque de votre appareil.';drawCircuit();});
  const photo=h('input',{type:'file',accept:'image/*',capture:'environment',class:'sr-only',id:'plateFile'});
  photo.addEventListener('change',async()=>{
   const file=photo.files[0];if(!file)return;
@@ -79,7 +84,7 @@ export async function addDialog({panel,save,onChange,edit=null}){
    if(r.model)f.model.value=String(r.model).slice(0,60);
    if(r.watts)f.w.value=r.watts;
    if([120,208,240,347,600].includes(r.volts))f.v.value=String(r.volts);
-   source='plaque';
+   source='plaque';autoCat();
    note.textContent=`Lu par l’IA (confiance ${Math.round((r.confidence||0)*100)} %)${r.model?' · modèle '+r.model:''}${r.watts?'':' · puissance illisible : saisissez-la'}. ${r.notes||''} Vérifiez avant d’enregistrer.`;
    drawCircuit();
   }catch(e){note.textContent=e.message;}
@@ -89,14 +94,14 @@ export async function addDialog({panel,save,onChange,edit=null}){
   ?h('div',{class:'page-actions'},h('label',{class:'btn primary',for:'plateFile'},'📷 Photographier la plaque signalétique'),photo,h('span',{class:'small muted',text:`Compte pour 1 analyse IA${status.monthly!=null?` (${status.used}/${status.monthly} ce mois-ci)`:''}.`}))
   :h('p',{class:'small muted',text:'La lecture de plaque par IA est incluse dans les forfaits payants. Vous pouvez saisir la puissance à la main ou choisir dans la liste.'});
  const d=dialog({title:edit?'Modifier l’électroménager':'Ajouter un électroménager',eyebrow:'Étape Vérification · '+(panel.tag||panel.name),form:true,wide:true,
-  body:[photoBlock,h('div',{class:'fields'},field('Ou choisir dans la liste',lib,{full:true}),field('Nom',f.name,{full:true}),field('Numéro de modèle',f.model,{full:true,hint:'Détecté par l’IA sur la plaque signalétique, modifiable.'}),field('Puissance (W)',f.w),field('Tension',f.v),field('Quantité',f.qty),h('label',{class:'check full'},f.cont,' Fonctionne en continu (3 h ou plus)')),note,circuitBox],
+  body:[photoBlock,h('div',{class:'fields'},field('Ou choisir dans la liste',lib,{full:true}),field('Nom',f.name,{full:true}),field('Numéro de modèle',f.model,{full:true,hint:'Détecté par l’IA sur la plaque signalétique, modifiable.'}),field('Puissance (W)',f.w),field('Tension',f.v),field('Quantité',f.qty),field('Catégorie de charge',f.cat,{full:true,hint:'Détermine le calcul : « Cuisinière » applique la règle 8-300 au circuit (8 000 W + 40 %) et 6 000 W + 40 % à l’entrée.'}),h('label',{class:'check full'},f.cont,' Charge continue (3 heures ou plus) : disjoncteur ≥ 125 %')),note,circuitBox],
   actions:[{label:'Annuler',kind:'ghost'},{label:'Enregistrer',kind:'primary',submit:true}]});
  drawCircuit();
  d.form.addEventListener('submit',async ev=>{
   ev.preventDefault();
   const w=Number(f.w.value);if(!f.name.value.trim())return toast('Donnez un nom à l’appareil.');if(!Number.isFinite(w)||w<=0)return toast('Indiquez la puissance en watts.');
   try{
-   const app={name:f.name.value.trim().slice(0,80),model:f.model.value.trim().slice(0,60),w:Math.round(w),v:Number(f.v.value),qty:Math.max(1,Number(f.qty.value)||1),cont:f.cont.checked,source};
+   const app={name:f.name.value.trim().slice(0,80),model:f.model.value.trim().slice(0,60),w:Math.round(w),v:Number(f.v.value),qty:Math.max(1,Number(f.qty.value)||1),cont:f.cont.checked,cat:f.cat.value,source};
    const circuit=d.form.elements.circuit.value||null;
    const next=edit?updateAppliance(panel,edit.id,app,circuit):addAppliance(panel,app,circuit);
    await save(next);d.close();onChange();toast(edit?'Électroménager modifié.':'Électroménager enregistré.');

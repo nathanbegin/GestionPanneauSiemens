@@ -66,6 +66,8 @@ export function circuitLoad(c,vs=DEFAULT_VOLTS){
   else if(!contW&&demandAmps>breaker*CONTINUOUS_FACTOR)issues.push({level:'info',text:`Charge non continue à ${round(demandAmps/breaker*100,0)} % du disjoncteur : admissible jusqu’à 100 %. Vérifiez qu’aucun appareil du circuit ne fonctionne en continu (3 heures ou plus).`});
  }
  if(watts&&!breaker)issues.push({level:'warn',text:'Calibre du disjoncteur à préciser.'});
+ const looksRange=loads.find(l=>l.cat!=='range'&&/cuisini[èe]re/i.test(l.name||''));
+ if(looksRange&&breaker&&demandAmps>breaker)issues.push({level:'info',text:`« ${looksRange.name} » ressemble à une cuisinière : choisissez la catégorie « Cuisinière » pour appliquer la règle 8-300 au circuit (8 000 W + 40 % de l’excédent de 12 kW, et non la pleine puissance).`});
  if(rangeW&&breaker&&amps>breaker)issues.push({level:'info',text:`À pleine puissance (tous les éléments), la cuisinière appellerait ${round(amps)} A, soit ${round(amps/breaker*100,0)} % du disjoncteur de ${breaker} A. Le facteur de demande de la règle 8-300 dimensionne le circuit selon l’usage prévu (${round(demandAmps)} A) ; il ne modifie pas la courbe de déclenchement : le disjoncteur n’est pas conçu pour supporter cette intensité en permanence.`});
  for(const l of loads){
   if(!l.cont&&CONT_RE.test(l.name||''))issues.push({level:'info',text:`« ${l.name} » est normalement une charge continue (disjoncteur ≥ 125 %) : cochez « charge continue » si l’appareil peut fonctionner 3 heures ou plus.`});
