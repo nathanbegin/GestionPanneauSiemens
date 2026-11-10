@@ -146,6 +146,19 @@ export function answerPosition(state,n,answer){
  circuits=validate(sortCircuits(circuits),{positions:state.positions});
  return {...state,circuits,done:[...done,n]};
 }
+/**
+ * Passe à « Identifié » les disjoncteurs dont l'utilisateur a confirmé la position (réponse à une question de l'assistant IA).
+ * answered : Map position → format de la réponse ; « je ne sais pas » et « espace vide » ne confirment rien.
+ */
+export function promoteAnswered(state,answered){
+ const ids=new Set();
+ for(const [n,fmt] of answered){
+  if(fmt==='unknown'||fmt==='empty')continue;
+  const cs=isSplit(state,n)?ownHalves(state,n):state.circuits.filter(c=>slotPos(c.slots[0])===n);
+  for(const c of cs)if(!c.vacant&&(c.label||c.amps!=null))ids.add(c.id);
+ }
+ return state.circuits.map(c=>ids.has(c.id)&&c.status!=='Identifié'?{...c,status:'Identifié'}:c);
+}
 // Toutes les positions restantes (non décrites) deviennent des espaces vides.
 export function fillRestEmpty(state,from){
  let s=state;

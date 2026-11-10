@@ -8,6 +8,7 @@ import {blank,resize,mergeScanned,designation,sortCircuits,ampsList,panelKinds,v
 import {FAMILIES} from '../catalog.js';
 import {AI_CONFIDENT} from '../aiscan.js';
 import {positionQuiz} from './guided.js';
+import {promoteAnswered} from '../guided.js';
 
 const MAX_SIDE=2000,MAX_FILES=6,MAX_TOTAL=3*1024*1024;
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -172,7 +173,7 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
    const r=p.review[c.id];
    const amps=h('select',{'aria-label':'Calibre '+designation(c)},new Option('?',''),...ampsList.map(a=>new Option(a+' A',a)));amps.value=c.amps??'';
    const label=h('input',{value:c.vacant?'':c.label,maxlength:100,'aria-label':'Désignation '+designation(c),placeholder:c.vacant?'Espace inutilisé':'Désignation'});
-   const upd=()=>{edited.add(c.id);circuits=circuits.map(x=>x.id!==c.id?x:{...x,vacant:undefined,amps:amps.value===''?null:Number(amps.value),label:label.value.trim(),status:label.value.trim()&&x.status==='Identifié'?'Identifié':'À confirmer'});draw();};
+   const upd=()=>{edited.add(c.id);circuits=circuits.map(x=>x.id!==c.id?x:{...x,vacant:undefined,amps:amps.value===''?null:Number(amps.value),label:label.value.trim(),status:label.value.trim()?'Identifié':'À confirmer'});draw();};
    amps.addEventListener('change',upd);label.addEventListener('change',upd);
    // Grouper avec un emplacement adjacent (jumelé / bipolaire à cheval sur deux positions) ou dissocier.
    const cands=groupCandidates(circuits,c.id);
@@ -234,12 +235,15 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
   const qBox=h('div',{class:'gd-question'}),artBox=h('div',{class:'gd-art'});
   put(h('div',{class:'gd-wrap'},qBox,artBox));
   const draw=n=>artBox.replaceChildren(panelArt({panel:{name:p.meta.name,kind:p.meta.kind,positions:p.positions,details:p.meta.details,circuits:st.circuits},showLabels:true,highlight:new Set([n])}));
-  positionQuiz(qBox,{getState:()=>st,setState:x=>{st=x;},list,art:draw,
+  const answered=new Map();
+  positionQuiz(qBox,{getState:()=>st,setState:x=>{st=x;},list,art:draw,onAnswer:(n,format)=>answered.set(n,format),
    onBack:()=>confirm(p,state),finishLabel:'Valider et revenir à la confirmation',
    onFinish:()=>{
     const edited=new Set(state.edited),changed=new Map(state.changed||[]);
-    for(const c of st.circuits)if(list.includes(slotPos(c.slots[0]))){edited.add(c.id);changed.set(c.id,'répondu');}
-    confirm(p,{circuits:st.circuits,edited,changed,note:`${list.length} point(s) incertain(s) vérifié(s) par vos réponses.`});
+    // Un disjoncteur confirmé par une réponse passe de « À confirmer » à « Identifié ».
+    const confirmed=promoteAnswered(st,answered);
+    for(const c of confirmed)if(list.includes(slotPos(c.slots[0]))){edited.add(c.id);changed.set(c.id,'répondu');}
+    confirm(p,{circuits:confirmed,edited,changed,note:`${list.length} point(s) incertain(s) vérifié(s) par vos réponses.`});
    }});
  }
 

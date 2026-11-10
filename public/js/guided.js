@@ -81,6 +81,7 @@ export function positionQuiz(box,ctx){
    try{
     const answer=format==='tandem'?{format,halves:halves.map(x=>x.value())}:{format,...(halves[0]?halves[0].value():{})};
     ctx.setState(answerPosition(ctx.getState(),n,answer));
+    ctx.onAnswer?.(n,answer.format);
     ask(next(n));
    }catch(e){err.textContent=e.message;}
   }

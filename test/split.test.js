@@ -70,3 +70,20 @@ test('garnir un panneau existant avec une lecture IA',()=>{
  const r3=mergeScanned(blank(30),scanned.circuits,30);
  assert.equal(r3.applied,5);assert.equal(r3.skipped.length,0);
 });
+
+import {promoteAnswered} from '../public/guided.js';
+test('les disjoncteurs confirmés par une réponse passent à « Identifié »',()=>{
+ let c=blank(30);const id=x=>c.find(y=>y.slots.includes(x)).id;
+ c=reshape(c,id('1A'),'tandem',30);c=reshape(c,id('3A'),'tandem',30);c=groupCircuits(c,id('1B'),id('3A'),30);
+ c=c.map(x=>x.slots[0]==='1A'?{...x,label:'Micro-ondes',amps:15}:x.slots[0]==='1B'?{...x,label:'Comptoirs',amps:15}:x.slots[0]==='3B'?{...x,label:'Chambre',amps:15}:x.slots[0]==='5A'?{...x,label:'Salon',amps:20}:x);
+ const st={...newGuided({positions:30}),circuits:validate(c,{positions:30}),done:[1,3,5]};
+ const st2=answerPosition(st,3,{format:'single',amps:15,label:'Chambre'});
+ const out=promoteAnswered(st2,new Map([[3,'single'],[5,'unknown'],[7,'empty']]));
+ const status=slot=>out.find(x=>x.slots[0]===slot).status;
+ assert.equal(status('3B'),'Identifié','moitié répondue');
+ assert.equal(status('1B'),'À confirmer','le disjoncteur lié n’a pas été répondu');
+ assert.equal(status('1A'),'À confirmer');assert.equal(status('5A'),'À confirmer','« je ne sais pas » ne confirme rien');
+ const out2=promoteAnswered(st2,new Map([[1,'single']]));
+ assert.equal(out2.find(x=>x.slots[0]==='1A').status,'Identifié');assert.equal(out2.find(x=>x.slots[0]==='1B').status,'À confirmer');
+ const out3=promoteAnswered(st2,new Map([[5,'single']]));assert.equal(out3.find(x=>x.slots[0]==='5A').status,'Identifié');
+});
