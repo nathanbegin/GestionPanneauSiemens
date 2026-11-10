@@ -154,7 +154,11 @@ export function outputText(data){
  throw new HttpError(502,'Réponse de l’IA vide ou incomplète.');
 }
 
-export async function scanPanel({files,hint={},settings={}},{fetchImpl=fetch,timeoutMs=55000}={}){
+export async function scanPanel({files,hint={},settings={},lite=false},{fetchImpl=fetch,timeoutMs=55000}={}){
+ if(lite){
+  if(Array.isArray(files)&&files.length>LITE_MAX_FILES)throw new HttpError(400,`Analyse allégée (forfait gratuit) : ${LITE_MAX_FILES} photos au maximum par analyse.`);
+  if(Array.isArray(hint.previous)&&hint.previous.length)throw new HttpError(402,'Les photos de précision sont réservées aux forfaits payants.',{quota:true});
+ }
  if(!aiConfigured())throw new HttpError(503,'L’analyse par IA n’est pas configurée sur ce serveur (OPENAI_API_KEY manquante).');
  const content=[{type:'input_text',text:scanPrompt(hint)},...toInputParts(files,imageDetail(settings))];
  const order=modelOrder(settings);
@@ -207,9 +211,22 @@ export async function testModel(model,{fetchImpl=fetch}={}){
 // Droits : forfaits payants (abonnement actif hors forfait gratuit), fonction « ai » explicite, ou administrateurs.
 // Quota mensuel : features.aiScans si défini, sinon 100 (forfaits Électricien) ou 20 (autres forfaits payants).
 export function aiAllowance(e,isAdmin){
- if(isAdmin)return {allowed:true,monthly:null};
+ if(isAdmin)return {allowed:true,monthly:null,lite:false};
  const f=e.plan.features||{};
  const paid=e.live&&e.plan.id!=='gratuit';
- if(!(paid||f.ai))return {allowed:false,monthly:0};
- return {allowed:true,monthly:Number.isInteger(f.aiScans)?f.aiScans:f.planning?100:20};
+ if(!(paid||f.ai))return {allowed:false,monthly:0,lite:false};
+ return {allowed:true,monthly:Number.isInteger(f.aiScans)?f.aiScans:f.planning?100:20,lite:!!f.aiLite};
+}
+// Analyse allégée (forfait gratuit) : moins de photos par analyse et pas de photos de précision, pour limiter le coût.
+export const LITE_MAX_FILES=3;
+/**
+ * Coût estimé d'une analyse en dollars US : tokens d'entrée = invite + schéma (~1 650) + photos (~1 000 chacune) ; sortie ~2 500 (+ 500 par photo de plus de 3).
+ * Les prix par million de tokens viennent de AI_CATALOG ; null si le modèle n'a pas de prix connu.
+ */
+export function estimateScanCost({model=DEFAULT_MODEL,photos=3,precision=false,outputTokens=null}={}){
+ const m=AI_CATALOG.find(x=>x.id===model);
+ if(!m||m.input==null)return null;
+ const input=1650+photos*1000+(precision?1300:0);
+ const output=outputTokens??2500+Math.max(0,photos-3)*500;
+ return {input,output,usd:(input*m.input+output*m.output)/1e6};
 }

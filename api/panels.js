@@ -8,7 +8,7 @@ import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
 import {siteAccess,panelAccess,need} from './_lib/shares.js';
-import {scanPanel,aiAllowance,aiConfigured,aiModel,loadAiSettings} from './_lib/ai.js';
+import {scanPanel,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
 import {scanToPanel} from '../public/aiscan.js';
 import {rateLimit,recordAttempt} from './_lib/auth.js';
 
@@ -56,7 +56,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   const allow=aiAllowance(e,isAdmin);
   const [{n:used}]=await sql`SELECT count(*)::int AS n FROM app_ai_scans WHERE user_id=${user.id} AND ok AND created_at>=date_trunc('month',now())`;
   const settings=await loadAiSettings(sql);
-  const status={configured:aiConfigured(),allowed:allow.allowed,monthly:allow.monthly,used,model:aiModel(settings)};
+  const status={configured:aiConfigured(),allowed:allow.allowed,monthly:allow.monthly,lite:allow.lite,maxFiles:allow.lite?LITE_MAX_FILES:null,used,model:aiModel(settings)};
   if(req.method==='GET')return res.status(200).json(status);
   if(req.method!=='POST')throw new HttpError(405,'Méthode non permise.');
   if(!allow.allowed)throw new HttpError(402,'L’ajout de panneau par photo (IA) est inclus dans les forfaits payants.',{quota:true});
@@ -65,7 +65,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   await recordAttempt(sql,'ai:'+user.id);
   const data=body(req);
   let out;
-  try{out=await scanPanel({files:data.files,hint:data.hint||{},settings});}
+  try{out=await scanPanel({files:data.files,hint:data.hint||{},settings,lite:allow.lite});}
   catch(x){await sql`INSERT INTO app_ai_scans(user_id,model,ok) VALUES(${user.id},${aiModel(settings)},false)`;throw x;}
   await sql`INSERT INTO app_ai_scans(user_id,model,input_tokens,output_tokens) VALUES(${user.id},${out.model},${out.usage.input},${out.usage.output})`;
   if(!out.scan.is_panel)return res.status(200).json({notPanel:true,summary:out.scan.summary||'',warnings:out.scan.warnings||[],used:used+1,monthly:allow.monthly});

@@ -8,7 +8,7 @@ export const QUOTA_TYPES={active:'Panneaux actifs',monthly:'Nouveaux panneaux pa
 export const AUDIENCES={gratuit:'Gratuit',proprietaire:'Propriétaire',gestionnaire:'Gestionnaire d’immeuble',electricien:'Électricien'};
 // Prix en cents (CAD, taxes en sus).
 const DEFAULT_PLANS=[
- {id:'gratuit',name:'Gratuit',audience:'gratuit',description:'Pour essayer : toutes les fonctions de base.',price_month:0,price_year:0,quota_type:'active',panel_limit:5,site_limit:2,seats:1,features:{},sort:0},
+ {id:'gratuit',name:'Gratuit',audience:'gratuit',description:'Pour essayer : toutes les fonctions de base.',price_month:0,price_year:0,quota_type:'active',panel_limit:5,site_limit:2,seats:1,features:{ai:true,aiScans:2,aiLite:true},sort:0},
  {id:'proprietaire',name:'Propriétaire',audience:'proprietaire',description:'Maison, condo, chalet : plus de panneaux et de sites.',price_month:399,price_year:2900,quota_type:'active',panel_limit:10,site_limit:3,seats:1,features:{},sort:10},
  {id:'gestionnaire',name:'Gestionnaire d’immeuble',audience:'gestionnaire',description:'Copropriétés et immeubles : sites illimités et plusieurs utilisateurs.',price_month:2400,price_year:24000,quota_type:'active',panel_limit:150,site_limit:null,seats:3,features:{qr:true},sort:20},
  {id:'electricien-solo',name:'Électricien Solo',audience:'electricien',description:'Maître électricien : planification avancée et rapports à votre image.',price_month:3400,price_year:34000,quota_type:'monthly',panel_limit:25,site_limit:null,seats:1,features:{planning:true,branding:true},sort:30},

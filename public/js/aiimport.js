@@ -64,7 +64,8 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
   const add=async input=>{
    errBox.textContent='';
    for(const file of [...input.files]){
-    if(files.length>=MAX_FILES){errBox.textContent=`${MAX_FILES} fichiers au maximum.`;break;}
+    const max=status.maxFiles||MAX_FILES;
+    if(files.length>=max){errBox.textContent=`${max} fichiers au maximum${status.lite?' (analyse allégée du forfait gratuit)':''}.`;break;}
     try{const p=await prepare(file);if(files.reduce((s,f)=>s+f.data.length*.75,0)+p.data.length*.75>MAX_TOTAL)throw Error('Total trop lourd : retirez un fichier.');files.push(p);}catch(e){errBox.textContent=e.message;}
    }
    input.value='';refresh();
@@ -81,6 +82,7 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
      h('li',{text:'Ouvrez la porte du panneau et photographiez-le de face, en entier, bien éclairé.'}),
      h('li',{text:'Ajoutez une photo rapprochée de l’étiquette du fabricant (marque, numéro de catalogue, ampérage).'}),
      h('li',{text:'Ajoutez le répertoire de la porte s’il est lisible, ou un fichier récapitulatif (PDF, CSV, texte).'})),
+    status.lite?h('p',{class:'notice info small',text:`Analyse allégée (forfait gratuit) : ${status.maxFiles} photos au maximum par analyse et pas de photos de précision. Les forfaits payants ajoutent plus d’analyses et les photos de précision.`}):null,
     h('p',{class:'small muted',text:`Analyses ce mois-ci : ${status.used}${status.monthly!=null?' / '+status.monthly:''}. Ne retirez jamais le couvercle intérieur : la photo de la face avant suffit.`})),
    h('div',{class:'page-actions'},h('label',{class:'btn primary',for:'aiCamera'},'📷 Prendre une photo'),camera,h('label',{class:'btn',for:'aiFiles'},'📁 Choisir des fichiers'),picker),
    list,
@@ -220,7 +222,7 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
     target?null:h('button',{type:'button',class:'ghost',onclick:()=>identify(p)},'← Revenir à l’identification'),
     h('button',{type:'button',class:'ghost',onclick:()=>photos()},'Recommencer'),
     uncertain().length?h('button',{type:'button',onclick:()=>quiz(p,{circuits,edited,changed})},`🧭 Questions sur les points incertains (${uncertain().length})`):null,
-    h('button',{type:'button',onclick:()=>clarify(p,{circuits,edited})},'📷 Ajouter des photos pour préciser'),
+    status.lite?null:h('button',{type:'button',onclick:()=>clarify(p,{circuits,edited})},'📷 Ajouter des photos pour préciser'),
     create));
   draw();
  }

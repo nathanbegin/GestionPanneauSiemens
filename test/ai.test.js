@@ -57,8 +57,8 @@ test('appel OpenAI simulé',async()=>{
 test('droits d’accès à l’IA',()=>{
  const e=(id,live,features={})=>({live,plan:{id,features}});
  assert.equal(aiAllowance(e('gratuit',false),false).allowed,false);
- assert.deepEqual(aiAllowance(e('proprietaire',true),false),{allowed:true,monthly:20});
- assert.deepEqual(aiAllowance(e('electricien-solo',true,{planning:true}),false),{allowed:true,monthly:100});
+ assert.deepEqual(aiAllowance(e('proprietaire',true),false),{allowed:true,monthly:20,lite:false});
+ assert.deepEqual(aiAllowance(e('electricien-solo',true,{planning:true}),false),{allowed:true,monthly:100,lite:false});
  assert.equal(aiAllowance(e('gratuit',false),true).allowed,true);
 });
 
@@ -109,4 +109,21 @@ test('photos de précision : configuration précédente transmise à l’IA',asy
  const txt=scanPrompt({previous:prev,brand:'Siemens',positions:32});
  assert.match(txt,/PHOTOS DE PRÉCISION/);assert.match(txt,/"user_confirmed":true/);assert.match(txt,/"positions":32/);
  assert.doesNotMatch(scanPrompt({}),/PHOTOS DE PRÉCISION/);
+});
+
+test('forfait gratuit : analyse allégée et coût estimé',async()=>{
+ const {aiAllowance:al,scanPanel:sp,LITE_MAX_FILES,estimateScanCost}=await import('../api/_lib/ai.js');
+ const e=(id,live,features={})=>({live,plan:{id,features}});
+ assert.deepEqual(al(e('gratuit',false,{ai:true,aiScans:2,aiLite:true}),false),{allowed:true,monthly:2,lite:true});
+ assert.equal(al(e('gratuit',false,{ai:true,aiScans:0,aiLite:true}),false).monthly,0);
+ assert.equal(al(e('proprietaire',true),false).lite,false);
+ process.env.OPENAI_API_KEY='k';
+ const four=Array.from({length:LITE_MAX_FILES+1},()=>({name:'a.jpg',data:'data:image/jpeg;base64,/9j/'}));
+ await assert.rejects(()=>sp({files:four,lite:true}),x=>x.status===400&&/3 photos/.test(x.message));
+ await assert.rejects(()=>sp({files:four.slice(0,1),hint:{previous:[{position:1}]},lite:true}),x=>x.status===402);
+ delete process.env.OPENAI_API_KEY;
+ const t=estimateScanCost({model:'gpt-6.1-terra',photos:3});
+ assert.equal(t.input,4650);assert.equal(t.output,2500);assert.ok(Math.abs(t.usd-(4650*1+2500*5)/1e6)<1e-9);
+ assert.ok(estimateScanCost({model:'gpt-6-astra',photos:3}).usd>estimateScanCost({model:'gpt-6.1-terra',photos:3}).usd*5);
+ assert.equal(estimateScanCost({model:'gpt-5.6-terra'}),null);
 });
