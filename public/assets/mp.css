@@ -677,3 +677,10 @@ body.app .container{max-width:min(1760px,96vw)}
 .ai-grp summary::-webkit-details-marker{display:none}
 .ai-grp summary.linked{font-weight:600;color:#245c3a}
 .ai-grp-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+
+/* Code QR du panneau */
+.qr-box{display:grid;place-items:center;padding:8px}
+.qr-box .qr-svg{width:min(280px,70vw);height:auto;border:1px solid var(--line);border-radius:8px}
+.qr-url{width:100%;margin:8px 0;font-size:12px}
+#qrPrint{display:none}
+@media print{body>*:not(#qrPrint){display:none!important}#qrPrint{display:block!important;text-align:center;padding:24mm 12mm}#qrPrint svg{width:90mm;height:90mm}}

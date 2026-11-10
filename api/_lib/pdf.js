@@ -3,6 +3,7 @@ import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
 import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,tagGroups,formatOf,breakerFormats} from '../../public/model.js';
 import {FAMILIES,serviceCheck} from '../../public/catalog.js';
 import LOGOS from '../_data/logos.js';
+import {qrMatrix} from '../../public/qr.js';
 
 // ---------- Logos et modèle du panneau ----------
 const slug=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -388,15 +389,27 @@ export async function buildReport({kind='report',format='letter',user,site,panel
 }
 
 // Étiquettes autocollantes : gabarit Avery 5160 / 8160 (30 par feuille Lettre, 2⅝ × 1 po).
-export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=null}){
+export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=null,qrUrl=''}){
  const d=await Doc.create('letter','Étiquettes — '+panelTitle(panel),brand);
  const W=189,H=72,left=13.5,top=36,pitchX=198;
- const items=[{type:'panel'},...sortCircuits(panel.circuits).filter(c=>!(skipFree&&c.status==='Libre')).map(c=>({type:'circuit',c}))];
+ const items=[{type:'panel'},...(qrUrl?[{type:'qr'}]:[]),...sortCircuits(panel.circuits).filter(c=>!(skipFree&&c.status==='Libre')).map(c=>({type:'circuit',c}))];
  const logos=panelLogos(panel.details);
  for(const [i,it] of items.entries()){
   const k=i%30;if(k===0)d.page();
   const col=k%3,row=Math.floor(k/3),x=left+col*pitchX,y=d.H-top-(row+1)*H;
   d.rect(x+2,y+2,W-4,H-4,{borderColor:rgb(.88,.9,.88),borderWidth:.4});
+  if(it.type==='qr'){
+   // Étiquette du code QR : ouvre ce panneau dans l'application (connexion requise).
+   const m=qrMatrix(qrUrl,{ecl:'M'}),n=m.length,plate=62,qz=2,mod=plate/(n+2*qz);
+   d.rect(x+6,y+5,plate,plate,{color:rgb(1,1,1),borderColor:rgb(.75,.8,.77),borderWidth:.4});
+   for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])d.rect(x+6+(c+qz)*mod,y+5+plate-(r+qz+1)*mod,mod+.05,mod+.05,{color:rgb(0,0,0)});
+   const tx=x+78,tw=W-88;
+   d.text('CODE QR · PANNEAU',tx,y+H-18,{size:6,f:d.bold,color:d.C.green,max:tw});
+   d.text(panel.tag||panel.name,tx,y+H-33,{size:14,f:d.bold,max:tw});
+   if(panel.tag)d.text(panel.name,tx,y+H-43,{size:7,max:tw});
+   d.wrap('Scannez pour ouvrir ce panneau (connexion requise).',6.5,tw).slice(0,2).forEach((l,j)=>d.text(l,tx,y+17-j*8,{size:6.5,color:d.C.muted}));
+   continue;
+  }
   if(it.type==='panel'){
    const det=panel.details||{};
    d.rect(x+8,y+10,W-16,H-20,{color:d.C.ink});

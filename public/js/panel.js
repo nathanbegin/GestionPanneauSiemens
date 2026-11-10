@@ -1,6 +1,7 @@
 // Vue d'un panneau : face avant, nomenclature, documents et fiche.
-import {h,toast,confirmDialog,fmtRelative} from './dom.js';
-import {api,openDocument} from './api.js';
+import {h,toast,confirmDialog,fmtRelative,dialog} from './dom.js';
+import {api,openDocument,NATIVE,webUrl} from './api.js';
+import {qrMatrix,qrSvg,panelLink,qrAllowed} from '../qr.js';
 import {designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
@@ -26,6 +27,8 @@ export async function panelView({id,tab='panel',ctx}){
  let {panel,site,siblings,children=[]}=data;
  // Planification : forfaits Électricien (et administrateurs).
  const planning=!!(ent?.plan?.features?.planning||ctx.user?.isAdmin);
+ // Code QR du panneau : forfaits qui l'incluent (Gestionnaire, Électricien) et administrateurs.
+ const qr=qrAllowed(ent?.plan?.features,ctx.user?.isAdmin);
  // Bibliothèque de produits (abonnés seulement).
  const lib=planning?await loadLibrary().catch(()=>null):null;
  let saving=Promise.resolve();
@@ -63,6 +66,18 @@ export async function panelView({id,tab='panel',ctx}){
   return run;
  }
 
+ // Code QR : ouvre ce panneau dans l'application (connexion requise).
+ function qrDialog(){
+  const url=panelLink(NATIVE?webUrl(''):location.origin,panel.id);
+  const svgText=qrSvg(url);
+  const node=new DOMParser().parseFromString(svgText,'image/svg+xml').documentElement;node.setAttribute('class','qr-svg');
+  const save=(blob,name)=>{const a=h('a',{href:URL.createObjectURL(blob),download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);};
+  const fname='qr-'+(panel.tag||panel.name).normalize('NFD').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const png=()=>{const m=qrMatrix(url),n=m.length,s=12,q=4,W=(n+2*q)*s,cv=document.createElement('canvas');cv.width=cv.height=W;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,W);g.fillStyle='#000';for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])g.fillRect((c+q)*s,(r+q)*s,s,s);cv.toBlob(b=>b&&save(b,fname+'.png'));};
+  const print=()=>{const box=h('div',{id:'qrPrint'},h('h2',{text:panelTitle(panel)}),node.cloneNode(true),h('p',{text:'Scannez pour ouvrir ce panneau dans Mon Panneau (connexion requise).'}),h('p',{class:'small',text:url}));document.body.append(box);window.print();setTimeout(()=>box.remove(),500);};
+  const copy=async()=>{try{await navigator.clipboard.writeText(url);toast('Lien copié.');}catch{toast(url,8000);}};
+  dialog({title:'Code QR · '+panelTitle(panel),eyebrow:'Ouvre ce panneau dans l’application',body:[h('div',{class:'qr-box'},node),h('p',{class:'small muted',text:'Collez-le sur la porte du panneau. Le lien ouvre ce panneau seulement pour les personnes connectées à un compte qui y a accès (vous, votre équipe, ou les personnes avec qui il est partagé).'}),h('input',{class:'qr-url',readOnly:true,value:url,'aria-label':'Lien du code QR',onfocus:e=>e.target.select()}),h('div',{class:'page-actions'},h('button',{type:'button',onclick:copy},'Copier le lien'),h('button',{type:'button',onclick:()=>save(new Blob([svgText],{type:'image/svg+xml'}),fname+'.svg')},'Télécharger SVG'),h('button',{type:'button',onclick:png},'Télécharger PNG'),h('button',{type:'button',class:'primary',onclick:print},'Imprimer'))],actions:[{label:'Fermer',kind:'ghost'}]});
+ }
  // Garnir le panneau existant avec des photos analysées par l'IA.
  const garnir=()=>aiImportDialog({site,siblings,target:panel,onApplied:p=>{panel=p;renderHead();renderBody();}});
  function renderHead(){
@@ -79,6 +94,7 @@ export async function panelView({id,tab='panel',ctx}){
    h('div',{class:'page-actions'},saveState,
     data.access&&data.access!=='owner'?h('span',{class:'badge shared',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})},'👥 Partager'),
     data.access!=='view'&&h('button',{type:'button',onclick:garnir},'📷 Garnir par photos (IA)'),
+    qr&&h('button',{type:'button',onclick:qrDialog},'▦ Code QR'),
     h('button',{type:'button',onclick:()=>doc({kind:'door'})},'📄 Aide-mémoire PDF'),
     h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes'))));
  }
@@ -239,7 +255,7 @@ export async function panelView({id,tab='panel',ctx}){
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'📘'}),h('h3',{text:'Rapport complet'}),h('p',{text:'Informations du site et du panneau, répertoire, tableau détaillé avec notes et exceptions, préparé par et signature.'}),h('div',{class:'opts'},f2),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'report',format:f2.value})},'Générer le PDF')),
    planning&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🧮'}),h('h3',{text:'Note de calcul de charge'}),h('p',{text:'Calcul de l’entrée électrique étape par étape, en langage clair, avec les règles du Code, les appareils comptés et exclus, et le verdict sur le principal installé.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'calc'})},'Générer le PDF')),
    planning&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'⚡'}),h('h3',{text:'Bilan de charges et matériel'}),h('p',{text:'Liste de charges par circuit, phases L1/L2, capacité du panneau, calcul selon la règle 8-200, alertes et liste de disjoncteurs.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'Générer le PDF')),
-   h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🏷'}),h('h3',{text:'Étiquettes autocollantes'}),h('p',{text:'Feuille Lettre Avery 5160 / 8160 (30 étiquettes 2⅝ × 1 po) : repère du panneau puis un circuit par étiquette. Imprimez à 100 %.'}),h('label',{class:'opts'},skip,'Ignorer les positions libres'),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'labels',skipFree:skip.checked})},'Générer les étiquettes')),
+   h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🏷'}),h('h3',{text:'Étiquettes autocollantes'}),h('p',{text:'Feuille Lettre Avery 5160 / 8160 (30 étiquettes 2⅝ × 1 po) : repère du panneau'+(qr?', code QR du panneau':'')+' puis un circuit par étiquette. Imprimez à 100 %.'}),h('label',{class:'opts'},skip,'Ignorer les positions libres'),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'labels',skipFree:skip.checked})},'Générer les étiquettes')),
   ];
   if(ctx.features.zebra)cards.push(h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🖨'}),h('h3',{text:'Imprimante ZebraHD'}),h('p',{text:'Envoie les circuits à ZebraHD pour imprimer des étiquettes sur imprimante thermique.'}),h('button',{type:'button',onclick:zebra},'Envoyer à ZebraHD')));
   cards.push(h('article',{class:'card doc-card'},h('div',{class:'ico',text:'💾'}),h('h3',{text:'Sauvegarde JSON'}),h('p',{text:'Exportez une copie complète du panneau, réimportable lors de la création d’un nouveau panneau.'}),h('button',{type:'button',onclick:exportJson},'Exporter le fichier')));
