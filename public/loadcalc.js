@@ -14,6 +14,11 @@ const round=(n,d=1)=>Math.round(n*10**d)/10**d;
 export const nextBreaker=a=>STANDARD_BREAKERS.find(b=>b>=a-1e-9)??null;
 export const wireFor=amps=>WIRE_TABLE.find(w=>w.amps>=amps)?.gauge??null;
 
+// Cuisinière sur son propre circuit : règle 8-300 — 8 000 W jusqu'à 12 kW, plus 40 % de l'excédent (jamais plus que la puissance de plaque).
+// Pour l'entrée de la maison, la règle 8-200 est différente : 6 000 W + 40 % de l'excédent (voir dwellingCalc).
+export const rangeCircuitDemand=w=>Math.min(w,8000+0.4*Math.max(0,w-12000));
+// Appareils à moteur ou à compresseur : le courant de démarrage dépasse le nominal sans être une surcharge (section 28).
+const MOTOR_RE=/pompe|thermopompe|climati|compresseur|moteur|ouvre-porte|aspirateur|r[ée]frig[ée]rateur|cong[ée]lateur|ventilat|vrc|vre|scie|perceuse/i;
 // Puissance d'une charge en watts.
 const lw=l=>(Number(l.w)||0)*(Number(l.qty)||1);
 
@@ -24,7 +29,7 @@ export function circuitLoad(c,vs=DEFAULT_VOLTS){
  const contW=loads.filter(l=>l.cont).reduce((s,l)=>s+lw(l),0);
  // Cuisinière : 6000 W + 40 % de l'excédent de 12 kW (même logique que le calcul du logement).
  const rangeW=loads.filter(l=>l.cat==='range').reduce((s,l)=>s+lw(l),0);
- const demandW=watts-rangeW+(rangeW?6000+0.4*Math.max(0,rangeW-12000):0);
+ const demandW=watts-rangeW+(rangeW?rangeCircuitDemand(rangeW):0);
  const amps=watts/volts,demandAmps=Math.min(watts,demandW)/volts;
  // Disjoncteur minimal : 125 % de la partie continue + 100 % du reste.
  const minBreakerAmps=(contW/CONTINUOUS_FACTOR+(Math.min(watts,demandW)-contW))/volts;
@@ -33,10 +38,12 @@ export function circuitLoad(c,vs=DEFAULT_VOLTS){
  const issues=[];
  if(watts&&breaker){
   if(demandAmps>breaker)issues.push({level:'error',text:`Charge de ${round(demandAmps)} A supérieure au disjoncteur de ${breaker} A.`});
-  else if(contW&&minBreakerAmps>breaker)issues.push({level:'error',text:`Charge continue au-delà de 80 % du disjoncteur (${round(demandAmps/breaker*100,0)} %). Minimum suggéré : ${nextBreaker(minBreakerAmps)} A.`});
-  else if(demandAmps>breaker*CONTINUOUS_FACTOR)issues.push({level:'warn',text:`Circuit chargé à ${round(demandAmps/breaker*100,0)} % du disjoncteur.`});
+  else if(contW&&minBreakerAmps>breaker)issues.push({level:'error',text:`Charge continue au-delà de 80 % du disjoncteur (${round(demandAmps/breaker*100,0)} %) : le disjoncteur doit valoir au moins 125 % de la charge continue. Minimum suggéré : ${nextBreaker(minBreakerAmps)} A.`});
+  // Charge non continue : admissible jusqu'à 100 % du calibre ; le 80 % n'est pas un seuil de déclenchement.
+  else if(!contW&&demandAmps>breaker*CONTINUOUS_FACTOR)issues.push({level:'info',text:`Charge non continue à ${round(demandAmps/breaker*100,0)} % du disjoncteur : admissible jusqu’à 100 %. Vérifiez qu’aucun appareil du circuit ne fonctionne en continu (3 heures ou plus).`});
  }
  if(watts&&!breaker)issues.push({level:'warn',text:'Calibre du disjoncteur à préciser.'});
+ if(loads.some(l=>MOTOR_RE.test(l.name||'')))issues.push({level:'info',text:'Appareil à moteur ou à compresseur : le courant de démarrage dépasse le nominal sans être une surcharge. Se fier à la plaque (MCA / MOCP) et, si le disjoncteur déclenche, chercher la cause plutôt qu’augmenter le calibre.'});
  const loadVolts=new Set(loads.map(l=>Number(l.v)||0).filter(Boolean));
  if([...loadVolts].some(v=>v>=208)&&volts===vs.uni)issues.push({level:'error',text:`Appareil ${[...loadVolts].find(v=>v>=208)} V sur un disjoncteur unipolaire : un bipolaire est requis.`});
  if(vs.bi===208&&loadVolts.has(240))issues.push({level:'info',text:'Appareil 240 V sur un réseau 208 V : un élément chauffant fournit environ 75 % de sa puissance. Vérifiez la plaque signalétique.'});
@@ -91,7 +98,7 @@ export function dwellingCalc(circuits,{livingArea=0,basementArea=0,children=[],p
  // 4. Cuisinière.
  const rangeW=sum('range'),range=rangeW?6000+0.4*Math.max(0,rangeW-12000):0;
  if(rangeW)steps.push({id:'range',title:'Cuisinière',rule:'CCÉ 8-200 1) a) iv)',formula:`6000 W${rangeW>12000?` + 40 % × (${kw(rangeW)} − 12 kW)`:` (cuisinière de ${kw(rangeW)}, 12 kW ou moins)`} = ${Math.round(range)} W`,w:range,items:of('range'),
-  itemsNote:of('range').length>1?'Table de cuisson et four encastré additionnés et traités comme une seule cuisinière.':''});
+  itemsNote:of('range').length>1?'Table de cuisson et four encastré : combinés comme une seule cuisinière selon les conditions du Code (8-300, 26-746).':''});
  // 5. Chauffe-eau instantané, piscine, spa.
  const w100=sum('water100');
  if(w100)steps.push({id:'water100',title:'Chauffe-eau instantané, piscine, spa, bain de vapeur',rule:'CCÉ 8-200 1) a) v)',formula:`100 % de ${kw(w100)}`,w:w100,items:of('water100')});

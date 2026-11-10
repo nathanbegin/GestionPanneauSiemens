@@ -55,7 +55,7 @@ export const LOAD_LIBRARY=[
  {id:'range-12',g:'Cuisine et lavage',name:'Cuisinière jusqu’à 12 kW',w:12000,v:240,cat:'range',cont:false,b:40,note:'Pratique courante : 40 A grâce au facteur de demande des cuisinières.'},
  {id:'cooktop',g:'Cuisine et lavage',name:'Table de cuisson 7 kW',w:7000,v:240,cat:'range',cont:false,b:40},
  {id:'wall-oven',g:'Cuisine et lavage',name:'Four encastré 5 kW',w:5000,v:240,cat:'other',cont:false,b:30},
- {id:'dryer',g:'Cuisine et lavage',name:'Sécheuse 5,6 kW',w:5600,v:240,cat:'other',cont:false,b:30},
+ {id:'dryer',g:'Cuisine et lavage',name:'Sécheuse 5,6 kW',w:5600,v:240,cat:'other',cont:true,b:30,note:'Traitée comme charge continue : disjoncteur ≥ 125 % (5 kW → 20,8 A × 1,25 = 26 A → 30 A).'},
  {id:'washer',g:'Cuisine et lavage',name:'Laveuse',w:1000,v:120,cat:'basic',cont:false,b:20},
  {id:'dishwasher',g:'Cuisine et lavage',name:'Lave-vaisselle',w:1200,v:120,cat:'basic',cont:false,b:15},
  {id:'fridge',g:'Cuisine et lavage',name:'Réfrigérateur',w:700,v:120,cat:'basic',cont:false,b:15},

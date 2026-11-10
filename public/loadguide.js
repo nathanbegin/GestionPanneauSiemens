@@ -27,10 +27,10 @@ export const GUIDE_STEPS={
   excludes:['Le moins élevé entre chauffage et climatisation (non simultanés)','Une thermopompe qui chauffe et climatise ne se compte pas deux fois'],
   tip:'14 kW de plinthes → 10 kW + 75 % de 4 kW = 13 kW. Climatisation 4,2 kW → on garde 13 kW.'},
  range:{title:'4. Ajouter la cuisinière',rule:'8-200 1) a) iv)',
-  plain:'Une cuisinière de 12 kW ou moins compte pour 6000 W. Au-delà de 12 kW, on ajoute 40 % de ce qui dépasse 12 kW.',
-  includes:['Cuisinière électrique','Table de cuisson et four encastré : on les additionne comme une seule cuisinière'],
+  plain:'Pour l’entrée de la maison, une cuisinière de 12 kW ou moins compte pour 6000 W. Au-delà de 12 kW, on ajoute 40 % de ce qui dépasse 12 kW. (Son propre circuit se dimensionne autrement : 8000 W jusqu’à 12 kW, règle 8-300.)',
+  includes:['Cuisinière électrique','Table de cuisson et four encastré : peuvent être combinés comme une seule cuisinière selon les conditions du Code (8-300, 26-746)'],
   excludes:['Cuisinière au gaz (sauf son allumage, déjà dans la charge de base)'],
-  tip:'Cuisinière de 14 kW → 6000 W + 40 % × 2000 W = 6800 W.'},
+  tip:'Cuisinière de 14 kW → 6000 W + 40 % × 2000 W = 6800 W. Cuisinière de plaque 13 300 W : entrée 6000 + 40 % × 1300 = 6520 W ; circuit 8000 + 40 % × 1300 = 8520 W ÷ 240 V = 35,5 A → disjoncteur de 40 A.'},
  water100:{title:'5. Ajouter à 100 % les gros appareils d’eau chaude',rule:'8-200 1) a) v)',
   plain:'Ces appareils fonctionnent longtemps à pleine puissance : on les compte au complet.',
   includes:['Chauffe-eau instantané (sans réservoir)','Chauffe-piscine et thermopompe de piscine','Spa et bain tourbillon chauffé','Bain de vapeur'],
@@ -55,13 +55,15 @@ export const GUIDE_STEPS={
 
 // Règles importantes hors du calcul de l'entrée.
 export const GUIDE_RULES=[
- {title:'La règle des 80 % pour chaque circuit',rule:'8-104',plain:'Une charge « continue » (qui fonctionne 3 heures ou plus : chauffage, borne, chauffe-eau) ne doit pas dépasser 80 % du calibre de son disjoncteur. Autrement dit, le disjoncteur doit valoir au moins 125 % de la charge. Exemple : borne de 32 A → disjoncteur de 40 A.'},
+ {title:'La règle des 80 % pour chaque circuit',rule:'8-104',plain:'Une charge « continue » (qui peut demeurer en service 3 heures ou plus : chauffage, borne de recharge, chauffe-eau à réservoir, sécheuse, spa…) ne doit pas dépasser 80 % du calibre de son disjoncteur. Autrement dit, le disjoncteur doit valoir au moins 125 % de la charge. Exemples : borne de 32 A → 40 A ; chauffe-eau de 4,5 kW (18,75 A) → 23,4 A → 25 A ; plinthe de 3 kW (12,5 A) → 15,6 A → 20 A. Une charge non continue (cuisinière, four, micro-ondes, grille-pain) est admissible jusqu’à 100 %. Le « 80 % » n’est pas un seuil de déclenchement : un disjoncteur de 40 A ne se coupe pas à 32 A. Un appareil cyclique ou commandé par thermostat n’est pas automatiquement non continu.'},
+ {title:'Circuit individuel ≠ entrée de la maison',rule:'8-300 et 8-200',plain:'Le dimensionnement d’un circuit et la contribution d’un appareil au calcul de l’entrée suivent des règles différentes. Maytag 13 300 W : circuit 8000 + 40 % × 1300 = 8520 W (40 A) ; entrée 6000 + 40 % × 1300 = 6520 W. Chauffe-eau de 4 500 W : circuit 4500 × 1,25 = 5625 W équivalents ; entrée 25 % = 1125 W (avec cuisinière). Borne de 32 A : 7680 W dans les deux cas (sans gestion d’énergie).'},
+ {title:'Démarrage et surcharge',rule:'Section 28',plain:'Les appareils à moteur ou à compresseur (réfrigérateur, thermopompe, pompe, aspirateur central, ouvre-porte, outils) tirent un courant de démarrage supérieur au nominal ; un appel de courant normal n’est pas une surcharge. Un courant temporairement toléré ne devient jamais une capacité de dimensionnement : si un disjoncteur déclenche de façon répétée, cherchez la cause au lieu d’augmenter son calibre.'},
  {title:'Le fil doit supporter le disjoncteur',rule:'Tableau 2 et 4-004',plain:'Le calibre du fil se choisit selon le disjoncteur, jamais l’inverse : 14 AWG pour 15 A, 12 AWG pour 20 A, 10 AWG pour 30 A, 8 AWG pour 40 A (cuivre, cas résidentiels courants).'},
  {title:'Garder une marge',rule:'Bonne pratique',plain:'Un panneau chargé à plus de 80 % de son principal laisse peu de place pour une borne, une thermopompe ou un spa futurs. Prévoyez vos projets dans le calcul.'},
- {title:'Les données à utiliser',rule:'Plaques signalétiques',plain:'Utilisez la puissance inscrite sur la plaque de chaque appareil (en W ou VA). Si seule l’intensité est indiquée : puissance ≈ ampères × tension. Pour les thermopompes, utilisez le MCA (fil) et le MOP (disjoncteur maximal).'},
+ {title:'Les données à utiliser',rule:'Plaques signalétiques',plain:'Utilisez la puissance inscrite sur la plaque de chaque appareil (en W ou VA). Si seule l’intensité est indiquée : puissance ≈ ampères × tension. Pour les thermopompes, utilisez le MCA (fil) et le MOCP.'},
  {title:'Changer l’entrée électrique',rule:'Hydro-Québec',plain:'Une augmentation de l’entrée (ex. 100 A → 200 A) se coordonne avec Hydro-Québec et doit être faite par un maître électricien, avec déclaration de travaux.'},
 ];
-export const GUIDE_DISCLAIMER='Vulgarisation fournie à titre informatif, basée sur le Code canadien de l’électricité (CSA C22.1) tel qu’adopté au Québec (Code de construction, chapitre V — Électricité). Les numéros de règles peuvent varier selon l’édition en vigueur. Seul le texte officiel du Code fait foi, et le calcul doit être validé par un maître électricien membre de la CMEQ.';
+export const GUIDE_DISCLAIMER='Vulgarisation fournie à titre informatif, basée sur le Code canadien de l’électricité (CSA C22.1) tel qu’adopté au Québec (Code de construction, chapitre V — Électricité). Les exemples de base proviennent du guide de la RBQ (Code 2018) ; le Code 2026 ajoute notamment des exigences sur la recharge des véhicules électriques et la gestion d’énergie. Les numéros de règles peuvent varier selon l’édition en vigueur : vérifiez l’édition applicable au chantier. Seul le texte officiel du Code fait foi, et le calcul doit être validé par un maître électricien membre de la CMEQ.';
 export const GUIDE_REFS=[
  'Code canadien de l’électricité, Première partie, CSA C22.1 — section 8 (règles 8-104, 8-106, 8-110, 8-200), section 62 (chauffage), section 86 (recharge de véhicules)',
  'Code de construction du Québec, chapitre V — Électricité (Régie du bâtiment du Québec)',
