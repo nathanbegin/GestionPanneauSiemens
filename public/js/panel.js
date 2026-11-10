@@ -345,7 +345,7 @@ export async function panelView({id,tab='panel',ctx}){
  // ---------- Onglet Planification ----------
  function renderPlan(){
   const rep=panelReport(panel,{children});
-  const statusText={ok:'Bonne marge',medium:'Marge correcte',high:'Au-delà de 80 %',over:'Surcharge',unknown:'À compléter'}[rep.status];
+  const statusText={ok:'Bonne marge',medium:'Marge correcte',high:'Marge réduite (> 80 %)',over:'Surcharge',unknown:'À compléter'}[rep.status];
   const kw=w=>(w/1000).toLocaleString('fr-CA',{maximumFractionDigits:1})+' kW';
   // Panneau réaliste + placement depuis la palette.
   const free=c=>isEmptySlot(c)||(c.status==='Libre'&&!c.label&&!c.notes);
@@ -368,11 +368,13 @@ export async function panelView({id,tab='panel',ctx}){
   const gauge=h('div',{class:'card side-card'},h('h3',{text:'Capacité du panneau'}),
    h('div',{class:'gauge '+rep.status},h('div',{class:'big',text:rep.percent!=null?rep.percent+' %':'—'}),h('div',{},h('b',{text:statusText}),h('div',{class:'small muted',text:rep.mainAmps?`${rep.designAmps} A sur un principal de ${rep.mainAmps} A (${rep.isDwelling?'calcul 8-200':'phase la plus chargée'})`:'Indiquez le calibre principal dans la fiche du panneau.'}))),
    rep.percent!=null&&h('div',{class:'progress mt'+(rep.percent>100?' over':rep.percent>80?' high':'')},h('i',{style:{width:Math.min(100,rep.percent)+'%'}})),
-   h('p',{class:'small muted mt',text:`Charge branchée : ${kw(rep.connectedW)}${children.length?` (dont ${children.length} sous-panneau(x))`:''} · ${rep.free} position(s) libre(s)${rep.remainingAmps!=null?` · marge avant 80 % : ${rep.remainingAmps} A`:''}`}),
+   h('p',{class:'small muted mt',text:`Charge branchée : ${kw(rep.connectedW)}${children.length?` (dont ${children.length} sous-panneau(x))`:''} · ${rep.free} position(s) libre(s)${rep.remainingAmps!=null?` · marge de prudence (80 %) : ${rep.remainingAmps} A`:''}`}),
    rep.model&&h('p',{class:'small muted',text:`Modèle : ${rep.model.id} — ${rep.model.label}`}),
    h('div',{class:'legs mt'},h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L1'}),h('b',{text:rep.balance.L1+' A'})),h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L2'}),h('b',{text:rep.balance.L2+' A'}))),
    h('p',{class:'small muted',text:`Déséquilibre : ${rep.balance.imbalance} %`}));
-  const issues=h('div',{class:'card side-card'},h('h3',{text:`Alertes (${rep.issues.length})`}),rep.issues.length?rep.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.circuit?`Circuit ${i.circuit} : `:'')+i.text})):h('p',{class:'issue info',text:'Aucune alerte. Ajoutez les charges de chaque circuit pour un bilan complet.'}));
+  const issues=h('div',{class:'card side-card'},h('h3',{text:`Alertes (${rep.issues.length})`}),
+   rep.issues.length?rep.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.circuit?`Circuit ${i.circuit} : `:'')+i.text})):h('p',{class:'issue info',text:'Aucune alerte. Ajoutez les charges de chaque circuit pour un bilan complet.'}),
+   ...(rep.notes||[]).map(n=>h('p',{class:'issue info',text:'ℹ '+n.text})));
   const sugg=h('div',{class:'card side-card'},h('h3',{text:'Suggestions'}),h('ul',{class:'small'},suggestions(rep).map(t=>h('li',{text:t}))));
   if(!planning){
    body.replaceChildren(h('div',{class:'card empty-state'},h('div',{class:'ico',text:'⚡'}),h('h2',{text:'Planification et calcul de charges'}),

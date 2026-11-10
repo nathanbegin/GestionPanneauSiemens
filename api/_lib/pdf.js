@@ -470,8 +470,8 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?rep.model.id+' — '+rep.model.label:[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—'],...(serviceLine(panel.details||{})?[['Conducteurs d’entrée',serviceLine(panel.details)]]:[])]);
  preparedBlock(d,user,generatedAt);
  // Synthèse.
- sectionTitle(d,'Synthèse','Charge de calcul comparée au disjoncteur principal ; seuil recommandé : 80 %.');
- const boxes=[['Capacité utilisée',rep.percent!=null?rep.percent+' %':'—'],['Charge de calcul',rep.designAmps+' A'],['Charge branchée',kw(rep.connectedW)],['Phase L1 / L2',`${rep.balance.L1} / ${rep.balance.L2} A`],['Marge avant 80 %',rep.remainingAmps!=null?rep.remainingAmps+' A':'—']];
+ sectionTitle(d,'Synthèse','Charge de calcul comparée au disjoncteur principal : permise jusqu’à 100 % (facteurs de demande appliqués) ; 80 % = marge de prudence.');
+ const boxes=[['Capacité utilisée',rep.percent!=null?rep.percent+' %':'—'],['Charge de calcul',rep.designAmps+' A'],['Charge branchée',kw(rep.connectedW)],['Phase L1 / L2',`${rep.balance.L1} / ${rep.balance.L2} A`],['Marge de prudence (80 %)',rep.remainingAmps!=null?rep.remainingAmps+' A':'—']];
  const bw=(d.W-2*M-4*8)/5;
  boxes.forEach(([k,v],i)=>{const x=M+i*(bw+8);d.rect(x,d.y-42,bw,42,{color:d.C.soft,borderColor:d.C.line,borderWidth:.6});d.text(k.toUpperCase(),x+7,d.y-13,{size:6,f:d.bold,color:d.C.muted,max:bw-14});d.text(v,x+7,d.y-32,{size:12,f:d.bold,color:i===0&&rep.percent>80?rgb(.64,.24,.2):d.C.ink,max:bw-14});});
  d.y-=56;
@@ -479,6 +479,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  // Alertes.
  sectionTitle(d,`Alertes (${rep.issues.length})`);
  if(!rep.issues.length){d.text('Aucune alerte.',M,d.y,{size:8.5,color:d.C.muted});d.y-=14;}
+ for(const n of (rep.notes||[])){const ls=d.wrap('Note : '+n.text,8,d.W-2*M-16);d.ensure(ls.length*10+4);ls.forEach((l,j)=>d.text(l,M+8,d.y-j*10,{size:8,color:d.C.muted}));d.y-=ls.length*10+4;}
  for(const i of rep.issues){const lines=d.wrap((i.circuit?`Circuit ${i.circuit} : `:'')+i.text,8.5,d.W-2*M-16);d.ensure(lines.length*11+4);d.rect(M,d.y-(lines.length-1)*11-3,3,(lines.length-1)*11+11,{color:i.level==='error'?rgb(.64,.24,.2):C.amber});lines.forEach((l,j)=>d.text(l,M+10,d.y-j*11,{size:8.5}));d.y-=lines.length*11+4;}
  d.y-=6;
  // Calcul 8-200.
@@ -489,7 +490,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  }
  // Liste de charges.
  d.page();
- sectionTitle(d,'Liste de charges par circuit','Charge de calcul, taux de charge du disjoncteur (charges continues limitées à 80 %) et conducteur.');
+ sectionTitle(d,'Liste de charges par circuit','Charge de calcul, taux de charge du disjoncteur (charge continue limitée à 80 % du calibre, charge non continue jusqu’à 100 %) et conducteur.');
  const cols=[['Pos.',44],['Circuit et charges',196],['kW',42],['A',38],['Disj.',40],['%',34],['Fil',58],['Ph.',30],['État',50]];
  const head=()=>{d.rect(M,d.y-16,d.W-2*M,16,{color:d.C.ink});let x=M+5;for(const [t,w] of cols){d.text(t.toUpperCase(),x,d.y-11,{size:6.5,f:d.bold,color:d.C.white});x+=w;}d.y-=18;};
  head();

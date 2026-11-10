@@ -38,7 +38,7 @@ export function appliancesView({panel,children=[],save,onChange,canEdit=true}){
   }))))
   :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'🔌'}),h('h3',{text:'Aucun électroménager inscrit'}),h('p',{text:'Inscrivez les appareils qui consomment le plus (cuisinière, sécheuse, chauffe-eau, thermopompe, borne…) et reliez-les au bon circuit. Vous pouvez photographier leur plaque signalétique : l’IA lit la puissance.'}));
  const gauge=rep&&h('div',{class:'card side-card'},h('h3',{text:'Charge du panneau'}),
-  h('div',{class:'gauge '+rep.status},h('div',{class:'big',text:rep.percent!=null?rep.percent+' %':'—'}),h('div',{},h('b',{text:{ok:'Bonne marge',medium:'Marge correcte',high:'Au-delà de 80 %',over:'Surcharge',unknown:'À compléter'}[rep.status]}),
+  h('div',{class:'gauge '+rep.status},h('div',{class:'big',text:rep.percent!=null?rep.percent+' %':'—'}),h('div',{},h('b',{text:{ok:'Bonne marge',medium:'Marge correcte',high:'Marge réduite (> 80 %)',over:'Surcharge',unknown:'À compléter'}[rep.status]}),
    h('div',{class:'small muted',text:rep.mainAmps?`${rep.designAmps} A sur un principal de ${rep.mainAmps} A`:'Indiquez le principal dans la fiche du panneau pour obtenir le pourcentage.'}))),
   h('p',{class:'small muted mt',text:`Charge branchée : ${fmtW(Math.round(rep.connectedW))} · seuls les appareils reliés à un circuit comptent.`}));
  const pending=rows.filter(r=>r.pending).length;

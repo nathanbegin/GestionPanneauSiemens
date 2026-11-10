@@ -36,6 +36,10 @@ export function breakerBehavior(breaker,{demandAmps=null,fullAmps=null}={}){
 }
 // Appareils à moteur ou à compresseur : le courant de démarrage dépasse le nominal sans être une surcharge (section 28).
 const MOTOR_RE=/pompe|thermopompe|climati|compresseur|moteur|ouvre-porte|aspirateur|r[ée]frig[ée]rateur|cong[ée]lateur|ventilat|vrc|vre|scie|perceuse/i;
+// Classement par nom : appareils normalement traités comme charge continue (×1,25) ou non continue (jusqu'à 100 %).
+// Un appareil cyclique ou commandé par thermostat n'est pas automatiquement non continu : ce ne sont que des repères à vérifier.
+const CONT_RE=/borne|recharge|chauffe[- ]?eau|plinthe|convecteur|a[ée]rotherme|fournaise|thermopompe|climati|\bspa\b|piscine|plancher chauffant|s[ée]cheuse/i;
+const NONCONT_RE=/cuisini|\bfour\b|table de cuisson|plaque de cuisson|micro-?ondes|grille-?pain|bouilloire|s[èe]che-?cheveux|mixeur|robot culinaire/i;
 // Puissance d'une charge en watts.
 const lw=l=>(Number(l.w)||0)*(Number(l.qty)||1);
 
@@ -48,6 +52,8 @@ export function circuitLoad(c,vs=DEFAULT_VOLTS){
  const rangeW=loads.filter(l=>l.cat==='range').reduce((s,l)=>s+lw(l),0);
  const demandW=watts-rangeW+(rangeW?rangeCircuitDemand(rangeW):0);
  const amps=watts/volts,demandAmps=Math.min(watts,demandW)/volts;
+ // Puissance équivalente pour dimensionner (alimentation, panneau) : charges continues × 1,25, charges non continues à 100 %.
+ const effW=(watts-contW)+contW/CONTINUOUS_FACTOR;
  // Disjoncteur minimal : 125 % de la partie continue + 100 % du reste.
  const minBreakerAmps=(contW/CONTINUOUS_FACTOR+(Math.min(watts,demandW)-contW))/volts;
  const breaker=c.amps||null;
@@ -61,23 +67,28 @@ export function circuitLoad(c,vs=DEFAULT_VOLTS){
  }
  if(watts&&!breaker)issues.push({level:'warn',text:'Calibre du disjoncteur à préciser.'});
  if(rangeW&&breaker&&amps>breaker)issues.push({level:'info',text:`À pleine puissance (tous les éléments), la cuisinière appellerait ${round(amps)} A, soit ${round(amps/breaker*100,0)} % du disjoncteur de ${breaker} A. Le facteur de demande de la règle 8-300 dimensionne le circuit selon l’usage prévu (${round(demandAmps)} A) ; il ne modifie pas la courbe de déclenchement : le disjoncteur n’est pas conçu pour supporter cette intensité en permanence.`});
+ for(const l of loads){
+  if(!l.cont&&CONT_RE.test(l.name||''))issues.push({level:'info',text:`« ${l.name} » est normalement une charge continue (disjoncteur ≥ 125 %) : cochez « charge continue » si l’appareil peut fonctionner 3 heures ou plus.`});
+  else if(l.cont&&NONCONT_RE.test(l.name||''))issues.push({level:'info',text:`« ${l.name} » est normalement une charge non continue (jusqu’à 100 % du disjoncteur) : décochez « charge continue » si son usage est intermittent.`});
+ }
  if(loads.some(l=>MOTOR_RE.test(l.name||'')))issues.push({level:'info',text:'Appareil à moteur ou à compresseur : le courant de démarrage dépasse le nominal sans être une surcharge. Se fier à la plaque (MCA / MOCP) et, si le disjoncteur déclenche, chercher la cause plutôt qu’augmenter le calibre.'});
  const loadVolts=new Set(loads.map(l=>Number(l.v)||0).filter(Boolean));
  if([...loadVolts].some(v=>v>=208)&&volts===vs.uni)issues.push({level:'error',text:`Appareil ${[...loadVolts].find(v=>v>=208)} V sur un disjoncteur unipolaire : un bipolaire est requis.`});
  if(vs.bi===208&&loadVolts.has(240))issues.push({level:'info',text:'Appareil 240 V sur un réseau 208 V : un élément chauffant fournit environ 75 % de sa puissance. Vérifiez la plaque signalétique.'});
  if(wire&&breaker&&wireAmps(wire)!=null&&wireAmps(wire)<breaker)issues.push({level:'error',text:`Fil ${wire} (${wireAmps(wire)} A) trop petit pour un disjoncteur de ${breaker} A.`});
  if(breaker&&!wire&&watts)issues.push({level:'info',text:`Fil suggéré : ${wireFor(breaker)} cuivre.`});
- return {volts,watts,contW,amps:round(amps),demandAmps:round(demandAmps),minBreaker:watts?nextBreaker(minBreakerAmps):null,suggestedWire:breaker?wireFor(breaker):null,
+ return {volts,watts,contW,effW,amps:round(amps),demandAmps:round(demandAmps),minBreaker:watts?nextBreaker(minBreakerAmps):null,suggestedWire:breaker?wireFor(breaker):null,
   percent:breaker&&watts?round(demandAmps/breaker*100,0):null,issues};
 }
 
 // Charges par phase (A). Un circuit bipolaire 240 V charge L1 et L2 ; un 120 V charge sa phase.
-export function phaseBalance(circuits,vs=DEFAULT_VOLTS){
+export function phaseBalance(circuits,vs=DEFAULT_VOLTS,{effective=false}={}){
  const legs={L1:0,L2:0};
  for(const c of circuits){
   const r=circuitLoad(c,vs);if(!r.watts)continue;
-  if(r.volts===vs.bi){legs.L1+=r.watts/vs.bi;legs.L2+=r.watts/vs.bi;}
-  else legs[legOf(slotPos(c.slots[0]))]+=r.watts/vs.uni;
+  const w=effective?r.effW:r.watts;
+  if(r.volts===vs.bi){legs.L1+=w/vs.bi;legs.L2+=w/vs.bi;}
+  else legs[legOf(slotPos(c.slots[0]))]+=w/vs.uni;
  }
  const max=Math.max(legs.L1,legs.L2),min=Math.min(legs.L1,legs.L2);
  return {L1:round(legs.L1),L2:round(legs.L2),imbalance:max?round((max-min)/max*100,0):0};
@@ -151,36 +162,50 @@ export function panelReport(panel,{children=[]}={}){
  // Sous-panneaux : charge répartie sur les deux phases.
  const childAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c,vs).watts,0),0)/vs.bi;
  balance.L1=round(balance.L1+childAmps);balance.L2=round(balance.L2+childAmps);
+ // Dimensionnement : charges continues × 1,25 (disjoncteur ≥ 125 %), charges non continues à 100 %.
+ const eff=phaseBalance(circuits,vs,{effective:true});
+ const childEffAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c,vs).effW,0),0)/vs.bi;
+ eff.L1+=childEffAmps;eff.L2+=childEffAmps;
  const mainAmps=Number(det.mainAmps)||null;
  const calc=dwellingCalc(circuits,{livingArea:det.livingArea,basementArea:det.basementArea,children,panelTag:panel.tag||'',vs});
  const isDwelling=panel.kind==='Principal'&&calc.area>0;
- const designAmps=isDwelling?calc.amps:Math.max(balance.L1,balance.L2);
+ // Maison : calcul 8-200 (facteurs de demande déjà appliqués). Autre panneau : charges continues × 1,25.
+ const designAmps=isDwelling?calc.amps:round(Math.max(eff.L1,eff.L2));
  const percent=mainAmps&&designAmps?round(designAmps/mainAmps*100,0):null;
  const issues=[];
  for(const {c,r} of rows)for(const i of r.issues)if(i.level!=='info')issues.push({...i,circuit:designation(c)});
  const used=circuits.filter(c=>c.status!=='Libre'&&(c.label||c.loads?.length||c.amps)).length;
  if(model?.maxCircuits&&used>model.maxCircuits)issues.push({level:'error',text:`${used} circuits pour un maximum de ${model.maxCircuits} sur ce modèle.`});
  if(model&&!model.tandem&&circuits.some(c=>c.slots.length===1))issues.push({level:'error',text:'Ce modèle n’accepte pas de disjoncteurs jumelés.'});
- if(percent!=null&&percent>100)issues.push({level:'error',text:`Charge de calcul (${designAmps} A) supérieure au principal de ${mainAmps} A.`});
- else if(percent!=null&&percent>80)issues.push({level:'warn',text:`Charge de calcul à ${percent} % du principal : au-delà de 80 %, prévoyez une marge (gestionnaire de charge, augmentation de l’entrée).`});
+ // Le principal peut être chargé jusqu'à 100 % de la charge calculée ; le 80 % n'est pas une exigence pour une charge non continue ni pour la charge calculée (8-200).
+ const notes=[];
+ if(percent!=null&&percent>100)issues.push({level:'error',text:isDwelling?`Charge de calcul 8-200 (${designAmps} A) supérieure au principal de ${mainAmps} A : l’entrée est insuffisante.`:`Charge (charges continues × 1,25) de ${designAmps} A supérieure au principal de ${mainAmps} A.`});
+ else if(percent!=null&&percent>80)notes.push({level:'info',text:isDwelling?`La charge de calcul (règle 8-200, facteurs de demande déjà appliqués) atteint ${percent} % du principal : c’est permis jusqu’à 100 %, mais il reste peu de marge pour des ajouts futurs (marge de prudence : 80 %).`:`La charge (charges continues × 1,25) atteint ${percent} % du principal : permis jusqu’à 100 %, mais peu de marge pour des ajouts futurs.`});
  const service=det.fedFrom?null:serviceCheck(det);
  if(service?.status==='warn')issues.push({level:'warn',text:service.text});
  if(balance.imbalance>30&&Math.max(balance.L1,balance.L2)>20)issues.push({level:'warn',text:`Déséquilibre de ${balance.imbalance} % entre L1 et L2 : déplacez des circuits 120 V.`});
  const free=circuits.filter(c=>c.status==='Libre'||(!c.label&&!c.loads?.length&&c.amps==null)).length;
- return {vs,model,mainAmps,service,rows,connectedW,balance,calc,isDwelling,designAmps,percent,status:percent==null?'unknown':percent>100?'over':percent>80?'high':percent>70?'medium':'ok',issues,free,remainingAmps:mainAmps?round(mainAmps*CONTINUOUS_FACTOR-designAmps):null};
+ return {vs,model,mainAmps,service,rows,connectedW,balance,calc,isDwelling,designAmps,percent,status:percent==null?'unknown':percent>100?'over':percent>80?'high':percent>70?'medium':'ok',issues,notes,free,remainingAmps:mainAmps?round(mainAmps*CONTINUOUS_FACTOR-designAmps):null,remaining100:mainAmps?round(mainAmps-designAmps):null,_ctx:{circuits,det,vs,children,panelTag:panel.tag||''}};
 }
 
 // Suggestions : quelle borne ou quel appareil peut encore être ajouté ?
 export function suggestions(report){
  const out=[];
- const rem=report.remainingAmps;
+ const rem=report.remaining100;
  if(rem==null){out.push('Indiquez le calibre du disjoncteur principal pour obtenir des suggestions.');return out;}
  const bi=report.vs?.bi||240;
- const fits=LOAD_LIBRARY.filter(l=>l.cat==='ev'&&l.v===240).filter(l=>l.w/bi<=rem).sort((a,b)=>b.w-a.w)[0];
- if(fits)out.push(`Borne de recharge : jusqu’à « ${fits.name} » sans dépasser 80 % du principal (marge restante ≈ ${rem} A).`);
+ const main=report.mainAmps;
+ // Courant de calcul de l'entrée si on ajoute cette charge (facteurs de demande de la règle 8-200 pour une maison, charge continue × 1,25 sinon).
+ const projected=l=>{
+  if(report.isDwelling&&report._ctx){const x=report._ctx;return dwellingCalc([...x.circuits,{id:'__x',slots:['99A'],label:'',loads:[{name:l.name,w:l.w,v:l.v,qty:1,cat:l.cat,cont:!!l.cont}]}],{livingArea:x.det.livingArea,basementArea:x.det.basementArea,children:x.children,panelTag:x.panelTag,vs:x.vs}).amps;}
+  return report.designAmps+(l.cont?l.w/CONTINUOUS_FACTOR:l.w)/(l.v>=208?bi:report.vs?.uni||120);
+ };
+ const verdict=l=>{const p=projected(l);return p>main?'✗ dépasserait le principal':p>main*CONTINUOUS_FACTOR?'✓ possible, mais au-delà de la marge de prudence de 80 %':'✓ possible';};
+ const fits=LOAD_LIBRARY.filter(l=>l.cat==='ev'&&l.v===240).filter(l=>projected(l)<=main).sort((a,b)=>b.w-a.w)[0];
+ if(fits)out.push(`Borne de recharge : jusqu’à « ${fits.name} » sans dépasser le principal (${verdict(fits).replace(/^✓ /,'')}). Marge restante avant 100 % ≈ ${rem} A.`);
  else if(rem>12)out.push(`Borne de recharge : seule une borne de niveau 1 ou une borne de niveau 2 réglée à basse intensité est possible (marge ≈ ${rem} A). Un gestionnaire de charge (EVEMS, règle 8-106 11)) peut éviter l’augmentation de l’entrée.`);
  else out.push('Borne de recharge : capacité insuffisante. Envisagez un gestionnaire de charge (EVEMS) ou l’augmentation de l’entrée électrique.');
- for(const id of ['pool-hp','spa','hp-3t','wh-4500']){const l=LOAD_LIBRARY.find(x=>x.id===id);out.push(`${l.name} (${(l.w/1000).toLocaleString('fr-CA')} kW, ≈ ${round(l.w/bi)} A) : ${l.w/bi<=rem?'✓ possible':'✗ dépasserait 80 % du principal'}.`);}
+ for(const id of ['pool-hp','spa','hp-3t','wh-4500']){const l=LOAD_LIBRARY.find(x=>x.id===id);out.push(`${l.name} (${(l.w/1000).toLocaleString('fr-CA')} kW, ≈ ${round(l.w/bi)} A) : ${verdict(l)}.`);}
  if(report.free===0)out.push('Plus aucune position libre : un sous-panneau ou des disjoncteurs jumelés (si permis) seront nécessaires.');
  if(report.isDwelling&&report.calc.recommended&&report.mainAmps&&report.calc.recommended>report.mainAmps)out.push(`Entrée électrique recommandée selon le calcul : ${report.calc.recommended} A (actuelle : ${report.mainAmps} A).`);
  return out;
