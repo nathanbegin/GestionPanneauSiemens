@@ -14,11 +14,18 @@ export function handoffDialog({site}){
  const radios=kinds.map(([v,t,d],i)=>h('label',{class:'stage-opt'},h('input',{type:'radio',name:'kind',value:v,checked:i===0,onchange:()=>{kind=v;desc.textContent=d;}}),h('span',{},h('b',{text:t}))));
  const auth=h('input',{type:'checkbox',name:'authorized'});
  const err=h('p',{class:'error',role:'alert'}),result=h('div'),list=h('div',{class:'handoff-list'});
+ // Lien d'invitation toujours affiché et copiable (pour l'envoyer par une autre application : texto, messagerie…).
+ function showLink(out){
+  result.replaceChildren(h('div',{class:'notice info'},out.sent?`Invitation envoyée par courriel (valide ${out.days} jours). Vous pouvez aussi transmettre ce lien par une autre application :`:`Courriel non envoyé : copiez ce lien et transmettez-le vous-même (valide ${out.days} jours).`,
+   h('input',{readonly:true,value:out.url,'aria-label':'Lien d’invitation',onfocus:e=>e.target.select(),style:{width:'100%',marginTop:'6px'}}),
+   h('button',{type:'button',class:'sm',onclick:async()=>{try{await navigator.clipboard.writeText(out.url);toast('Lien copié.');}catch{toast(out.url,8000);}}},'Copier le lien')));
+ }
  async function refresh(){
   try{
    const {items}=await api('/api/sites?action=handoff&siteId='+site.id);
    list.replaceChildren(items.length?h('div',{},h('h3',{text:'Remises effectuées'}),...items.map(it=>h('div',{class:'trash-row card'},
     h('div',{},h('b',{text:it.email}),h('div',{class:'small muted',text:`${KIND[it.kind]} · ${STATUS[it.status]||it.status}${it.acceptedName?' par '+it.acceptedName:''} · ${fmtRelative(it.createdAt)}`})),
+    it.status==='pending'&&h('button',{type:'button',class:'sm',onclick:async()=>{try{showLink(await api('/api/sites?action=handoff-create',{method:'POST',body:{siteId:site.id,kind:it.kind,email:it.email,authorized:true}}));refresh();}catch(e){err.textContent=e.message;}}},'Nouveau lien à copier'),
     (it.kind==='access'&&['pending','accepted'].includes(it.status)||it.kind==='transfer'&&it.status==='pending')&&h('button',{type:'button',class:'danger sm',onclick:async()=>{if(!await confirmDialog(it.kind==='access'?`Retirer l’accès de ${it.email} ?`:'Annuler cette invitation ?',{title:'Retirer',confirm:'Retirer',danger:true}))return;await api('/api/sites?action=handoff-revoke&hid='+it.id,{method:'DELETE'});refresh();}},it.kind==='access'?'Retirer l’accès':'Annuler l’invitation')))):'');
   }catch{list.replaceChildren();}
  }
@@ -31,9 +38,7 @@ export function handoffDialog({site}){
   ev.preventDefault();err.textContent='';result.replaceChildren();
   try{
    const out=await api('/api/sites?action=handoff-create',{method:'POST',body:{siteId:site.id,kind,email:email.value,authorized:auth.checked}});
-   result.replaceChildren(h('div',{class:'notice info'},out.sent?`Invitation envoyée par courriel (valide ${out.days} jours). `:'Courriel non envoyé : copiez ce lien et transmettez-le vous-même. ',
-    h('input',{readonly:true,value:out.url,'aria-label':'Lien d’invitation',onfocus:e=>e.target.select(),style:{width:'100%',marginTop:'6px'}}),
-    h('button',{type:'button',class:'sm',onclick:async()=>{try{await navigator.clipboard.writeText(out.url);toast('Lien copié.');}catch{toast(out.url,8000);}}},'Copier le lien')));
+   showLink(out);
    email.value='';auth.checked=false;refresh();
   }catch(e){err.textContent=e.message;}
  });

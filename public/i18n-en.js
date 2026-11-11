@@ -1802,4 +1802,7 @@ export default [
  ["Centrer sur le circuit sélectionné", "Center on the selected circuit"],
  ["● Modifications non enregistrées", "● Unsaved changes"],
  ["ORGANISATION ÉLECTRIQUE", "ELECTRICAL ORGANIZATION"],
+ ["Nouveau lien à copier", "New link to copy"],
+ ["Invitation envoyée par courriel (valide {} jours). Vous pouvez aussi transmettre ce lien par une autre application :", "Invitation sent by email (valid for {} days). You can also send this link through another app:"],
+ ["Courriel non envoyé : copiez ce lien et transmettez-le vous-même (valide {} jours).", "Email not sent: copy this link and send it yourself (valid for {} days)."],
 ];
