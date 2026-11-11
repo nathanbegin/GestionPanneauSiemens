@@ -3,7 +3,7 @@ import {getSql} from './_lib/db.js';
 import {route,body,HttpError,isUuid,check} from './_lib/http.js';
 import {requireUser,newId} from './_lib/auth.js';
 import {assertCanCreateSite} from './_lib/plans.js';
-import {cleanSite} from '../public/model.js';
+import {cleanSite,designation,panelTitle} from '../public/model.js';
 import {siteOut,panelSummary} from './_lib/serialize.js';
 import {sharesFor,siteAccess,need} from './_lib/shares.js';
 
@@ -12,6 +12,27 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  const user=await requireUser(req,sql);
  const id=req.query?.id?String(req.query.id):'';
  if(id&&!isUuid(id))throw new HttpError(404,'Site introuvable.');
+ // Recherche sur l'ensemble des sites de l'utilisateur : site, client, adresse, panneau, circuit.
+ if(req.method==='GET'&&!id&&req.query?.search!==undefined){
+  const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const q=norm(String(req.query.search).slice(0,80)).trim();
+  if(q.length<2)return res.status(200).json({results:[]});
+  const has=(...v)=>v.some(x=>norm(x).includes(q));
+  const sites=await sql`SELECT * FROM app_sites WHERE user_id=${user.id}`;
+  const panels=await sql`SELECT id,site_id,name,tag,kind,location,details,circuits FROM app_panels WHERE user_id=${user.id}`;
+  const byId=new Map(sites.map(x=>[x.id,x]));
+  const out=[];
+  for(const st of sites)if(has(st.name,st.client,st.street,st.city,st.notes))out.push({type:'site',siteId:st.id,title:st.name,sub:[st.client,st.city].filter(Boolean).join(' · ')});
+  for(const p of panels){
+   const st=byId.get(p.site_id);if(!st)continue;
+   if(has(p.name,p.tag,p.location,p.details?.building,p.details?.brand,p.details?.model))out.push({type:'panel',siteId:st.id,panelId:p.id,title:panelTitle(p),sub:st.name+(p.location?' · '+p.location:'')});
+   for(const c of p.circuits||[]){
+    const tags=Object.values(c.tags||{}).flat();
+    if(has(c.label,c.room,c.notes,c.exceptions,c.breakerRef,...tags))out.push({type:'circuit',siteId:st.id,panelId:p.id,title:(c.label||'Sans désignation'),sub:`${st.name} · ${panelTitle(p)} · circuit ${designation(c)}${c.room?' · '+c.room:''}`,q:String(req.query.search).slice(0,80)});
+   }
+  }
+  return res.status(200).json({results:out.slice(0,40),more:out.length>40});
+ }
  if(req.method==='GET'&&!id){
   const rows=await sql`SELECT s.*,(SELECT count(*)::int FROM app_panels p WHERE p.site_id=s.id) AS panel_count FROM app_sites s WHERE s.user_id=${user.id} ORDER BY lower(s.name)`;
   const panels=await sql`SELECT id,site_id,name,tag,kind,location,positions,details,circuits,updated_at FROM app_panels WHERE user_id=${user.id}`;

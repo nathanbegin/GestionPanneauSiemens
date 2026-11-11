@@ -789,3 +789,21 @@ details.form-adv[open]>summary{margin-bottom:8px}
 .resume-cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 .resume-card{display:grid;gap:4px;text-decoration:none;color:inherit;padding:14px 16px}
 .resume-cta{color:var(--green,#226a51);font-weight:600;font-size:14px}
+/* Recherche globale, nomenclature éditable, menu « Plus d'actions », éditeur latéral */
+.global-search{display:flex;max-width:640px;margin:0 0 16px}
+.global-search input{width:100%}
+.result-list{display:grid;gap:8px;margin-bottom:20px}
+.result{display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit;padding:10px 14px}
+.result small{display:block}
+.etable{display:grid;gap:4px}
+.erow{display:grid;grid-template-columns:64px minmax(180px,2fr) minmax(110px,1fr) 130px 60px 76px;gap:8px;align-items:center;padding:4px 6px;border-radius:8px}
+.erow.ehead{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.erow input,.erow select{min-height:38px;width:100%}
+.erow .pos{font-weight:700}
+.erow.vacant{opacity:.6}
+.more-menu .menu{right:0;left:auto}
+dialog.side{position:fixed;inset:64px 0 0 auto;margin:0;width:min(440px,38vw);height:calc(100vh - 64px);max-height:none;border-radius:14px 0 0 0;box-shadow:-10px 0 30px #0b241b30;overflow:auto;z-index:15}
+dialog.side .dlg-body{overflow:auto}
+body.has-side #view{padding-right:min(460px,40vw)}
+@media (max-width:720px){.erow{grid-template-columns:48px 1fr 110px}.erow .amps,.erow.ehead span:nth-child(5),.erow.ehead span:nth-child(6){display:none}.erow>:nth-child(3){grid-column:2}.erow>:nth-child(4){grid-column:3;grid-row:1}.erow>button{grid-column:3}}
+body:has(#worknav:not([hidden])) dialog.side{inset-block-start:111px;height:calc(100vh - 111px)}

@@ -148,6 +148,16 @@ async function sitesView(){
   h('p',{class:'small muted mt'},'Vous utilisiez l’ancienne version avec une clé d’accès ? ',h('a',{href:'#/compte',text:'Importez vos panneaux'}),'.')));
  const resume=recents().filter(r=>sites.some(x=>x.panels.some(p=>p.id===r.id))).slice(0,3);
  const resumeBox=resume.length?h('section',{class:'resume','aria-label':'Reprendre le travail'},h('h2',{class:'resume-title',text:'Reprendre le travail'}),h('div',{class:'resume-cards'},...resume.map(r=>h('a',{class:'card resume-card',href:'#/panneaux/'+r.id},h('b',{text:(r.tag?r.tag+' · ':'')+r.name}),h('span',{class:'small muted',text:r.site}),h('span',{class:'resume-cta',text:r.toConfirm>0?`Continuer le relevé — ${r.toConfirm} circuit${r.toConfirm>1?'s':''} à confirmer`:'Rouvrir le panneau'}))))):null;
+// Recherche sur l'ensemble des sites : site, client, panneau, circuit, appareil.
+ const found=h('div',{class:'search-results',role:'region','aria-live':'polite'});let timer=0,seq=0;
+ const gsearch=h('label',{class:'search global-search'},h('span',{'aria-hidden':'true',text:'⌕'}),h('input',{type:'search',placeholder:'Rechercher dans tous mes sites : chauffe-eau, client, SP-GAR…','aria-label':'Rechercher dans tous mes sites',oninput:e=>{
+  clearTimeout(timer);const q=e.target.value.trim();
+  if(q.length<2){found.replaceChildren();gridWrap.hidden=false;return;}
+  timer=setTimeout(async()=>{const my=++seq;try{const r=await api('/api/sites?search='+encodeURIComponent(q));if(my!==seq)return;gridWrap.hidden=true;
+   const icon={site:'🏠',panel:'▦',circuit:'⚡'};
+   found.replaceChildren(r.results.length?h('div',{class:'result-list'},...r.results.map(x=>h('a',{class:'result card',href:x.panelId?'#/panneaux/'+x.panelId+(x.type==='circuit'?'/list':''):'#/sites/'+x.siteId,onclick:()=>{if(x.type==='circuit'){try{sessionStorage.setItem('mp_goto_q',x.q);}catch{}}}},h('span',{class:'ico','aria-hidden':'true',text:icon[x.type]}),h('span',{},h('b',{text:x.title}),h('small',{class:'muted',text:x.sub}))))):h('p',{class:'muted',text:'Aucun résultat.'}));
+  }catch(err){if(my===seq)found.replaceChildren(h('p',{class:'error',text:err.message}));}},250);}}));
+ const gridWrap=h('div');
  const grid=h('div',{class:'cards'},...sites.map(s=>h('a',{class:'card site-card',href:'#/sites/'+s.id},
    h('div',{},h('h2',{text:s.name}),s.shared&&h('span',{class:'badge shared',text:`👥 Partagé par ${s.shared.by}`}),h('div',{class:'addr',text:siteAddress(s)||'Adresse à préciser'}),s.client&&h('div',{class:'addr',text:'Client : '+s.client})),
    h('div',{class:'chips'},s.panels.length?s.panels.map(p=>h('span',{class:'badge '+(p.progress===100?'ok':''),text:`${p.tag||p.name} · ${p.progress} %`})):h('span',{class:'badge warn',text:'Aucun panneau'})),
@@ -155,7 +165,7 @@ async function sitesView(){
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
  return h('div',{class:'container'},
   h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
-  resumeBox||"",grid);
+  gsearch,found,(()=>{gridWrap.append(resumeBox||'',grid);return gridWrap;})());
 }
 
 function tree(panels){

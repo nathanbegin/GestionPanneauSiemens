@@ -171,7 +171,15 @@ export function panelDialog({siblings=[],onSave,library=false,defaultBipolar=240
 }
 
 // Fiche d'un circuit avec navigation précédent / suivant.
-export function circuitEditor({panel,id,order,onSave,planning=false,lib=null,feeds=null}){
+// Éditeur latéral (bureau) : un seul à la fois ; ouvrir un autre circuit le remplace après confirmation si nécessaire.
+let activeSide=null;
+const wideScreen=()=>typeof matchMedia==='function'&&matchMedia('(min-width:1100px)').matches;
+export function circuitEditor(opts){
+ if(activeSide){const a=activeSide;a.request().then(ok=>{if(ok)circuitEditor(opts);});return a.api;}
+ return openCircuitEditor(opts);
+}
+function openCircuitEditor({panel,id,order,onSave,planning=false,lib=null,feeds=null}){
+ const side=wideScreen();
  let current=id;
  let plan=null;
  const e=err();
@@ -260,7 +268,7 @@ h('div',{class:'full group-block'}),
  const prevBtn=h('button',{type:'button',class:'ghost',text:'‹ Précédent'});
  const nextBtn=h('button',{type:'button',text:'Enregistrer et suivant ›'});
  const guard=async()=>{if(dirty&&!await confirmDialog('Fermer sans enregistrer les modifications de cette fiche ?',{confirm:'Fermer sans enregistrer'}))return false;};
- d=dialog({title:'Circuit',eyebrow:' ',form:true,wide:true,body:[body],beforeClose:guard,dirty:()=>dirty,actions:[{label:'Fermer',kind:'ghost',left:true,onClick:guard},{label:'Enregistrer',kind:'primary',submit:true}]});
+ d=dialog({title:'Circuit',eyebrow:' ',form:true,wide:!side,side,body:[body],beforeClose:guard,dirty:()=>dirty,onClose:()=>{if(activeSide?.d===d)activeSide=null;},actions:[{label:'Fermer',kind:'ghost',left:true,onClick:guard},{label:'Enregistrer',kind:'primary',submit:true}]});
  d.el.querySelector('.dlg-foot .right').prepend(prevBtn,nextBtn);
  prevBtn.onclick=async()=>{const ok=await save(0);if(ok!==false){const idx=order.indexOf(current)-1;if(order[idx]){current=order[idx];render();}}};
  nextBtn.onclick=()=>save(1);
@@ -270,6 +278,7 @@ h('div',{class:'full group-block'}),
  // Le panneau peut être remplacé après une sauvegarde (nouvelle révision, ids réorganisés).
  const api={setPanel(p,nextOrder){panel=p;order=nextOrder;if(!panel.circuits.some(x=>x.id===current))current=order[0];}};
  render();
+ if(side)activeSide={d,api,request:async()=>{if(await guard()===false)return false;activeSide=null;d.close();return true;}};
  return api;
 }
 

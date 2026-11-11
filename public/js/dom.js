@@ -56,9 +56,9 @@ export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide
  el.addEventListener('cancel',ev=>{ev.preventDefault();tryClose();});
  if(form||dirty){unsaved.add(isDirty);if(form){inner.addEventListener('input',()=>{touched=true;});inner.addEventListener('change',()=>{touched=true;});}}
  if(!leaveHooked){leaveHooked=true;window.addEventListener('beforeunload',ev=>{if(hasUnsaved()){ev.preventDefault();ev.returnValue='';}});}
- el.addEventListener('close',()=>{unsaved.delete(isDirty);el.remove();onClose?.();});
+ el.addEventListener('close',()=>{unsaved.delete(isDirty);if(side)document.body.classList.remove('has-side');el.remove();onClose?.();});
  document.body.append(el);
- if(side){el.classList.add('side');el.show();}else el.showModal();
+ if(side){el.classList.add('side');document.body.classList.add('has-side');el.show();}else el.showModal();
  return {el,close,form:form?inner:null};
 }
 export function confirmDialog(message,{title='Confirmer',confirm='Confirmer',danger=false}={}){

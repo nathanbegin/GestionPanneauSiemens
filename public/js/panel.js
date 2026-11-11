@@ -43,6 +43,8 @@ export async function panelView({id,tab='panel',ctx}){
  const pref=k=>{try{return localStorage.getItem(k);}catch{return null;}};
  const setPref=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
  state.view=pref('mp_panel_view')==='reel'?'reel':'schema';
+ // Arrivée depuis la recherche globale : liste filtrée sur le terme cherché.
+ try{const gq=sessionStorage.getItem('mp_goto_q');if(gq){state.q=gq;state.tab='list';sessionStorage.removeItem('mp_goto_q');}}catch{}
  // Désignations à côté du panneau réaliste : désactivées par défaut (la liste des circuits les montre déjà).
  state.realLabels=pref('mp_panel_real_labels')==='1';state.rzoom=pref('mp_panel_zoom')==='circuits'?'circuits':'full';state.rmult=[1,1.25,1.5,2,3].includes(Number(pref('mp_panel_mult')))?Number(pref('mp_panel_mult')):1;
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
@@ -123,6 +125,28 @@ export async function panelView({id,tab='panel',ctx}){
  }
  // Garnir le panneau existant avec des photos analysées par l'IA.
  const garnir=()=>aiImportDialog({site,siblings,target:panel,onApplied:p=>{panel=p;renderHead();renderBody();}});
+ // Une action principale selon l'étape ; partage, photos, QR et exports sont regroupés dans « Plus d'actions ».
+ function primaryAction(){
+  const cur=stageOf(),todo=panel.circuits.filter(c=>!c.vacant&&c.status==='À confirmer'&&!c.label).length;
+  if(data.access!=='view'&&cur==='releve'&&panel.circuits.some(c=>c.status==='À confirmer'&&!c.vacant)){
+   const first=sortCircuits(panel.circuits).find(c=>c.status==='À confirmer'&&!c.vacant);
+   return h('button',{type:'button',class:'primary',onclick:()=>openCircuit(first.id)},'Identifier les circuits'+(todo?` (${todo})`:''));
+  }
+  if(cur==='verification')return h('button',{type:'button',class:'primary',onclick:()=>go('appliances')},'🔌 Électroménagers');
+  return h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes');
+ }
+ function moreMenu(){
+  const item=(label,fn)=>h('button',{type:'button',role:'menuitem',onclick:fn},label);
+  const menu=h('div',{class:'menu',role:'menu'},
+   data.access&&data.access!=='owner'?h('div',{class:'who',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):item('👥 Partager',()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})),
+   data.access!=='view'&&item('📷 Garnir par photos (IA)',garnir),
+   qr&&item('▦ Code QR',qrDialog),
+   item('📄 Aide-mémoire PDF',()=>doc({kind:'door'})),
+   item('🖨 Rapports et étiquettes',()=>go('docs')));
+  const btn=h('button',{type:'button','aria-haspopup':'menu','aria-expanded':'false'},'⋯ Plus d’actions');
+  btn.onclick=e=>{e.stopPropagation();const open=menu.classList.toggle('open');btn.setAttribute('aria-expanded',String(open));};
+  return h('div',{class:'user-menu more-menu'},btn,menu);
+ }
  function renderHead(){
   const s=stats(panel.circuits),det=panel.details||{};
   ctx.remember?.({id:panel.id,name:panel.name,tag:panel.tag,site:site.name,siteId:site.id,toConfirm:s.toConfirm});
@@ -136,12 +160,7 @@ export async function panelView({id,tab='panel',ctx}){
     h('div',{class:'sub'},[panel.kind,panel.location||'Emplacement à préciser',det.building].filter(Boolean).join(' · ')),
     h('div',{class:'progress-line'},h('div',{class:'progress','aria-hidden':'true'},h('i',{style:{width:s.progress+'%'}})),h('span',{text:`${s.identified} identifiés · ${s.free} libres · ${s.toConfirm} à confirmer`})),
     fed&&h('div',{class:'sub small'},'Alimenté par ',h('a',{href:'#/panneaux/'+fed.id,text:panelTitle(fed)}),det.fedFromCircuit?` (circuit ${det.fedFromCircuit})`:'')),
-   h('div',{class:'page-actions'},
-    data.access&&data.access!=='owner'?h('span',{class:'badge shared',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})},'👥 Partager'),
-    data.access!=='view'&&h('button',{type:'button',onclick:garnir},'📷 Garnir par photos (IA)'),
-    qr&&h('button',{type:'button',onclick:qrDialog},'▦ Code QR'),
-    h('button',{type:'button',onclick:()=>doc({kind:'door'})},'📄 Aide-mémoire PDF'),
-    h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes'))));
+   h('div',{class:'page-actions'},primaryAction(),moreMenu())));
  }
  function renderTabs(){
   // Tous les outils sont accessibles quelle que soit l'étape (l'étape n'est qu'un indicateur d'avancement).
@@ -172,7 +191,25 @@ export async function panelView({id,tab='panel',ctx}){
   if(tagsList.length){const tg=h('select',{'aria-label':'Filtrer par tag',onchange:e=>{state.tag=e.target.value;onChange();}},new Option('Tous les tags',''),...tagsList.map(t=>new Option(t,t)));tg.value=state.tag;row.append(tg);}
   return row;
  }
- function circuitList(container){
+ // Nomenclature éditable : désignation, pièce et statut directement dans les lignes (la fiche complète reste pour les détails).
+ async function saveField(id,patch){
+  try{const next=structuredClone(panel.circuits);const c=next.find(x=>x.id===id);if(!c)return;Object.assign(c,patch);await persist({circuits:next});renderHead();}
+  catch(e){toast(e.message,7000);renderBody();}
+ }
+ function editableList(container){
+  const list=sortCircuits(panel.circuits).filter(filtered());
+  const rooms=[...new Set(panel.circuits.map(c=>c.room).filter(Boolean))];
+  const rowOf=c=>{
+   if(c.vacant)return h('div',{class:'erow vacant'},h('span',{class:'pos',text:designation(c)}),h('span',{class:'muted',text:'Espace inutilisé'}));
+   const label=h('input',{value:c.label||'','aria-label':'Désignation du circuit '+designation(c),maxlength:100,placeholder:'À identifier…',onchange:e=>saveField(c.id,{label:e.target.value.trim()})});
+   const room=h('input',{value:c.room||'','aria-label':'Pièce du circuit '+designation(c),maxlength:80,list:'erRooms',placeholder:'Pièce',onchange:e=>saveField(c.id,{room:e.target.value.trim()})});
+   const st=h('select',{'aria-label':'Statut du circuit '+designation(c),class:'st-'+statusClass(c),onchange:e=>saveField(c.id,{status:e.target.value})},...states.map(x=>new Option(x,x)));st.value=c.status;
+   return h('div',{class:'erow '+statusClass(c)},h('span',{class:'pos',text:designation(c)}),label,room,st,h('span',{class:'amps',text:c.amps?c.amps+' A':'— A'}),h('button',{type:'button',class:'ghost sm','aria-label':'Ouvrir la fiche complète du circuit '+designation(c),onclick:()=>openCircuit(c.id)},'Fiche ›'));
+  };
+  container.replaceChildren(list.length?h('div',{class:'etable'},h('div',{class:'erow ehead'},h('span',{text:'Pos.'}),h('span',{text:'Désignation'}),h('span',{text:'Pièce'}),h('span',{text:'Statut'}),h('span',{text:'Calibre'}),h('span')),...list.map(rowOf),h('datalist',{id:'erRooms'},rooms.map(r=>h('option',{value:r})))):h('p',{class:'empty-state muted',text:'Aucun circuit ne correspond à la recherche.'}));
+ }
+ function circuitList(container,editable=false){
+  if(editable&&data.access!=='view'&&!state.select)return editableList(container);
   const match=filtered();
   const list=sortCircuits(panel.circuits).filter(match);
   container.replaceChildren(...(list.length?list.map(c=>{
@@ -256,8 +293,8 @@ export async function panelView({id,tab='panel',ctx}){
    refresh();
   }else if(state.tab==='list'){
    const listBox=h('div',{class:'circuit-list'});
-   body.replaceChildren(h('div',{class:'list-wide'},bulkBar(),filters(()=>circuitList(listBox)),listBox,legend()));
-   circuitList(listBox);
+   body.replaceChildren(h('div',{class:'list-wide'},bulkBar(),filters(()=>circuitList(listBox,true)),listBox,legend()));
+   circuitList(listBox,true);
   }else if(state.tab==='appliances')body.replaceChildren(appliancesView({panel,children,canEdit:data.access!=='view',onChange:()=>{renderHead();renderBody();},
    save:async({circuits,appliances})=>{await persist({circuits,meta:metaWith({appliances})});}}));
   else if(state.tab==='plan')renderPlan();
