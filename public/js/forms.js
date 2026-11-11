@@ -203,10 +203,12 @@ function openCircuitEditor({panel,id,order,onSave,planning=false,lib=null,feeds=
   body.replaceChildren(
    ...(isPhone()?[miniStrip(c)]:[]),
    h('div',{class:'fields'},
+    h('h4',{class:'full form-sub',text:'Identification'}),
     field('Désignation — ce que le circuit alimente',input('label',c.label,{maxlength:100,placeholder:'Ex. Prises du salon',autocomplete:'off'}),{full:true}),
     field('Pièce / zone',input('room',c.room,{maxlength:80,placeholder:'Ex. Cuisine, Sous-sol',list:'rooms'})),
     field('Type d’usage',select('usage',usageOrder,c.usage)),
     feeds&&h('div',{class:'full feed-slot'}),
+    h('h4',{class:'full form-sub',text:'Caractéristiques'}),
     field('Calibre',select('amps',[['','À confirmer'],...ampsList.map(a=>[a,a+' A'])],c.amps??'')),
     field('Statut',select('status',states,c.status),{hint:'« Identifié » = vérifié sur place. Une description seule laisse le circuit « À confirmer ».'}),
     h('datalist',{id:'rooms'},[...new Set(panel.circuits.map(x=>x.room).filter(Boolean))].map(r=>h('option',{value:r}))),
@@ -215,6 +217,7 @@ function openCircuitEditor({panel,id,order,onSave,planning=false,lib=null,feeds=
     field('Format du disjoncteur',select('format',Object.entries(breakerFormats),fmt),{hint:'Bipolaire = 240 V (cuisinière, sécheuse…).'}),
 h('div',{class:'full group-block'}),
     )),
+    h('h4',{class:'full form-sub',text:'Notes'}),
     h('details',{class:'full'},h('summary',{class:'small',text:'Tags, exceptions et notes'}),h('div',{class:'fields'},
      field('Tags · emplacements',input('locations',(c.tags?.locations||[]).join(', '),{placeholder:'Sous-sol, Cinéma'}),{hint:'Séparez par des virgules.'}),
      field('Tags · fonctions',input('functions',(c.tags?.functions||[]).join(', '),{placeholder:'Prises, Réseau'})),
@@ -273,7 +276,7 @@ h('div',{class:'full group-block'}),
   e.textContent='';
   try{
    if(dirty){const next=collect();await onSave(next);}
-   dirty=false;statusTouched=false;
+   dirty=false;statusTouched=false;try{d.el.querySelector('.dirty-flag').hidden=true;}catch{}
    if(move){const idx=order.indexOf(current)+move;if(order[idx]){current=order[idx];render();return false;}}
    return true;
   }catch(x){e.textContent=x.message;return false;}
@@ -286,6 +289,10 @@ h('div',{class:'full group-block'}),
  d.el.querySelector('.dlg-foot .right').prepend(prevBtn,nextBtn);
  prevBtn.onclick=async()=>{const ok=await save(0);if(ok!==false){const idx=order.indexOf(current)-1;if(order[idx]){current=order[idx];render();}}};
  nextBtn.onclick=()=>save(1);
+ const flag=h('span',{class:'dirty-flag',hidden:true,role:'status',text:'● Modifications non enregistrées'});
+ d.el.querySelector('.dlg-head > div')?.append(flag);
+ const markDirty=()=>{flag.hidden=!dirty;};
+ d.form.addEventListener('input',()=>setTimeout(markDirty,0));d.form.addEventListener('change',()=>setTimeout(markDirty,0));
  d.form.addEventListener('input',ev=>{dirty=true;if(ev.target.name==='status')statusTouched=true;});
  d.form.addEventListener('change',ev=>{dirty=true;if(ev.target.name==='status')statusTouched=true;});
  d.form.addEventListener('submit',async ev=>{ev.preventDefault();if(await save(0))d.close();});

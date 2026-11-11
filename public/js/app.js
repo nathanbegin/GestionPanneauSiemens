@@ -2,6 +2,7 @@
 import {brandingCard} from './branding.js';
 import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
 import {trashDialog} from './trash.js';
+import {watchIcons} from './icons.js';
 import {handoffDialog,handoffView} from './handoff.js';
 import {net,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
 import {aiImportDialog} from './aiimport.js';
@@ -369,6 +370,7 @@ async function boot(){
  handleSsoReturn(); // SSO
  route();
 }
+watchIcons();
 if('serviceWorker' in navigator&&!NATIVE)navigator.serviceWorker.register('sw.js').catch(()=>{});
 checkUpdateQuietly();
 boot();

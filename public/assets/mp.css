@@ -913,3 +913,21 @@ dialog.side .dlg-foot button{padding:8px 12px;white-space:nowrap;min-height:40px
 dialog.side .load-row{grid-template-columns:1fr 1fr}
 dialog.side .load-row>input:first-child{grid-column:1/-1}
 dialog.side .load-kpis{grid-template-columns:repeat(2,1fr)}
+/* Icônes SVG (remplacent les émojis en début de bouton/lien/titre) */
+.ic{flex:none;vertical-align:-3px;margin-right:6px}
+.has-ic{display:inline-flex;align-items:center}
+.menu .has-ic{display:flex}
+.tabs button.has-ic{display:inline-flex}
+summary.has-ic{display:list-item}
+summary.has-ic .ic{display:inline-block}
+/* Fiche de circuit : sous-titres de sections, états harmonisés, aides discrètes */
+.form-sub{margin:10px 0 0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:4px}
+.form-sub:first-child{margin-top:0}
+.dirty-flag{font-size:12px;font-weight:600;color:#a36b00;background:#fff3cd;border:1px solid #e6cf85;border-radius:99px;padding:2px 10px;margin-left:6px;white-space:nowrap}
+dialog.side .dlg-head .dirty-flag{display:inline-block;margin:4px 0 0}
+/* Aides : visibles seulement quand le champ est actif (réduit la répétition dans la fiche latérale) */
+dialog.side .f .hint{display:none;margin-top:3px}
+dialog.side .f:focus-within .hint{display:block}
+/* États : sélection (bleu), modification non enregistrée (ambre), succès (vert), erreur (rouge), lecture seule (gris) */
+.notice.readonly,.badge.shared{background:#eef1ee;color:#4a574f}
+.save-state.fail{background:#fdecec}

@@ -1800,4 +1800,5 @@ export default [
  ["Fermer la fiche et revenir à la liste", "Close the form and return to the list"],
  ["Afficher tout le panneau dans la fenêtre", "Show the whole panel in the window"],
  ["Centrer sur le circuit sélectionné", "Center on the selected circuit"],
+ ["● Modifications non enregistrées", "● Unsaved changes"],
 ];
