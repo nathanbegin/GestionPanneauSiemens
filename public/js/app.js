@@ -231,8 +231,31 @@ async function siteView(id){
   const sel=select('p',panels.map(p=>[p.id,panelTitle(p)]),panels[0].id);
   const d=dialog({title:'Vérifier la charge d’un panneau',eyebrow:site.name,body:[h('p',{class:'muted',text:'Inscrivez les gros électroménagers (avec la plaque signalétique en photo) et reliez-les au bon circuit. Le calcul de charge se base sur le relevé déjà fait.'}),field('Panneau',sel)],actions:[{label:'Annuler',kind:'ghost'},{label:'Ouvrir la vérification',kind:'primary',onClick:()=>{location.hash=`#/panneaux/${sel.value}/appliances`;}}]});};
  // Une seule entrée « Ajouter un panneau » : panneau existant (relevé) ou projet de panneau (conception).
+ // Restauration d'un panneau depuis une sauvegarde JSON (export « Sauvegarde JSON » d'un panneau, ou ancienne version).
+ const restoreJson=()=>{
+  const input=h('input',{type:'file',accept:'application/json,.json',class:'sr-only'});
+  document.body.append(input);
+  input.addEventListener('change',async()=>{
+   const file=input.files[0];input.remove();if(!file)return;
+   try{
+    if(file.size>1500000)throw Error('Fichier trop volumineux.');
+    const data=JSON.parse(await file.text());
+    if(!Array.isArray(data.circuits)||!data.circuits.length)throw Error('Fichier non reconnu : ce n’est pas une sauvegarde de panneau Disjonio.');
+    const maxPos=Math.max(...data.circuits.flatMap(c=>(c.slots||[]).map(x=>parseInt(x,10)||0)),0);
+    const positions=Number.isInteger(data.positions)?data.positions:Math.max(8,Math.ceil(maxPos/2)*2);
+    const name=String(data.panel||data.name||'Panneau restauré').slice(0,100);
+    const used=data.circuits.filter(c=>c.label||c.amps).length;
+    if(!await confirmDialog(`Restaurer « ${name} » (${positions} positions, ${used} circuit(s) décrit(s)) dans « ${site.name} » ? Un nouveau panneau sera créé avec ces données ; rien n’est remplacé.`,{title:'Restaurer une sauvegarde',confirm:'Restaurer'}))return;
+    const meta={name,tag:String(data.tag||'').slice(0,24),kind:data.kind||'Principal',location:String(data.location||'').slice(0,140),details:(data.details&&typeof data.details==='object'?data.details:{})};
+    const {panel}=await api('/api/panels',{method:'POST',body:{siteId:site.id,...meta,positions,circuits:data.circuits}});
+    toast('Panneau restauré.');location.hash='#/panneaux/'+panel.id;
+   }catch(e){toast(e.message,8000);}
+  });
+  input.click();
+ };
  const addPanel=()=>{const d=dialog({title:'Ajouter un panneau',eyebrow:site.name,wide:true,body:[h('div',{class:'stage-choices'},
    choice('📋','Panneau existant','Il est déjà installé : le relever par photo (IA), par questions ou par saisie.',()=>{d.close();releveChoices();}),
+   choice('💾','Restaurer une sauvegarde','Recréer un panneau à partir d’un fichier JSON exporté depuis Disjonio (ou de l’ancienne version).',()=>{d.close();restoreJson();}),
    choice('✏️','Projet de panneau','Il n’existe pas encore : concevoir un nouveau panneau ou un agrandissement.',()=>{d.close();designDialog({site,onCreated:p=>{location.hash='#/panneaux/'+p.id;},onManual:()=>createPanel({stage:'conception',state:'Planifié'},'Nouveau panneau à concevoir')});})),
    panels.length>0&&h('p',{class:'small'},h('button',{type:'button',class:'link',onclick:()=>{d.close();verifyChoices();}},'Vérifier la charge d’un panneau existant'),' (électroménagers et calcul).')],actions:[{label:'Annuler',kind:'ghost'}]});};
  // Disponible hors ligne : conserve le site et ses panneaux sur cet appareil (consultation sans réseau).

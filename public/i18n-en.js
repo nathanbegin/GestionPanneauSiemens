@@ -1847,4 +1847,10 @@ export default [
  ["Écart L1/L2 estimé : {} A (indice de déséquilibre {} %). Ce n’est pas une limite réglementaire pour une résidence monophasée 120/240 V ; une répartition plus équilibrée reste toutefois souhaitable.", "Estimated L1/L2 difference: {} A (imbalance index {} %). This is not a regulatory limit for a single-phase 120/240 V home; a more balanced distribution is nevertheless desirable."],
  ["Le courant estimé sur {} ({} A, total des charges branchées) dépasse le principal de {} A. Ce total ne tient pas compte des facteurs de demande : vérifiez le calcul de charge (règle 8-200).", "The estimated current on {} ({} A, total of connected loads) exceeds the {} A main. This total does not account for demand factors: check the load calculation (Rule 8-200)."],
  ["Code de construction du Québec, chapitre V — Électricité (édition 2026), intégrant CSA C22.1:21 et les modifications du Québec — en vigueur depuis le 26 mars 2026 (l’édition 2018 reste admissible pour certains travaux commencés avant le 17 octobre 2027)", "Québec Construction Code, Chapter V — Electricity (2026 edition), incorporating CSA C22.1:21 and Québec amendments — in force since March 26, 2026 (the 2018 edition remains admissible for some work started before October 17, 2027)"],
+ ["Restaurer une sauvegarde", "Restore a backup"],
+ ["Recréer un panneau à partir d’un fichier JSON exporté depuis Disjonio (ou de l’ancienne version).", "Recreate a panel from a JSON file exported from Disjonio (or from the old version)."],
+ ["Fichier non reconnu : ce n’est pas une sauvegarde de panneau Disjonio.", "Unrecognized file: this is not a Disjonio panel backup."],
+ ["Panneau restauré.", "Panel restored."],
+ ["Restaurer « {} » ({} positions, {} circuit(s) décrit(s)) dans « {} » ? Un nouveau panneau sera créé avec ces données ; rien n’est remplacé.", "Restore “{}” ({} positions, {} described circuit(s)) in “{}”? A new panel will be created with this data; nothing is replaced."],
+ ["Fichier trop volumineux.", "File too large."],
 ];
