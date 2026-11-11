@@ -54,13 +54,14 @@ function crumbs(items){
  else parts.push(h('a',{class:'btn sm',href:webUrl('/fonctionnement'),target:NATIVE?'_blank':null},'Fonctionnement'));
  // Langue : FR / EN (le bouton montre la langue vers laquelle on bascule).
  parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:async()=>{const next=lang==='en'?'fr':'en';if(state.user){try{await api('/api/account',{method:'PUT',body:{name:state.user.name,profile:{...(state.user.profile||{}),lang:next}}});}catch{}}setLang(next);}},lang==='en'?'FR':'EN'));
- topbar.replaceChildren(...parts);
- // Navigation de travail visible pour les professionnels : Sites · Comparer · Équipe.
- {let wn=document.getElementById('worknav');if(!wn){wn=h('nav',{id:'worknav',class:'worknav','aria-label':'Navigation de travail'});topbar.parentElement.append(wn);}
+ // Navigation de travail des professionnels, dans l'en-tête, juste après le logo : Sites · Comparer · Équipe.
+ document.getElementById('worknav')?.remove();
+ if(state.user&&isPro&&!state.demo){
   const cur=location.hash.split('/')[1]||'';
   const link=(href,label,on)=>h('a',{href,class:on?'on':'','aria-current':on?'page':null,text:label});
-  wn.hidden=!(state.user&&isPro&&!state.demo);
-  wn.replaceChildren(...(wn.hidden?[]:[h('div',{class:'container'},link('#/sites','Sites',['sites','panneaux'].includes(cur)),link('#/comparer','Comparer',cur==='comparer'),link('#/equipe','Équipe',cur==='equipe'))]));}
+  parts.splice(1,0,h('nav',{id:'worknav',class:'worknav','aria-label':'Navigation de travail'},link('#/sites','Sites',['sites','panneaux'].includes(cur)),link('#/comparer','Comparer',cur==='comparer'),link('#/equipe','Équipe',cur==='equipe')));
+ }
+ topbar.replaceChildren(...parts);
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Disjonio';
  syncChrome();
 }

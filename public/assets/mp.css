@@ -779,11 +779,16 @@ details.form-adv{border:1px dashed var(--line);border-radius:12px;padding:6px 12
 details.form-adv>summary{cursor:pointer;padding:8px 0;font-weight:600;color:var(--ink)}
 details.form-adv[open]>summary{margin-bottom:8px}
 /* Navigation de travail (pros) et reprise du travail */
-.worknav{background:var(--card,#fff);border-bottom:1px solid var(--line)}
-.worknav .container{display:flex;gap:6px;height:46px;align-items:center;overflow-x:auto;scrollbar-width:none}
-.worknav a{text-decoration:none;color:var(--muted);padding:8px 14px;border-radius:99px;font-weight:600;white-space:nowrap;min-height:36px;display:inline-flex;align-items:center}
+/* En-tête pleine largeur : logo à gauche, navigation de travail, chemin au centre, nom et langue à droite */
+.topbar .container,body.app .topbar .container{width:auto;max-width:none;margin:0;padding:0 22px;gap:18px}
+.topbar .brand{font-size:19px;gap:13px}
+.topbar .brand-icon{width:46px;height:46px;font-size:27px;border-radius:11px}
+.worknav{display:flex;gap:4px;align-items:center;flex:none}
+.worknav a{text-decoration:none;color:var(--muted);padding:8px 14px;border-radius:99px;font-weight:600;white-space:nowrap;min-height:38px;display:inline-flex;align-items:center}
 .worknav a:hover{background:var(--soft);color:var(--ink)}
 .worknav a.on{background:var(--ink);color:#fff}
+.topbar .crumbs{justify-content:center}
+@media (max-width:900px){.topbar .container{flex-wrap:wrap;height:auto;padding:8px 14px;gap:6px 10px}.topbar .brand{font-size:16px}.topbar .brand-icon{width:40px;height:40px;font-size:23px}.worknav{order:10;flex-basis:100%;overflow-x:auto;scrollbar-width:none}.topbar .crumbs{justify-content:flex-start;min-width:0;flex:1}}
 .resume{margin:0 0 22px}
 .resume-title{font-size:15px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .resume-cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
