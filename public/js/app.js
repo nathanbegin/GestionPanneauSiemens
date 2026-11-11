@@ -2,6 +2,7 @@
 import {brandingCard} from './branding.js';
 import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
 import {trashDialog} from './trash.js';
+import {handoffDialog,handoffView} from './handoff.js';
 import {net,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
@@ -213,6 +214,7 @@ async function siteView(id){
   if(!dlRec)return run();
   const d=dialog({title:'Disponible hors ligne',eyebrow:site.name,body:[h('p',{class:'muted',text:`Copie enregistrée ${fmtRelative(dlRec.savedAt)} sur cet appareil. Les PDF, les photos et les modifications exigent une connexion.`})],actions:[{label:'Fermer',kind:'ghost'},{label:'Retirer de cet appareil',kind:'danger',onClick:async()=>{await removeDownload(site.id);toast('Copie hors ligne retirée.');route();}},{label:'Actualiser',kind:'primary',onClick:()=>{run();}}]});
  }},dlRec?'📥 Hors ligne ✓':'📥 Rendre disponible hors ligne');
+ const handoff=()=>handoffDialog({site});
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
  const remove=async()=>{if(!await confirmDialog(`Supprimer « ${site.name} », ses ${panels.length} panneau(x) et tous leurs circuits ? Il sera placé dans la corbeille pendant 30 jours : vous pourrez le restaurer.`,{title:'Supprimer le site',confirm:'Mettre à la corbeille',danger:true}))return;await api('/api/sites?id='+site.id,{method:'DELETE'});toast('Site placé dans la corbeille (30 jours).');location.hash='#/sites';};
  const report=async()=>{try{toast('Génération du rapport du site…');await openDocument({site:site.id,kind:'report'});}catch(e){toast(e.message);}};
@@ -224,7 +226,7 @@ async function siteView(id){
  return h('div',{class:'container'},
   h('div',{class:'page-head'},
    h('div',{},h('div',{class:'eyebrow',text:'Site'}),h('h1',{text:site.name}),h('div',{class:'sub',text:siteAddress(site)||'Adresse à préciser'}),site.client&&h('div',{class:'sub',text:'Client : '+site.client})),
-   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,offlineBtn,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
+   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,offlineBtn,!site.shared&&!net.offline&&!state.demo?h('button',{type:'button',onclick:handoff},'🤝 Remettre au client'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
     panels.length?(()=>{const g=h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'));return h('div',{},h('div',{class:'cards-toolbar'},viewToggle('mp_panels_view',g)),g);})()
@@ -312,6 +314,7 @@ async function route(){
   else if(name==='compte')node=accountView();
   else if(name==='equipe')node=await teamView({ctx});
   else if(name==='rejoindre'&&id)node=await joinInviteView({ctx,token:id});
+  else if(name==='remise'&&id)node=await handoffView({token:id});
   else if(name==='abonnement')node=await billingView({ctx,sub:id,a:sub,b:extra});
   else if(name==='admin'&&state.user.isAdmin)node=await adminView({ctx,tab:id||'tableau',id:sub});
   else if(name===''||name==='sites')node=await sitesView();

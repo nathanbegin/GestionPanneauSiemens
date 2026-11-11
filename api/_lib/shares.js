@@ -1,6 +1,7 @@
 // Partage de sites et de panneaux entre membres d'une même équipe (forfait avec la fonction « team »).
 // Un partage vaut seulement tant que la personne fait partie de l'équipe du partage (team_owner).
 import {HttpError} from './http.js';
+import {clientAccessOf} from './handoff.js';
 
 // Propriétaire de l'équipe de l'utilisateur (lui-même s'il en a une), ou null.
 export async function teamOwnerOf(sql,userId){
@@ -30,6 +31,9 @@ export async function siteAccess(sql,userId,siteId){
  const panels=sh.filter(s=>s.panel_id);
  if(panels.length){const ids=panels.map(s=>s.panel_id);const rows=await sql`SELECT id FROM app_panels WHERE site_id=${siteId} AND id=ANY(${ids}::uuid[])`;
   if(rows.length)return {site,role:'panels',panelIds:rows.map(r=>r.id),by:panels[0].owner_name};}
+ // Accès client (consultation) remis par le propriétaire, distinct de l'équipe.
+ const ca=await clientAccessOf(sql,userId,siteId);
+ if(ca)return {site,role:'view',by:ca.by,client:true};
  return null;
 }
 export async function panelAccess(sql,userId,panelId){
@@ -38,7 +42,9 @@ export async function panelAccess(sql,userId,panelId){
  if(panel.user_id===userId)return {panel,role:'owner'};
  const sh=await sharesFor(sql,userId);
  const r=best(sh.filter(s=>s.panel_id===panelId||s.site_id===panel.site_id));
- return r?{panel,role:r,by:sh.find(s=>s.panel_id===panelId||s.site_id===panel.site_id).owner_name}:null;
+ if(r)return {panel,role:r,by:sh.find(s=>s.panel_id===panelId||s.site_id===panel.site_id).owner_name};
+ const ca=await clientAccessOf(sql,userId,panel.site_id);
+ return ca?{panel,role:'view',by:ca.by,client:true}:null;
 }
 export const canEdit=a=>a&&(a.role==='owner'||a.role==='edit');
 export function need(a,write,what='Panneau'){

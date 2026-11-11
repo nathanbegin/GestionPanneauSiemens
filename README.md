@@ -226,3 +226,9 @@ Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/
 
 - **Corbeille** : supprimer un site ou un panneau le déplace 30 jours dans `app_trash` (copie JSON, historique inclus) avant l'effacement définitif; « 🗑 Corbeille » (page Mes sites) restaure ou supprime pour de bon. La restauration respecte les limites du forfait. Les partages d'un site supprimé ne sont pas restaurés.
 - **Historique** : chaque enregistrement d'un panneau crée un instantané (`app_panel_history`), regroupé par rafales de 10 minutes pour une même personne; 60 versions gardées. « ⋯ Plus d'actions → 🕘 Historique » montre qui a changé quoi, remet l'ancienne valeur d'un circuit ou restaure tout le panneau (la restauration est elle-même une nouvelle version).
+
+## Remise au client, démonstration et liste « À terminer »
+
+- **Remettre au client** (page d'un site, forfaits Électricien) : « Accès en consultation » (lecture seule, distinct de l'équipe, révocable : table `app_handoffs`, accès via `siteAccess`/`panelAccess`) ou « Copie du dossier » (copie indépendante du site et des panneaux dans le compte du destinataire après acceptation, limites de forfait respectées). L'invitation est liée à l'adresse courriel du client; lien valide 14 jours; courriel envoyé si Resend est configuré, sinon lien à copier. Code : `api/_lib/handoff.js`, `public/js/handoff.js`.
+- **Démonstration** : `/app#/demo` (sans compte) charge un faux serveur en mémoire (`public/js/demo.js`, données `demo-data.js` générées par `node scripts/build-demo.mjs`); rien n'est envoyé ni enregistré. Le rapport d'exemple est `public/assets/exemple-rapport.pdf` (`node scripts/build-sample.mjs`).
+- **À terminer** : bouton « ✅ À terminer » sur un panneau (circuits sans description, à vérifier sur place, sans calibre, fiche incomplète, appareils non reliés, alertes de calcul), chaque point ouvrant la correction (`public/js/checklist.js`).

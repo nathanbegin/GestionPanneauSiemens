@@ -7,6 +7,9 @@ import {cleanSite,designation,panelTitle} from '../public/model.js';
 import {siteOut,panelSummary} from './_lib/serialize.js';
 import {sharesFor,siteAccess,need} from './_lib/shares.js';
 import {trashSite,listTrash,restoreTrash,purgeTrash} from './_lib/trash.js';
+import {createHandoff,listHandoffs,revokeHandoff,previewHandoff,acceptHandoff,declineHandoff,clientSiteIds} from './_lib/handoff.js';
+import {entitlement} from './_lib/plans.js';
+import {adminEmails} from './_lib/auth.js';
 
 export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  const sql=await getSql();
@@ -20,6 +23,21 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   const tid=String(req.query?.tid||'');if(!isUuid(tid))throw new HttpError(404,'Élément introuvable.');
   if(action==='trash-restore'&&req.method==='POST')return res.status(200).json({ok:true,...await restoreTrash(sql,user.id,tid)});
   if(action==='trash-purge'&&req.method==='DELETE'){await purgeTrash(sql,user.id,tid);return res.status(200).json({ok:true});}
+ }
+ // Remise au client : accès en consultation ou copie du dossier.
+ if(action.startsWith('handoff')){
+  const hid=String(req.query?.hid||'');
+  if(action==='handoff-preview'&&req.method==='GET')return res.status(200).json(await previewHandoff(sql,user,String(req.query?.token||'')));
+  if(action==='handoff-accept'&&req.method==='POST')return res.status(200).json({ok:true,...await acceptHandoff(sql,user,String(body(req).token||''))});
+  if(action==='handoff-decline'&&req.method==='POST'){await declineHandoff(sql,user,String(body(req).token||''));return res.status(200).json({ok:true});}
+  if(action==='handoff-revoke'&&req.method==='DELETE'){if(!isUuid(hid))throw new HttpError(404,'Introuvable.');await revokeHandoff(sql,user.id,hid);return res.status(200).json({ok:true});}
+  const siteId=String(req.query?.siteId||body(req).siteId||'');if(!isUuid(siteId))throw new HttpError(404,'Site introuvable.');
+  if(action==='handoff'&&req.method==='GET')return res.status(200).json({items:await listHandoffs(sql,user.id,siteId)});
+  if(action==='handoff-create'&&req.method==='POST'){
+   const f=(await entitlement(sql,user.id)).plan.features||{};
+   if(!f.planning&&!f.team&&!adminEmails().includes(user.email))throw new HttpError(402,'La remise du dossier au client est incluse dans les forfaits Électricien.',{quota:true});
+   const d=body(req);return res.status(201).json(await createHandoff(sql,req,user,{siteId,kind:d.kind,email:d.email,authorized:d.authorized===true}));
+  }
  }
  // Recherche sur l'ensemble des sites de l'utilisateur : site, client, adresse, panneau, circuit.
  if(req.method==='GET'&&!id&&req.query?.search!==undefined){
@@ -60,6 +78,13 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
     const by=(whole[0]||sh.find(s=>ps.some(p=>p.id===s.panel_id)))?.owner_name||'';
     out.push({...siteOut(r),panelCount:ps.length,shared:{by,scope:whole.length?'site':'panels',canEdit:whole.some(s=>s.can_edit)},panels:ps.map(p=>({id:p.id,name:p.name,tag:p.tag,kind:p.kind,progress:p.stats.progress}))});
    }
+  }
+  // Sites remis en consultation par un professionnel (accès client).
+  const cids=(await clientSiteIds(sql,user.id)).filter(sid=>!out.some(o=>o.id===sid));
+  if(cids.length){
+   const crows=await sql`SELECT s.*,u.name AS owner_name FROM app_sites s JOIN app_users u ON u.id=s.user_id WHERE s.id=ANY(${cids}::uuid[])`;
+   const cp=await sql`SELECT id,site_id,name,tag,kind,location,positions,details,circuits,updated_at FROM app_panels WHERE site_id=ANY(${cids}::uuid[])`;
+   for(const r of crows){const ps=cp.filter(p=>p.site_id===r.id).map(panelSummary);out.push({...siteOut(r),panelCount:ps.length,shared:{by:r.owner_name,scope:'site',canEdit:false,client:true},panels:ps.map(p=>({id:p.id,name:p.name,tag:p.tag,kind:p.kind,progress:p.stats.progress}))});}
   }
   return res.status(200).json({sites:out});
  }

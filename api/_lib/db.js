@@ -43,6 +43,14 @@ async function ensureSchema(sql){
   positions integer NOT NULL DEFAULT 32, details jsonb NOT NULL DEFAULT '{}'::jsonb, circuits jsonb NOT NULL,
   revision integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
  await sql`CREATE INDEX IF NOT EXISTS app_panels_site ON app_panels(site_id)`;
+ // ---- Remise au client : accès en consultation ou copie du dossier, avec acceptation ----
+ await sql`CREATE TABLE IF NOT EXISTS app_handoffs(
+  id uuid PRIMARY KEY, kind text NOT NULL, owner_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  site_id uuid REFERENCES app_sites(id) ON DELETE CASCADE, site_name text NOT NULL DEFAULT '', email text NOT NULL, token_hash text NOT NULL UNIQUE,
+  status text NOT NULL DEFAULT 'pending', created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL,
+  accepted_by uuid REFERENCES app_users(id) ON DELETE CASCADE, accepted_at timestamptz, new_site_id uuid)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_handoffs_site ON app_handoffs(site_id)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_handoffs_user ON app_handoffs(accepted_by)`;
  // ---- Corbeille (30 jours) et historique des versions d'un panneau ----
  await sql`CREATE TABLE IF NOT EXISTS app_trash(
   id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, kind text NOT NULL, ref_id uuid NOT NULL, title text NOT NULL DEFAULT '',
