@@ -5,7 +5,7 @@ import {normalize,panelTitle,MAX_POSITIONS} from '../public/model.js';
 import {getSql} from './_lib/db.js';
 import {panelAccess} from './_lib/shares.js';
 import {route,body,HttpError,isUuid} from './_lib/http.js';
-import {requireUser} from './_lib/auth.js';
+import {requireUser,adminEmails} from './_lib/auth.js';
 
 const ZEBRA_ORIGIN='https://zebra.nathanbegin.xyz';
 const MAX_BYTES=400000;
@@ -32,6 +32,8 @@ export default route(['POST'],async(req,res)=>{
   if(!isUuid(data.panelId))throw new HttpError(400,'Panneau invalide.');
   const sql=await getSql();
   const user=await requireUser(req,sql);
+  // Envoi vers ZebraHD réservé à l'administrateur.
+  if(!adminEmails().includes(user.email))throw new HttpError(403,'L’envoi vers ZebraHD est réservé à l’administrateur.');
   const p=(await panelAccess(sql,user.id,String(data.panelId||'')))?.panel;
   if(!p)throw new HttpError(404,'Panneau introuvable.');
   const payload={id:p.id.toLowerCase(),schema:2,panel:panelTitle(p).slice(0,100),mainAmps:p.details?.mainAmps||null,visiblePositions:p.positions,circuits:p.circuits};

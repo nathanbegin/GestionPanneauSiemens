@@ -1,7 +1,7 @@
 // Inscription, connexion, session courante, déconnexion et mot de passe oublié.
 import {getSql} from './_lib/db.js';
 import {route,body,HttpError,clientIp} from './_lib/http.js';
-import {hashPassword,verifyPassword,checkPassword,checkEmail,newId,createSession,destroySession,readToken,setSessionCookie,clearSessionCookie,publicUser,currentUser,rateLimit,recordAttempt,createResetToken,consumeResetToken} from './_lib/auth.js';
+import {hashPassword,verifyPassword,checkPassword,checkEmail,newId,createSession,destroySession,readToken,setSessionCookie,clearSessionCookie,publicUser,adminEmails,currentUser,rateLimit,recordAttempt,createResetToken,consumeResetToken} from './_lib/auth.js';
 import {sendMail,mailConfigured,appUrl} from './_lib/mail.js';
 import {mailText} from './_lib/mail-text.js';
 import {termsRecord} from './_lib/terms.js';
@@ -24,7 +24,8 @@ export default route(['GET','POST'],async(req,res)=>{
  if(req.method==='GET'){
   if(action!=='me')throw new HttpError(404,'Action inconnue.');
   const u=await currentUser(req,sql);
-  const zebra=!!(process.env.PANELS_API_KEY||process.env.ETIQUETTES_API_KEY||process.env.ZEBRAHD_API_KEY);
+  // ZebraHD : réservé à l'administrateur (courriel de ADMIN_EMAILS).
+  const zebra=!!(u&&adminEmails().includes(u.email)&&(process.env.PANELS_API_KEY||process.env.ETIQUETTES_API_KEY||process.env.ZEBRAHD_API_KEY));
   return res.status(200).json({user:u?publicUser(u):null,features:{mail:mailConfigured(),zebra}});
  }
  if(!req.headers['x-mp-client'])throw new HttpError(403,'Requête refusée.');
