@@ -61,6 +61,7 @@ function crumbs(items){
   wn.hidden=!(state.user&&isPro&&!state.demo);
   wn.replaceChildren(...(wn.hidden?[]:[h('div',{class:'container'},link('#/sites','Sites',['sites','panneaux'].includes(cur)),link('#/comparer','Comparer',cur==='comparer'),link('#/equipe','Équipe',cur==='equipe'))]));}
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Disjonio';
+ syncChrome();
 }
 document.addEventListener('click',()=>document.querySelectorAll('.menu.open').forEach(m=>{m.classList.remove('open');m.previousElementSibling?.setAttribute('aria-expanded','false');}));
 // Derniers panneaux consultés (sur cet appareil) : alimente « Continuer » à l'accueil.
@@ -334,6 +335,16 @@ async function route(){
  document.body.prepend(bar);
  globalThis.addEventListener('mp-offline',e=>{bar.hidden=!e.detail;document.body.classList.toggle('is-offline',!!e.detail);});
  globalThis.addEventListener('online',()=>{if(net.offline)route();});}
+// Hauteur réelle de l'en-tête (barres hors ligne / démo comprises) : sert à positionner la fiche latérale et la zone du panneau.
+function syncChrome(){
+ const bars=[...document.querySelectorAll('.offline-bar,.demo-bar')].filter(b=>!b.hidden&&b.offsetHeight).reduce((n,b)=>n+b.offsetHeight,0);
+ const head=document.querySelector('header.topbar');
+ const r=document.documentElement.style;
+ r.setProperty('--bars-h',bars+'px');
+ if(head)r.setProperty('--chrome-h',Math.round(bars+head.offsetHeight)+'px');
+}
+if(typeof ResizeObserver==='function'){const ro=new ResizeObserver(syncChrome);ro.observe(document.body);}
+globalThis.addEventListener('resize',syncChrome);globalThis.addEventListener('mp-offline',()=>setTimeout(syncChrome,0));
 let lastPath='';
 let settledHash=location.hash,guarding=false;
 window.addEventListener('hashchange',async()=>{

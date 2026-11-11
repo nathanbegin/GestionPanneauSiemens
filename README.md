@@ -232,3 +232,10 @@ Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/
 - **Remettre au client** (page d'un site, forfaits Électricien) : « Accès en consultation » (lecture seule, distinct de l'équipe, révocable : table `app_handoffs`, accès via `siteAccess`/`panelAccess`) ou « Copie du dossier » (copie indépendante du site et des panneaux dans le compte du destinataire après acceptation, limites de forfait respectées). L'invitation est liée à l'adresse courriel du client; lien valide 14 jours; courriel envoyé si Resend est configuré, sinon lien à copier. Code : `api/_lib/handoff.js`, `public/js/handoff.js`.
 - **Démonstration** : `/app#/demo` (sans compte) charge un faux serveur en mémoire (`public/js/demo.js`, données `demo-data.js` générées par `node scripts/build-demo.mjs`); rien n'est envoyé ni enregistré. Le rapport d'exemple est `public/assets/exemple-rapport.pdf` (`node scripts/build-sample.mjs`).
 - **À terminer** : bouton « ✅ À terminer » sur un panneau (circuits sans description, à vérifier sur place, sans calibre, fiche incomplète, appareils non reliés, alertes de calcul), chaque point ouvrant la correction (`public/js/checklist.js`).
+
+## Disposition d'édition (bureau, tablette, téléphone)
+
+- **Deux zones** dès 900 px (ou 721 px en paysage) : panneau à gauche, fiche du circuit à droite (largeur redimensionnable en glissant la poignée, mémorisée). La liste des circuits est masquée pendant l'édition (bouton « ☷ Liste » pour y revenir); l'en-tête se réduit à une pastille d'étape et au menu d'actions.
+- Le **circuit en cours** est entouré de bleu (distinct des couleurs de statut) et suit « Enregistrer et suivant »; le cadrage « Circuits » est privilégié pendant l'édition et rétabli à la fermeture; « Ajuster » et « Centrer » sont dans la barre du panneau.
+- **Positionnement mesuré** : `--chrome-h` (hauteur réelle de l'en-tête, barres démo/hors ligne comprises) est calculée dans `public/js/app.js` (`syncChrome`).
+- **Téléphone** : fiche plein écran avec un repère du circuit actif et de ses voisins; « ▦ Panneau » ouvre un aperçu temporaire du panneau.

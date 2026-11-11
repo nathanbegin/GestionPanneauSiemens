@@ -173,23 +173,35 @@ export function panelDialog({siblings=[],onSave,library=false,defaultBipolar=240
 // Fiche d'un circuit avec navigation précédent / suivant.
 // Éditeur latéral (bureau) : un seul à la fois ; ouvrir un autre circuit le remplace après confirmation si nécessaire.
 let activeSide=null;
-const wideScreen=()=>typeof matchMedia==='function'&&matchMedia('(min-width:1100px)').matches;
+// Deux zones (panneau + fiche) dès 900 px, ou 721 px en paysage ; en dessous, fenêtre plein écran.
+const wideScreen=()=>typeof matchMedia==='function'&&matchMedia('(min-width:900px), (min-width:721px) and (orientation:landscape)').matches;
+const isPhone=()=>typeof matchMedia==='function'&&matchMedia('(max-width:720px)').matches;
 export function circuitEditor(opts){
  if(activeSide){const a=activeSide;a.request().then(ok=>{if(ok)circuitEditor(opts);});return a.api;}
  return openCircuitEditor(opts);
 }
-function openCircuitEditor({panel,id,order,onSave,planning=false,lib=null,feeds=null}){
+function openCircuitEditor({panel,id,order,onSave,planning=false,lib=null,feeds=null,onCurrent=null,onShowPanel=null}){
  const side=wideScreen();
  let current=id;
  let plan=null;
  const e=err();
  const body=h('div');
  let d;
+ // Mobile : repère du circuit actif et de ses voisins au-dessus du formulaire (le panneau reste atteignable).
+ const stCls=c=>c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
+ const miniStrip=c=>{
+  const sorted=order.map(x=>panel.circuits.find(y=>y.id===x)).filter(Boolean),i=sorted.findIndex(x=>x.id===c.id);
+  return h('div',{class:'mini-strip','aria-label':'Circuits voisins'},
+   onShowPanel&&h('button',{type:'button',class:'sm mini-panel',onclick:()=>onShowPanel(c.id,goTo)},'▦ Panneau'),
+   ...sorted.slice(Math.max(0,i-2),i+3).map(x=>h('button',{type:'button',class:'mini-cell '+stCls(x)+(x.id===c.id?' on':''),'aria-current':x.id===c.id?'true':null,onclick:()=>goTo(x.id)},h('b',{text:designation(x)}),h('small',{text:x.label||'—'}))));
+ };
+ const goTo=async id=>{if(id===current)return;const ok=await save(0);if(ok!==false){current=id;render();}};
  const render=()=>{
   const c=panel.circuits.find(x=>x.id===current);
   const idx=order.indexOf(current);
   const fmt=formatOf(c);
   body.replaceChildren(
+   ...(isPhone()?[miniStrip(c)]:[]),
    h('div',{class:'fields'},
     field('Désignation — ce que le circuit alimente',input('label',c.label,{maxlength:100,placeholder:'Ex. Prises du salon',autocomplete:'off'}),{full:true}),
     field('Pièce / zone',input('room',c.room,{maxlength:80,placeholder:'Ex. Cuisine, Sous-sol',list:'rooms'})),
@@ -234,7 +246,8 @@ h('div',{class:'full group-block'}),
   d.el.querySelector('.dlg-head .eyebrow').textContent=`Fiche ${idx+1} sur ${order.length} · ${panelTitle(panel)}`;
   prevBtn.disabled=idx<=0;nextBtn.disabled=idx>=order.length-1;
   if((c.slots.length===1&&c.slots[0].endsWith('B'))||isLinkedPair(c))body.querySelector('[name=format]').disabled=true;
-  if(d.el.open)setTimeout(()=>body.querySelector('[name=label]').focus(),0);
+  if(d.el.open)setTimeout(()=>body.querySelector('[name=label]')?.focus(),0);
+  onCurrent?.(current);
  };
  const collect=()=>{
   const f=new FormData(d.form);
@@ -268,7 +281,7 @@ h('div',{class:'full group-block'}),
  const prevBtn=h('button',{type:'button',class:'ghost',text:'‹ Précédent'});
  const nextBtn=h('button',{type:'button',text:'Enregistrer et suivant ›'});
  const guard=async()=>{if(dirty&&!await confirmDialog('Fermer sans enregistrer les modifications de cette fiche ?',{confirm:'Fermer sans enregistrer'}))return false;};
- d=dialog({title:'Circuit',eyebrow:' ',form:true,wide:!side,side,body:[body],beforeClose:guard,dirty:()=>dirty,onClose:()=>{if(activeSide?.d===d)activeSide=null;},actions:[{label:'Fermer',kind:'ghost',left:true,onClick:guard},{label:'Enregistrer',kind:'primary',submit:true}]});
+ d=dialog({title:'Circuit',eyebrow:' ',form:true,wide:!side,side,body:[body],beforeClose:guard,dirty:()=>dirty,onClose:()=>{if(!activeSide||activeSide.d===d){activeSide=null;onCurrent?.(null);}},actions:[{label:'Fermer',kind:'ghost',left:true,onClick:guard},{label:'Enregistrer',kind:'primary',submit:true}]});
  d.el.classList.add('circuit-dlg');nextBtn.classList.add('next-btn');
  d.el.querySelector('.dlg-foot .right').prepend(prevBtn,nextBtn);
  prevBtn.onclick=async()=>{const ok=await save(0);if(ok!==false){const idx=order.indexOf(current)-1;if(order[idx]){current=order[idx];render();}}};
@@ -277,9 +290,14 @@ h('div',{class:'full group-block'}),
  d.form.addEventListener('change',ev=>{dirty=true;if(ev.target.name==='status')statusTouched=true;});
  d.form.addEventListener('submit',async ev=>{ev.preventDefault();if(await save(0))d.close();});
  // Le panneau peut être remplacé après une sauvegarde (nouvelle révision, ids réorganisés).
- const api={setPanel(p,nextOrder){panel=p;order=nextOrder;if(!panel.circuits.some(x=>x.id===current))current=order[0];}};
+ const api={goTo,setPanel(p,nextOrder){panel=p;order=nextOrder;if(!panel.circuits.some(x=>x.id===current))current=order[0];}};
  render();
- if(side)activeSide={d,api,request:async()=>{if(await guard()===false)return false;activeSide=null;d.close();return true;}};
+ if(side){
+  activeSide={d,api,request:async()=>{if(await guard()===false)return false;activeSide=null;d.close();return true;}};
+  // Bascule Liste / Fiche : revenir à la liste des circuits.
+  const toList=h('button',{type:'button',class:'ghost sm side-list',title:'Fermer la fiche et revenir à la liste',onclick:()=>activeSide?.request()},'☷ Liste');
+  d.el.querySelector('.dlg-head')?.insertBefore(toList,d.el.querySelector('.dlg-head button[aria-label]'));
+ }
  return api;
 }
 
@@ -363,7 +381,7 @@ function planningSection(c,panel,markDirty,root,lib){
  root._planRefresh=refresh;
  if(!root._planListener){root._planListener=true;root.addEventListener('change',e=>{if(['amps','format','wireGauge','protection'].includes(e.target.name))root._planRefresh?.();});}
  drawLoads();
- const node=h('details',{class:'full plan-box',open:true},h('summary',{text:'⚡ Planification : disjoncteur, charges et conducteur'}),
+ const node=h('details',{class:'full plan-box',open:!!((c.loads&&c.loads.length)||c.wire||c.breakerRef)},h('summary',{text:'⚡ Planification : disjoncteur, charges et conducteur'}),
   h('div',{class:'fields'},
    field('Disjoncteur de la bibliothèque',pick,{hint:fam?`Produits ${familyOf(fam).name} (catalogues des fabricants). Les quads se placent depuis la palette.`:'Choisissez un modèle de panneau pour filtrer les disjoncteurs.'}),
    field('Référence du disjoncteur',input('breakerRef',c.breakerRef||'',{maxlength:40,placeholder:'Ex. Q240'})),

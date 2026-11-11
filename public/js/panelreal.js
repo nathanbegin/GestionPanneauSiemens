@@ -31,7 +31,7 @@ const BW=38; // largeur du bloc d'identification (calibre, référence, bouton T
  * opts : {panel, labels:boolean (désignations de part et d'autre), match?(c)→bool (filtre), selected?:Set<id>,
  *         highlight?:Set<position> (positions de départ proposées), onCircuit(id), onPosition(position)}
  */
-export function panelReal({panel,labels=false,match=null,selected=null,highlight=null,crop=false,onCircuit,onPosition}){
+export function panelReal({panel,labels=false,match=null,selected=null,highlight=null,crop=false,activeId=null,onCircuit,onPosition}){
  const det=panel.details||{};
  const fam=familyOf(det.family);
  const brand=(fam.brand||det.brand||'').trim();
@@ -129,7 +129,7 @@ export function panelReal({panel,labels=false,match=null,selected=null,highlight
   const poles=new Set(c.slots.map(slotPos)).size;
   const dim=match&&!match(c);
   const desc=`${designation(c)} · ${c.vacant?'Espace inutilisé':c.label||'À identifier'}${c.amps?' · '+c.amps+' A':''}${c.protection&&c.protection!=='Standard'?' · '+c.protection:''}${c.breakerRef?' · '+c.breakerRef:''}`;
-  const g=s('g',{class:'rp-slot'+(dim?' dim':'')+(selected?.has(c.id)?' sel':''),'data-id':c.id,transform:`translate(${x} ${y})`,role:'button',tabindex:0,'aria-label':desc},s('title',{},desc));
+  const g=s('g',{class:'rp-slot'+(dim?' dim':'')+(selected?.has(c.id)?' sel':'')+(activeId===c.id?' act':''),'data-id':c.id,transform:`translate(${x} ${y})`,role:'button',tabindex:0,'aria-label':desc},s('title',{},desc));
   const bx=right?W-BW-2:2;            // bloc d'identification, côté extérieur
   const hx=right?6:BW+6,hw=W-BW-14;    // logement de la manette, côté barre centrale
   if(isEmptySlot(c)){

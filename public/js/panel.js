@@ -108,14 +108,10 @@ export async function panelView({id,tab='panel',ctx}){
   const radios=STAGE_IDS.map(k=>{const st=PANEL_STAGES[k];return h('label',{class:'stage-opt'},h('input',{type:'radio',name:'stage',value:k,checked:k===cur,onchange:()=>{pick=k;}}),h('span',{},h('b',{text:st.n+'. '+st.label}),h('small',{class:'muted',text:st.hint})));});
   dialog({title:'Étape du projet',eyebrow:panelTitle(panel),body:[h('p',{class:'muted',text:'L’étape indique où en est le projet. Elle ne modifie ni vos circuits ni vos calculs, et tous les outils restent accessibles dans les onglets.'}),h('div',{class:'stage-opts'},radios)],actions:[{label:'Annuler',kind:'ghost'},{label:'Enregistrer',kind:'primary',onClick:async()=>{if(pick!==cur)await setStage(pick,{keepTab:true});}}]});
  }
- function stepper(){
-  const cur=stageOf(),canEdit=data.access!=='view',ci=STAGE_IDS.indexOf(cur);
-  return h('div',{class:'stage-bar compact'},
-   h('div',{class:'stage-line'},h('span',{class:'stage-label',text:'Avancement du projet'}),
-    h('ol',{class:'stage-pills','aria-label':'Étapes du projet'},...STAGE_IDS.map((k,i)=>h('li',{class:k===cur?'on':i<ci?'done':'','aria-current':k===cur?'step':null,text:PANEL_STAGES[k].n+'. '+PANEL_STAGES[k].label}))),
-    canEdit&&h('button',{type:'button',class:'sm ghost',onclick:stageDialog},'Changer l’étape…')),
-   h('div',{class:'stage-hint'},h('span',{class:'small muted',text:PANEL_STAGES[cur].hint}),
-    canEdit&&cur==='releve'&&h('span',{class:'stage-actions'},h('button',{type:'button',class:'sm',onclick:conceptionCopy},'✏️ Planifier un agrandissement (copie)'))));
+ // Étape du projet : simple pastille (les détails s'ouvrent au clic).
+ function stageChip(){
+  const cur=stageOf(),canEdit=data.access!=='view';
+  return h(canEdit?'button':'span',{type:canEdit?'button':null,class:'stage-chip',title:'Étape du projet : '+PANEL_STAGES[cur].hint,onclick:canEdit?stageDialog:null},`${PANEL_STAGES[cur].n}. ${PANEL_STAGES[cur].label}${canEdit?' ▾':''}`);
  }
  // Code QR : ouvre ce panneau dans l'application (connexion requise).
  function qrDialog(){
@@ -160,6 +156,7 @@ export async function panelView({id,tab='panel',ctx}){
    data.access&&data.access!=='owner'?h('div',{class:'who',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):item('👥 Partager',()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})),
    data.access!=='view'&&item('📷 Garnir par photos (IA)',garnir),
    qr&&item('▦ Code QR',qrDialog),
+   data.access!=='view'&&stageOf()==='releve'&&item('✏️ Planifier un agrandissement (copie)',conceptionCopy),
    item('📄 Aide-mémoire PDF',()=>doc({kind:'door'})),
    data.access!=='view'&&item('🕘 Historique',()=>historyDialog({panel,persist,onDone:()=>{renderHead();renderBody();}})),
    item('🖨 Rapports et étiquettes',()=>go('docs')));
@@ -173,10 +170,10 @@ export async function panelView({id,tab='panel',ctx}){
   const fed=siblings.find(x=>x.id===det.fedFrom);
   const ro=data.access==='view'?h('p',{class:'notice info',text:`Panneau partagé en lecture seule par ${data.sharedBy} : vous pouvez le consulter et générer ses documents, mais pas le modifier.`}):null;
   const empty=data.access!=='view'&&!panel.circuits.some(c=>c.label||c.amps!=null||c.vacant);
-  head.replaceChildren(ro||'',stepper(),empty&&stageOf()==='releve'?h('div',{class:'notice info'},h('b',{text:'Panneau vide. '}),'Prenez en photo le panneau ouvert (et son répertoire) : l’IA lit les disjoncteurs et garnit ce panneau pour vous. ',h('button',{type:'button',class:'primary sm',onclick:garnir},'📷 Garnir par photos (IA)')):'',h('div',{class:'page-head'},
+  head.replaceChildren(ro||'',empty&&stageOf()==='releve'?h('div',{class:'notice info'},h('b',{text:'Panneau vide. '}),'Prenez en photo le panneau ouvert (et son répertoire) : l’IA lit les disjoncteurs et garnit ce panneau pour vous. ',h('button',{type:'button',class:'primary sm',onclick:garnir},'📷 Garnir par photos (IA)')):'',h('div',{class:'page-head'},
    h('div',{},
     saveState,
-    h('div',{class:'panel-hero'},panel.tag&&h('span',{class:'badge tag',text:panel.tag}),h('h1',{text:panel.name})),
+    h('div',{class:'panel-hero'},panel.tag&&h('span',{class:'badge tag',text:panel.tag}),h('h1',{text:panel.name}),stageChip()),
     h('div',{class:'sub'},[panel.kind,panel.location||'Emplacement à préciser',det.building].filter(Boolean).join(' · ')),
     h('div',{class:'progress-line'},h('div',{class:'progress','aria-hidden':'true'},h('i',{style:{width:s.progress+'%'}})),h('span',{text:`${s.identified} identifiés · ${s.free} libres · ${s.toConfirm} à confirmer`})),
     fed&&h('div',{class:'sub small'},'Alimenté par ',h('a',{href:'#/panneaux/'+fed.id,text:panelTitle(fed)}),det.fedFromCircuit?` (circuit ${det.fedFromCircuit})`:'')),
@@ -204,10 +201,34 @@ export async function panelView({id,tab='panel',ctx}){
   const q=fold(state.q);
   return c=>(!state.status||c.status===state.status||(state.status==='À confirmer'&&c.status==='Non visible'))&&(!q||searchable(c).includes(q))&&(!state.tag||allTags(c).includes(state.tag));
  }
+ // Circuit en cours d'édition : contour distinct des couleurs de statut, centré dans la zone du panneau.
+ function markActive(center){
+  body.querySelectorAll('.breaker.active,.rp-slot.act,.pa-item.act').forEach(e=>e.classList.remove('active','act'));
+  if(!state.activeId)return;
+  const el=[...body.querySelectorAll('[data-id]')].find(e=>e.getAttribute('data-id')===state.activeId&&e.matches('.breaker,.rp-slot,.pa-item'));
+  if(!el)return;
+  el.classList.add(el.matches('.breaker')?'active':'act');
+  if(center)el.scrollIntoView({block:center==='nearest'?'nearest':'center',inline:center==='nearest'?'nearest':'center',behavior:'smooth'});
+ }
+ // Pendant l'édition (bureau), le cadrage « Circuits » est privilégié ; l'état précédent est rétabli à la fermeture.
+ function setActive(id){
+  const was=state.activeId;state.activeId=id||null;
+  if(id&&!was&&state.view==='reel'&&state.rzoom==='full'&&document.body.classList.contains('has-side')){state.prevZoom='full';state.rzoom='circuits';renderBody();}
+  else if(!id&&state.prevZoom){state.rzoom=state.prevZoom;state.prevZoom=null;renderBody();}
+  markActive(id?'nearest':false);
+ }
+ // Téléphone : aperçu temporaire du panneau complet, puis retour à la fiche sans perdre la saisie.
+ function showPanelOverlay(activeId,goTo){
+  const wrap=h('div',{class:'panel-overlay'});
+  const real=panelReal({panel,activeId,crop:true,labels:false,onCircuit:async cid=>{d.close();await goTo(cid);}});
+  wrap.append(real);
+  const d=dialog({title:'Panneau',eyebrow:panelTitle(panel),wide:'xl',body:[wrap,h('p',{class:'small muted',text:'Touchez un disjoncteur pour passer à sa fiche.'})],actions:[{label:'Retour à la fiche',kind:'primary'}]});
+  setTimeout(()=>real.querySelector('.rp-slot.act')?.scrollIntoView({block:'center',inline:'center'}),50);
+ }
  function openCircuit(cid){
   if(state.select){state.select.has(cid)?state.select.delete(cid):state.select.add(cid);renderBody();return;}
   const order=sortCircuits(panel.circuits).map(c=>c.id);
-  const editor=circuitEditor({panel,id:cid,order,planning,lib,feeds:{siblings,createSubpanel,onChange:()=>{renderBody();}},onSave:async circuits=>{
+  const editor=circuitEditor({panel,id:cid,order,planning,lib,onCurrent:setActive,onShowPanel:showPanelOverlay,feeds:{siblings,createSubpanel,onChange:()=>{renderBody();}},onSave:async circuits=>{
    const p=await persist({circuits});
    editor.setPanel(p,sortCircuits(p.circuits).map(c=>c.id));
    renderHead();renderBody();
@@ -265,6 +286,9 @@ export async function panelView({id,tab='panel',ctx}){
    h('div',{class:'view-switch',role:'group','aria-label':'Cadrage du panneau'},
     h('button',{type:'button','aria-pressed':String(state.rzoom==='full'),class:state.rzoom==='full'?'on':'',onclick:()=>setZ('full')},'Entier'),
     h('button',{type:'button','aria-pressed':String(state.rzoom==='circuits'),class:state.rzoom==='circuits'?'on':'',title:'Agrandir sur la zone des circuits',onclick:()=>setZ('circuits')},'Circuits')),
+   h('div',{class:'view-switch',role:'group','aria-label':'Ajustement'},
+    h('button',{type:'button',title:'Afficher tout le panneau dans la fenêtre',onclick:()=>{state.rzoom='full';state.rmult=1;setPref('mp_panel_zoom','full');setPref('mp_panel_mult','1');renderBody();}},'Ajuster'),
+    state.activeId&&h('button',{type:'button',title:'Centrer sur le circuit sélectionné',onclick:()=>markActive('center')},'Centrer')),
    h('div',{class:'view-switch',role:'group','aria-label':'Zoom'},
     h('button',{type:'button','aria-label':'Réduire le zoom',disabled:state.rmult===MULTS[0],onclick:()=>setM(-1)},'−'),
     h('button',{type:'button','aria-label':'Réinitialiser le zoom',title:'Réinitialiser',onclick:()=>{state.rmult=1;setPref('mp_panel_mult','1');renderBody();}},'×'+String(state.rmult).replace('.',',')),
@@ -275,20 +299,20 @@ export async function panelView({id,tab='panel',ctx}){
   const labels=h('label',{class:'check small'},h('input',{type:'checkbox',checked:state.realLabels,onchange:e=>{state.realLabels=e.target.checked;setPref('mp_panel_real_labels',e.target.checked?'1':'0');renderBody();}}),'Désignations');
   return h('section',{class:'panel-area real'+(state.realLabels?' wide':''),'aria-label':'Vue réaliste du panneau'},
    h('div',{class:'panel-caption'},viewSwitch(),zoomControls(),labels),
-   h('div',{class:'real-wrap'},sized(panelReal({panel,crop:state.rzoom==='circuits',labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit}))),
+   h('div',{class:'real-wrap'},sized(panelReal({panel,crop:state.rzoom==='circuits',activeId:state.activeId,labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit}))),
    h('p',{class:'panel-tip',text:state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche. DDFT : bouton TEST blanc et fil témoin ; anti-arc : bouton TEST bleu.'}));
  }
  function cabinet(){
   if(state.tab==='panel'&&state.view==='reel')return realCabinet();
   const det=panel.details||{};
   const grid=h('div',{class:'breakers'});
-  grid.style.gridTemplateRows=`repeat(${panel.positions},16px)`;
+  grid.style.gridTemplateRows=`repeat(${panel.positions},var(--row,16px))`;grid.style.setProperty('--pos',panel.positions);
   const match=filtered(),filtering=!!(state.q||state.status||state.tag);
   const showLoads=planning&&state.tab==='plan';
   for(const c of panel.circuits){
    const start=c.slots[0],n=slotPos(start),side=n%2===0?2:1;
    const linked=c.slots.length>2;
-   const b=h('button',{type:'button',class:`breaker ${statusClass(c)}${side===2?' even':''}${linked?' linked':''}${filtering?(match(c)?' match':' dimmed'):''}${state.select?.has(c.id)?' selected':''}`,'aria-label':`${designation(c)} : ${c.label||'à identifier'}, ${c.amps??'?'} A`,onclick:()=>openCircuit(c.id)},
+   const b=h('button',{type:'button','data-id':c.id,class:`breaker ${statusClass(c)}${side===2?' even':''}${linked?' linked':''}${filtering?(match(c)?' match':' dimmed'):''}${state.select?.has(c.id)?' selected':''}`,'aria-label':`${designation(c)} : ${c.label||'à identifier'}, ${c.amps??'?'} A`,onclick:()=>openCircuit(c.id)},
     h('span',{class:'num',text:designation(c)}),h('span',{class:'lever',text:c.amps??'?'}),h('span',{class:'short',text:shortText(c)||'—'}),h('i',{class:'dot'}));
    if(showLoads){
     // Phase et taux de charge du circuit.
@@ -320,7 +344,7 @@ export async function panelView({id,tab='panel',ctx}){
    const cabBox=h('div',{class:'sticky-col'+(state.view==='reel'&&state.realLabels?' span-all':'')});
    const refresh=()=>{cabBox.replaceChildren(cabinet());circuitList(listBox);};
    body.replaceChildren(h('div',{class:'workspace'},cabBox,h('section',{'aria-label':'Liste des circuits'},bulkBar(),filters(refresh),listBox,legend())));
-   refresh();
+   refresh();markActive(false);
   }else if(state.tab==='list'){
    const listBox=h('div',{class:'circuit-list'});
    body.replaceChildren(h('div',{class:'list-wide'},bulkBar(),filters(()=>circuitList(listBox,true)),listBox,legend()));

@@ -60,7 +60,19 @@ export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide
  if(!leaveHooked){leaveHooked=true;window.addEventListener('beforeunload',ev=>{if(hasUnsaved()){ev.preventDefault();ev.returnValue='';}});}
  el.addEventListener('close',()=>{unsaved.delete(isDirty);if(side)document.body.classList.remove('has-side');el.remove();onClose?.();});
  document.body.append(el);
- if(side){el.classList.add('side');document.body.classList.add('has-side');el.show();}else el.showModal();
+ if(side){
+  el.classList.add('side');document.body.classList.add('has-side');
+  // Séparation redimensionnable entre le panneau et la fiche (largeur gardée sur l'appareil).
+  try{const w=Number(localStorage.getItem('mp_side_w'));if(w>=320)document.documentElement.style.setProperty('--side-w',w+'px');}catch{}
+  const grip=h('div',{class:'side-grip',role:'separator','aria-orientation':'vertical','aria-label':'Redimensionner la fiche',title:'Glisser pour redimensionner'});
+  grip.addEventListener('pointerdown',ev=>{
+   ev.preventDefault();grip.setPointerCapture(ev.pointerId);
+   const move=e=>{const w=Math.round(Math.min(Math.max(320,innerWidth-e.clientX),innerWidth*0.65));document.documentElement.style.setProperty('--side-w',w+'px');try{localStorage.setItem('mp_side_w',String(w));}catch{}};
+   const up=()=>{grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);};
+   grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',up);
+  });
+  el.prepend(grip);el.show();
+ }else el.showModal();
  return {el,close,form:form?inner:null};
 }
 export function confirmDialog(message,{title='Confirmer',confirm='Confirmer',danger=false}={}){

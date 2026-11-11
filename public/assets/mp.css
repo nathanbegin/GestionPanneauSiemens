@@ -802,11 +802,8 @@ details.form-adv[open]>summary{margin-bottom:8px}
 .erow .pos{font-weight:700}
 .erow.vacant{opacity:.6}
 .more-menu .menu{right:0;left:auto}
-dialog.side{position:fixed;inset:64px 0 0 auto;margin:0;width:min(440px,38vw);height:calc(100vh - 64px);max-height:none;border-radius:14px 0 0 0;box-shadow:-10px 0 30px #0b241b30;overflow:auto;z-index:15}
-dialog.side .dlg-body{overflow:auto}
-body.has-side #view{padding-right:min(460px,40vw)}
+/* (éditeur latéral : voir la section « Disposition d'édition » plus bas) */
 @media (max-width:720px){.erow{grid-template-columns:48px 1fr 110px}.erow .amps,.erow.ehead span:nth-child(5),.erow.ehead span:nth-child(6){display:none}.erow>:nth-child(3){grid-column:2}.erow>:nth-child(4){grid-column:3;grid-row:1}.erow>button{grid-column:3}}
-body:has(#worknav:not([hidden])) dialog.side{inset-block-start:111px;height:calc(100vh - 111px)}
 /* ---- Mobile : navigation courte, mode terrain, zones tactiles, état de sauvegarde ---- */
 .save-state{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:40;margin:0;padding:6px 12px;border-radius:99px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px #0b241b22;font-size:13px}
 .save-state.ok{color:var(--green,#226a51)}.save-state.fail{color:#a33;border-color:#e1b4b4}.save-state.busy{color:var(--muted)}
@@ -840,10 +837,8 @@ body:has(#worknav:not([hidden])) dialog.side{inset-block-start:111px;height:calc
 }
 /* Mode hors ligne */
 .offline-bar{position:sticky;top:0;z-index:60;background:#fff3cd;color:#6b4e00;border-bottom:1px solid #e6cf85;padding:8px 14px;font-size:14px;text-align:center}
-body.is-offline .topbar{top:36px}
 /* Mode hors ligne */
 .offline-bar{position:sticky;top:0;z-index:60;background:#fff3cd;color:#6b4e00;border-bottom:1px solid #e6cf85;padding:8px 14px;font-size:14px;text-align:center}
-body.is-offline .topbar{top:36px}
 /* Corbeille et historique */
 .trash-list{display:grid;gap:10px}
 .trash-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;flex-wrap:wrap}
@@ -860,3 +855,61 @@ body.is-offline .topbar{top:36px}
 .todo-more{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;font-size:13px}
 .demo-bar{position:sticky;top:0;z-index:60;background:#e4f7a8;color:#183c32;border-bottom:1px solid #c5dd7f;padding:8px 14px;font-size:14px;text-align:center}
 .demo-bar a{color:inherit;font-weight:700}
+
+/* ---- Disposition d'édition : panneau (≈ 60 %) + fiche (≈ 40 %), hauteur mesurée plutôt que décalages fixes ---- */
+:root{--chrome-h:64px}
+.topbar{top:var(--bars-h,0px)}
+.offline-bar,.demo-bar{min-height:36px;box-sizing:border-box}
+.stage-chip{display:inline-flex;align-items:center;min-height:0;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--soft);font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;vertical-align:middle}
+span.stage-chip{cursor:default}
+.panel-hero{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+dialog.side{position:fixed;inset:var(--chrome-h) 0 0 auto;margin:0;width:var(--side-w,clamp(360px,40vw,560px));height:calc(100dvh - var(--chrome-h));max-height:none;border-radius:14px 0 0 0;box-shadow:-10px 0 30px #0b241b30;z-index:15;overflow:hidden}
+dialog.side[open]{display:flex;flex-direction:column}
+dialog.side>form{display:flex;flex-direction:column;min-height:0;flex:1}
+dialog.side .dlg-body{flex:1;overflow:auto;min-height:0}
+dialog.side .dlg-foot{border-top:1px solid var(--line);background:var(--card,#fff);padding:10px 14px}
+dialog.side .dlg-head{padding:12px 14px}
+dialog.side .side-list{margin-right:6px;min-height:34px}
+dialog.side .dlg-head{display:flex;align-items:center;gap:6px}
+dialog.side .dlg-head>div:first-child{flex:1;min-width:0}
+.side-grip{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:3;touch-action:none}
+.side-grip::after{content:'';position:absolute;left:4px;top:calc(50% - 22px);height:44px;width:3px;border-radius:2px;background:#9aa89f;opacity:.6}
+.side-grip:hover::after{opacity:1;background:var(--green,#226a51)}
+body.has-side #view{padding-right:var(--side-w,clamp(360px,40vw,560px))}
+body.has-side #view .container{max-width:none}
+/* Pendant l'édition : en-tête compact, liste masquée (la fiche la remplace), le panneau occupe la hauteur disponible */
+body.has-side .tabs,body.has-side .progress-line,body.has-side .page-head .sub,body.has-side .head-extra,body.has-side .page-actions>*:not(.more-menu){display:none}
+body.has-side .page-head{margin-bottom:8px;align-items:center}
+body.has-side .panel-hero h1{font-size:22px;margin:0}
+body.has-side .workspace{grid-template-columns:minmax(0,1fr)}
+body.has-side .workspace>section[aria-label="Liste des circuits"]{display:none}
+body.has-side .workspace>.sticky-col{position:sticky;top:calc(var(--chrome-h) + 6px);max-height:calc(100dvh - var(--chrome-h) - 70px);overflow:auto}
+body.has-side .workspace .panel-area.real .panel-real{max-height:calc(100dvh - var(--chrome-h) - 190px)}
+body.has-side .cabinet{--row:clamp(8px,calc((100dvh - var(--chrome-h) - 390px) / var(--pos,24) - 2px),16px);max-width:none;padding:14px 14px}
+body.has-side .cabinet .main-breaker{margin:8px 0}
+body.has-side .cabinet .manufacturer{padding-bottom:6px}
+body.has-side .cabinet .rail-labels{margin:6px 0 4px}
+body.has-side .cabinet .panel-foot{margin-top:6px}
+body.has-side .cabinet .manufacturer,body.has-side .cabinet .main-breaker{transform:none}
+body.has-side .panel-area{padding:10px}
+/* Circuit en cours d'édition : contour bleu, distinct des couleurs de statut */
+.breaker.active{outline:3px solid #2f6fdd;outline-offset:1px;z-index:3;position:relative;box-shadow:0 0 0 5px #2f6fdd33}
+.rp-slot.act,.pa-item.act{filter:drop-shadow(0 0 3px #2f6fdd) drop-shadow(0 0 3px #2f6fdd)}
+.rp-slot.act rect,.pa-item.act rect{stroke:#2f6fdd;stroke-width:2.5}
+/* Mobile : repère du circuit actif et de ses voisins au-dessus de la fiche */
+.mini-strip{display:flex;gap:6px;align-items:stretch;overflow-x:auto;padding:0 0 10px;margin:0 0 8px;border-bottom:1px solid var(--line)}
+.mini-cell{flex:0 0 auto;min-width:64px;max-width:96px;display:grid;gap:1px;text-align:left;padding:6px 8px;border:1px solid var(--line);border-left:4px solid #adb5a8;border-radius:8px;background:#fff}
+.mini-cell small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.mini-cell.identified{border-left-color:#3f9a62}.mini-cell.unknown{border-left-color:#d0a04a}
+.mini-cell.on{outline:3px solid #2f6fdd;outline-offset:0;background:#eef4ff}
+.mini-panel{flex:0 0 auto;align-self:center;white-space:nowrap}
+.panel-overlay .panel-real{max-height:62dvh;margin:0 auto}
+dialog.side .dlg-foot{display:flex;flex-wrap:nowrap;align-items:center;gap:8px}
+dialog.side .dlg-foot .right{display:flex;flex-wrap:nowrap;gap:6px;margin-left:auto}
+dialog.side .dlg-foot button{padding:8px 12px;white-space:nowrap;min-height:40px}
+.mini-panel{position:sticky;left:0;z-index:1;background:#fff}
+@media (max-width:1100px){dialog.side .dlg-foot,dialog.side .dlg-foot .right{flex-wrap:wrap}dialog.side .dlg-foot .right{margin-left:0;width:100%}dialog.side .dlg-foot .right button{flex:1}}
+/* Champs de charges adaptés à la largeur réelle de la fiche latérale */
+dialog.side .load-row{grid-template-columns:1fr 1fr}
+dialog.side .load-row>input:first-child{grid-column:1/-1}
+dialog.side .load-kpis{grid-template-columns:repeat(2,1fr)}
