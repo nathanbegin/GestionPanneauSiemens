@@ -248,3 +248,9 @@ Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/
 ## Progression des analyses par IA
 
 `public/js/aiprogress.js` : barre de progression, étapes cochées, temps écoulé et résultats qui apparaissent un à un (circuits lus, champs de la plaque). L'**envoi** des photos est mesuré pour de vrai (`apiProgress` dans `api.js`, XHR) ; l'**attente de l'IA** est estimée (sa durée réelle n'est pas connue d'avance, la barre plafonne à ~94 % jusqu'à la réponse). Utilisée pour la plaque signalétique d'un électroménager et l'ajout d'un panneau par photos (et photos de précision).
+
+## Base de données : migrations et performance
+
+- **Migrations versionnées** (`api/_lib/db.js`) : `SCHEMA_VERSION` + table `app_schema_version`. Un démarrage à froid ne fait que 2 requêtes quand le schéma est à jour ; les ~35 instructions (`runMigrations`, idempotentes) ne s'exécutent qu'une fois par version. **Quand on ajoute une table, une colonne ou un index : l'ajouter à `runMigrations` et augmenter `SCHEMA_VERSION`.** `npm run migrate` (avec `DATABASE_URL`) les applique à la main, par exemple avant un déploiement.
+- **Index** : panneaux par utilisateur, clients et abonnements Stripe, partages, invitations (courriel), crédits, événements de quota.
+- **Recherche globale** : le filtrage (insensible à la casse et aux accents courants) se fait dans PostgreSQL ; seuls les panneaux pouvant correspondre (300 au plus) sont chargés et détaillés.

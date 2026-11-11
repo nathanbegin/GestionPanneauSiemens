@@ -49,7 +49,10 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   if(q.length<2)return res.status(200).json({results:[]});
   const has=(...v)=>v.some(x=>norm(x).includes(q));
   const sites=await sql`SELECT * FROM app_sites WHERE user_id=${user.id}`;
-  const panels=await sql`SELECT id,site_id,name,tag,kind,location,details,circuits FROM app_panels WHERE user_id=${user.id}`;
+  // Filtrage dans la base (insensible à la casse et aux accents courants) : seuls les panneaux pouvant correspondre sont chargés.
+  const like='%'+q.replace(/[\\%_]/g,m=>'\\'+m)+'%';
+  const panels=await sql`SELECT id,site_id,name,tag,kind,location,details,circuits FROM app_panels WHERE user_id=${user.id}
+   AND translate(lower(name||' '||tag||' '||location||' '||details::text||' '||circuits::text),'àáâãäåçèéêëìíîïñòóôõöùúûüý','aaaaaaceeeeiiiinooooouuuuy') LIKE ${like} ORDER BY updated_at DESC LIMIT 300`;
   const byId=new Map(sites.map(x=>[x.id,x]));
   const out=[];
   for(const st of sites)if(has(st.name,st.client,st.street,st.city,st.notes))out.push({type:'site',siteId:st.id,title:st.name,sub:[st.client,st.city].filter(Boolean).join(' · ')});

@@ -1,6 +1,6 @@
 {
   "name": "gestion-panneau-siemens",
-  "version": "2.44.1",
+  "version": "2.45.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,7 +10,8 @@
     "test": "node --test test/*.test.js",
     "dev": "node scripts/dev-server.mjs",
     "icons": "NODE_PATH=$(npm root -g) node scripts/icons.mjs",
-    "mobile": "cd mobile && npm run build"
+    "mobile": "cd mobile && npm run build",
+    "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.0.2",

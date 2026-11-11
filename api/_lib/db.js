@@ -1,6 +1,9 @@
 // Accès base de données : Neon (HTTP) en production, PostgreSQL local (pg) en développement.
 import {neon} from '@neondatabase/serverless';
 let cached,schemaReady;
+// Version du schéma : les migrations ne s'exécutent qu'une fois par version (au lieu de ~35 requêtes à chaque démarrage à froid).
+// Augmenter ce nombre quand on ajoute une table, une colonne ou un index à runMigrations.
+export const SCHEMA_VERSION=2;
 const isLocal=url=>/@(localhost|127\.0\.0\.1)(:\d+)?\//.test(url);
 async function localSql(url){
  const {default:pg}=await import('pg');
@@ -17,6 +20,14 @@ export async function getSql(){
  return cached;
 }
 async function ensureSchema(sql){
+ await sql`CREATE TABLE IF NOT EXISTS app_schema_version(id integer PRIMARY KEY DEFAULT 1, version integer NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`;
+ const [row]=await sql`SELECT version FROM app_schema_version WHERE id=1`;
+ if((row?.version||0)>=SCHEMA_VERSION)return;
+ await runMigrations(sql);
+ await sql`INSERT INTO app_schema_version(id,version) VALUES(1,${SCHEMA_VERSION}) ON CONFLICT (id) DO UPDATE SET version=GREATEST(app_schema_version.version,EXCLUDED.version),updated_at=now()`;
+}
+// Toutes les migrations (idempotentes). Exécutées par ensureSchema quand la version change, ou à la main : npm run migrate.
+export async function runMigrations(sql){
  await sql`CREATE TABLE IF NOT EXISTS app_users(
   id uuid PRIMARY KEY, email text NOT NULL UNIQUE, password_hash text NOT NULL, name text NOT NULL DEFAULT '',
   profile jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
@@ -98,6 +109,16 @@ async function ensureSchema(sql){
  await sql`CREATE INDEX IF NOT EXISTS app_shares_team ON app_shares(team_owner)`;
  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_public boolean NOT NULL DEFAULT false`;
  await sql`CREATE TABLE IF NOT EXISTS app_settings(key text PRIMARY KEY, value jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamptz NOT NULL DEFAULT now(), updated_by text NOT NULL DEFAULT '')`;
+ // ---- Index de performance (v2) : recherches par utilisateur, Stripe, partages, invitations ----
+ await sql`CREATE INDEX IF NOT EXISTS app_panels_user ON app_panels(user_id, updated_at DESC)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_users_stripe_customer ON app_users(stripe_customer) WHERE stripe_customer IS NOT NULL`;
+ await sql`CREATE INDEX IF NOT EXISTS app_subscriptions_stripe ON app_subscriptions(stripe_subscription) WHERE stripe_subscription IS NOT NULL`;
+ await sql`CREATE INDEX IF NOT EXISTS app_credits_user ON app_credits(user_id, expires_at)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_shares_owner ON app_shares(owner_id)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_shares_target ON app_shares(target_user)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_team_invites_owner ON app_team_invites(owner_id)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_handoffs_email ON app_handoffs(lower(email), status)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_panel_events_plan ON app_panel_events(user_id, source, created_at)`;
  const {seedPlans}=await import('./plans.js');
  await seedPlans(sql);
 }
