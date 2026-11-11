@@ -269,6 +269,7 @@ h('div',{class:'full group-block'}),
  const nextBtn=h('button',{type:'button',text:'Enregistrer et suivant ›'});
  const guard=async()=>{if(dirty&&!await confirmDialog('Fermer sans enregistrer les modifications de cette fiche ?',{confirm:'Fermer sans enregistrer'}))return false;};
  d=dialog({title:'Circuit',eyebrow:' ',form:true,wide:!side,side,body:[body],beforeClose:guard,dirty:()=>dirty,onClose:()=>{if(activeSide?.d===d)activeSide=null;},actions:[{label:'Fermer',kind:'ghost',left:true,onClick:guard},{label:'Enregistrer',kind:'primary',submit:true}]});
+ d.el.classList.add('circuit-dlg');nextBtn.classList.add('next-btn');
  d.el.querySelector('.dlg-foot .right').prepend(prevBtn,nextBtn);
  prevBtn.onclick=async()=>{const ok=await save(0);if(ok!==false){const idx=order.indexOf(current)-1;if(order[idx]){current=order[idx];render();}}};
  nextBtn.onclick=()=>save(1);

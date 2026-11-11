@@ -12,6 +12,8 @@ export function h(tag,props,...kids){
   else if(['value','checked','selected','disabled','hidden','required','multiple','readOnly'].includes(k))el[k]=v;
   else el.setAttribute(k,v===true?'':v);
  }
+ // Clavier numérique pour les valeurs numériques (sans surcharger un choix explicite).
+ if(tag==='input'&&el.type==='number'&&!el.hasAttribute('inputmode'))el.setAttribute('inputmode','decimal');
  append(el,kids);
  return el;
 }

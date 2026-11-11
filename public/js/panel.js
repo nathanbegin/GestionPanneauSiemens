@@ -37,7 +37,8 @@ export async function panelView({id,tab='panel',ctx}){
  const lib=planning?await loadLibrary().catch(()=>null):null;
  let saving=Promise.resolve();
  const stageOf=()=>panel.details?.stage||stageFromState(panel.details?.state);
- const defaultTab=()=>({conception:planning?'plan':'panel',releve:'panel',verification:'appliances'}[stageOf()]);
+ const isMobile=()=>typeof matchMedia==='function'&&matchMedia('(max-width:720px)').matches;
+ const defaultTab=()=>({conception:planning?'plan':'panel',releve:isMobile()?'list':'panel',verification:'appliances'}[stageOf()]);
  const state={tab:tabNames[tab]?tab:defaultTab(),q:'',status:'',tag:'',place:null,select:null};
  // Vue du panneau : schéma (par défaut) ou réaliste ; préférence gardée sur l'appareil.
  const pref=k=>{try{return localStorage.getItem(k);}catch{return null;}};
@@ -59,13 +60,16 @@ export async function panelView({id,tab='panel',ctx}){
  async function persist(update){
   // Sérialise les écritures pour garder les numéros de révision cohérents.
   const run=saving.then(async()=>{
-   saveState.textContent='Enregistrement…';
+   saveState.className='save-state busy';saveState.textContent='Enregistrement…';
    try{
     const out=await api('/api/panels?id='+panel.id,{method:'PUT',body:{revision:panel.revision,...update}});
-    panel=out.panel;saveState.textContent='✓ Enregistré';
+    panel=out.panel;saveState.className='save-state ok';saveState.textContent='✓ Enregistré';
     return panel;
    }catch(e){
-    saveState.textContent='⚠ Non enregistré';
+    saveState.className='save-state fail';
+    // Échec : le bouton relance l'enregistrement avec les mêmes données (sauf conflit de révision).
+    if(e.status===409)saveState.textContent='⚠ Non enregistré';
+    else saveState.replaceChildren('⚠ Échec — ',h('button',{type:'button',class:'link',onclick:()=>persist(update).then(()=>{renderHead();renderBody();}).catch(()=>{})},'Réessayer'));
     if(e.status===409){toast(e.message,8000);}
     throw e;
    }
@@ -162,7 +166,17 @@ export async function panelView({id,tab='panel',ctx}){
     fed&&h('div',{class:'sub small'},'Alimenté par ',h('a',{href:'#/panneaux/'+fed.id,text:panelTitle(fed)}),det.fedFromCircuit?` (circuit ${det.fedFromCircuit})`:'')),
    h('div',{class:'page-actions'},primaryAction(),moreMenu())));
  }
+ const mobile=()=>typeof matchMedia==='function'&&matchMedia('(max-width:720px)').matches;
  function renderTabs(){
+  // Mobile : trois accès (Circuits · Vue du panneau · Plus) au lieu d'onglets défilants.
+  if(mobile()){
+   const more=['plan','appliances','docs','info'],inMore=more.includes(state.tab);
+   const t=(k,label)=>h('button',{type:'button',role:'tab','aria-selected':String(state.tab===k),onclick:()=>go(k)},label);
+   const moreBtn=h('button',{type:'button',role:'tab','aria-selected':String(inMore),'aria-haspopup':'dialog',onclick:()=>{
+    const d=dialog({title:'Plus',eyebrow:panelTitle(panel),body:[h('div',{class:'more-list'},...more.map(k=>h('button',{type:'button',class:state.tab===k?'on':'',onclick:()=>{d.close();go(k);}},tabNames[k])))],actions:[{label:'Fermer',kind:'ghost'}]});}},inMore?tabNames[state.tab]+' ▾':'⋯ Plus');
+   tabs.className='tabs tabs-3';tabs.replaceChildren(t('list','☷ Circuits'),t('panel','▦ Vue du panneau'),moreBtn);return;
+  }
+  tabs.className='tabs';
   // Tous les outils sont accessibles quelle que soit l'étape (l'étape n'est qu'un indicateur d'avancement).
  const keys=['panel','list','plan','appliances','docs','info'];
   tabs.replaceChildren(...keys.map(k=>h('button',{type:'button',role:'tab','aria-selected':String(state.tab===k),onclick:()=>go(k)},tabNames[k])));
@@ -209,7 +223,7 @@ export async function panelView({id,tab='panel',ctx}){
   container.replaceChildren(list.length?h('div',{class:'etable'},h('div',{class:'erow ehead'},h('span',{text:'Pos.'}),h('span',{text:'Désignation'}),h('span',{text:'Pièce'}),h('span',{text:'Statut'}),h('span',{text:'Calibre'}),h('span')),...list.map(rowOf),h('datalist',{id:'erRooms'},rooms.map(r=>h('option',{value:r})))):h('p',{class:'empty-state muted',text:'Aucun circuit ne correspond à la recherche.'}));
  }
  function circuitList(container,editable=false){
-  if(editable&&data.access!=='view'&&!state.select)return editableList(container);
+  if(editable&&data.access!=='view'&&!state.select&&!isMobile())return editableList(container);
   const match=filtered();
   const list=sortCircuits(panel.circuits).filter(match);
   container.replaceChildren(...(list.length?list.map(c=>{

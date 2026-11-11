@@ -1675,4 +1675,10 @@ export default [
  ["🖨 Rapports et étiquettes", "🖨 Reports and labels"],
  ["📷 Garnir par photos (IA)", "📷 Fill from photos (AI)"],
  ["▦ Code QR", "▦ QR code"],
+ ["☷ Circuits", "☷ Circuits"],
+ ["▦ Vue du panneau", "▦ Panel view"],
+ ["⋯ Plus", "⋯ More"],
+ ["Plus", "More"],
+ ["⚠ Échec — ", "⚠ Failed — "],
+ ["En attente…", "Pending…"],
 ];

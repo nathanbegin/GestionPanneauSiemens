@@ -807,3 +807,34 @@ dialog.side .dlg-body{overflow:auto}
 body.has-side #view{padding-right:min(460px,40vw)}
 @media (max-width:720px){.erow{grid-template-columns:48px 1fr 110px}.erow .amps,.erow.ehead span:nth-child(5),.erow.ehead span:nth-child(6){display:none}.erow>:nth-child(3){grid-column:2}.erow>:nth-child(4){grid-column:3;grid-row:1}.erow>button{grid-column:3}}
 body:has(#worknav:not([hidden])) dialog.side{inset-block-start:111px;height:calc(100vh - 111px)}
+/* ---- Mobile : navigation courte, mode terrain, zones tactiles, état de sauvegarde ---- */
+.save-state{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:40;margin:0;padding:6px 12px;border-radius:99px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px #0b241b22;font-size:13px}
+.save-state.ok{color:var(--green,#226a51)}.save-state.fail{color:#a33;border-color:#e1b4b4}.save-state.busy{color:var(--muted)}
+.tabs.tabs-3{display:grid;grid-template-columns:1fr 1fr 1fr;overflow:visible}
+.tabs.tabs-3 button{min-height:48px;padding:8px 6px;white-space:normal;line-height:1.15}
+.more-list{display:grid;gap:8px}
+.more-list button{min-height:52px;text-align:left;font-size:16px;justify-content:flex-start}
+.more-list button.on{background:var(--ink);color:#fff}
+@media (max-width:720px){
+ /* Zones tactiles : 44 à 48 px pour les commandes importantes */
+ button,.btn,select,input:not([type=checkbox]):not([type=radio]):not([type=color]),.chip{min-height:44px}
+ .btn.sm,button.sm,.tabs button,.billing-toggle button{min-height:44px}
+ /* En-tête compact : étapes du projet sur une ligne, texte d'aide masqué */
+ .stage-bar.compact{padding:8px 10px;margin-bottom:10px}
+ .stage-bar.compact .stage-hint>.muted{display:none}
+ .stage-pills li{padding:3px 8px;font-size:12px}
+ .stage-label{display:none}
+ /* Mode terrain : fiche circuit plein écran, désignation bien visible, gros bouton Enregistrer et suivant */
+ dialog.circuit-dlg{inset:0;width:100vw!important;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0}
+ dialog.circuit-dlg[open]{display:flex;flex-direction:column}
+ dialog.circuit-dlg>form{display:flex;flex-direction:column;min-height:0;flex:1}
+ dialog.circuit-dlg .dlg-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+ dialog.circuit-dlg input[name=label]{font-size:20px;min-height:56px}
+ dialog.circuit-dlg .dlg-foot{position:sticky;bottom:0;background:var(--card,#fff);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr;justify-content:stretch;gap:8px}
+ dialog.circuit-dlg .dlg-foot .right{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin:0}
+ dialog.circuit-dlg .dlg-foot .right button{width:100%;justify-content:center}
+ dialog.circuit-dlg .next-btn{grid-column:1/-1;order:-1;min-height:56px;font-size:17px;font-weight:700;background:var(--ink);color:#fff;border-color:var(--ink)}
+ dialog.circuit-dlg .dlg-foot>button{width:100%}
+ .save-state{left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+ body:has(dialog.circuit-dlg[open]) .save-state{display:none}
+}
