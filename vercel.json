@@ -40,6 +40,7 @@
  ],
  "rewrites": [
   {"source": "/google7a6acaf8f35c3a5f.html", "destination": "/google-site-verification.txt"},
+  {"source": "/google7a6acaf8f35c3a5f", "destination": "/google-site-verification.txt"},
   {"source": "/sso/callback/:provider", "destination": "/api/auth?action=sso-callback&provider=:provider"}
  ],
  "cleanUrls": true
