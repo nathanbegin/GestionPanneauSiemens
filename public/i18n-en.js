@@ -1652,4 +1652,8 @@ export default [
  ["Avancement du projet", "Project progress"],
  ["Changer l’étape…", "Change stage…"],
  ["L’étape indique où en est le projet. Elle ne modifie ni vos circuits ni vos calculs, et tous les outils restent accessibles dans les onglets.", "The stage shows where the project stands. It does not change your circuits or calculations, and every tool remains available in the tabs."],
+ ["Caractéristiques avancées (tension, superficies, alimentation, entrée, relevé)", "Advanced characteristics (voltage, areas, supply, service entrance, survey)"],
+ ["Caractéristiques avancées (protection, format du disjoncteur, regroupement)", "Advanced characteristics (protection, breaker format, grouping)"],
+ ["Tension et superficies", "Voltage and floor areas"],
+ ["Ex. 200 (laisser vide si inconnu)", "E.g. 200 (leave empty if unknown)"],
 ];
