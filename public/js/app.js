@@ -166,7 +166,7 @@ async function sitesView(){
   if(q.length<2){found.replaceChildren();gridWrap.hidden=false;return;}
   timer=setTimeout(async()=>{const my=++seq;try{const r=await api('/api/sites?search='+encodeURIComponent(q));if(my!==seq)return;gridWrap.hidden=true;
    const icon={site:'🏠',panel:'▦',circuit:'⚡'};
-   found.replaceChildren(r.results.length?h('div',{class:'result-list'},...r.results.map(x=>h('a',{class:'result card',href:x.panelId?'#/panneaux/'+x.panelId+(x.type==='circuit'?'/list':''):'#/sites/'+x.siteId,onclick:()=>{if(x.type==='circuit'){try{sessionStorage.setItem('mp_goto_q',x.q);}catch{}}}},h('span',{class:'ico','aria-hidden':'true',text:icon[x.type]}),h('span',{},h('b',{text:x.title}),h('small',{class:'muted',text:x.sub}))))):h('p',{class:'muted',text:'Aucun résultat.'}));
+   found.replaceChildren(r.results.length?h('div',{class:'result-list'},...r.results.map(x=>h('a',{class:'result card',href:x.panelId?'#/panneaux/'+x.panelId+(x.type==='circuit'?'/panel':''):'#/sites/'+x.siteId,onclick:()=>{if(x.type==='circuit'){try{sessionStorage.setItem('mp_goto_circuit',x.circuitId);}catch{}}}},h('span',{class:'ico','aria-hidden':'true',text:icon[x.type]}),h('span',{},h('b',{text:x.title}),h('small',{class:'muted',text:x.sub}))))):h('p',{class:'muted',text:'Aucun résultat.'}));
   }catch(err){if(my===seq)found.replaceChildren(h('p',{class:'error',text:err.message}));}},250);}}));
  const gridWrap=h('div');
  const grid=h('div',{class:'cards'},...sites.map(s=>h('a',{class:'card site-card',href:'#/sites/'+s.id},

@@ -46,7 +46,10 @@ export async function panelView({id,tab='panel',ctx}){
  const pref=k=>{try{return localStorage.getItem(k);}catch{return null;}};
  const setPref=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};
  state.view=pref('mp_panel_view')==='reel'?'reel':'schema';
- // Arrivée depuis la recherche globale : liste filtrée sur le terme cherché.
+ // Arrivée depuis la recherche globale : schéma réaliste, circuit en évidence et fiche ouverte.
+ let gotoCircuit=null;
+ try{gotoCircuit=sessionStorage.getItem('mp_goto_circuit');sessionStorage.removeItem('mp_goto_circuit');}catch{}
+ if(gotoCircuit&&panel.circuits.some(c=>c.id===gotoCircuit)){state.tab='panel';state.view='reel';}else gotoCircuit=null;
  try{const gq=sessionStorage.getItem('mp_goto_q');if(gq){state.q=gq;state.tab='list';sessionStorage.removeItem('mp_goto_q');}}catch{}
  // Désignations à côté du panneau réaliste : désactivées par défaut (la liste des circuits les montre déjà).
  state.realLabels=pref('mp_panel_real_labels')==='1';state.rzoom=pref('mp_panel_zoom')==='circuits'?'circuits':'full';state.rmult=[1,1.25,1.5,2,3].includes(Number(pref('mp_panel_mult')))?Number(pref('mp_panel_mult')):1;
@@ -534,6 +537,7 @@ export async function panelView({id,tab='panel',ctx}){
  }
 
  renderHead();renderTabs();renderBody();
+ if(gotoCircuit)setTimeout(()=>openCircuit(gotoCircuit),0);
  // Lien direct vers les électroménagers : le projet passe à l'étape Vérification.
  return root;
 }

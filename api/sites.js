@@ -55,7 +55,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
    if(has(p.name,p.tag,p.location,p.details?.building,p.details?.brand,p.details?.model))out.push({type:'panel',siteId:st.id,panelId:p.id,title:panelTitle(p),sub:st.name+(p.location?' · '+p.location:'')});
    for(const c of p.circuits||[]){
     const tags=Object.values(c.tags||{}).flat();
-    if(has(c.label,c.room,c.notes,c.exceptions,c.breakerRef,...tags))out.push({type:'circuit',siteId:st.id,panelId:p.id,title:(c.label||'Sans désignation'),sub:`${st.name} · ${panelTitle(p)} · circuit ${designation(c)}${c.room?' · '+c.room:''}`,q:String(req.query.search).slice(0,80)});
+    if(has(c.label,c.room,c.notes,c.exceptions,c.breakerRef,...tags))out.push({type:'circuit',siteId:st.id,panelId:p.id,circuitId:c.id,title:(c.label||'Sans désignation'),sub:`${st.name} · ${panelTitle(p)} · circuit ${designation(c)}${c.room?' · '+c.room:''}`,q:String(req.query.search).slice(0,80)});
    }
   }
   return res.status(200).json({results:out.slice(0,40),more:out.length>40});
