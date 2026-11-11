@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 const out=new URL('../public/assets/',import.meta.url);
 const browser=await chromium.launch();
 const page=await browser.newPage();
-for(const [src,size,name] of [['icon.svg',192,'icon-192.png'],['icon.svg',512,'icon-512.png'],['icon-maskable.svg',512,'icon-maskable-512.png'],['icon-maskable.svg',1024,'icon-1024.png']]){
+for(const [src,size,name] of [['icon.svg',192,'icon-192.png'],['icon.svg',512,'icon-512.png'],['icon-maskable.svg',512,'icon-maskable-512.png'],['icon-maskable.svg',1024,'icon-1024.png'],['icon.svg',16,'favicon-16.png'],['icon.svg',32,'favicon-32.png'],['icon.svg',48,'favicon-48.png'],['icon.svg',180,'apple-touch-icon.png']]){
  const svg=await readFile(new URL(src,out),'utf8');
  await page.setViewportSize({width:size,height:size});
  await page.setContent(`<style>html,body{margin:0}svg{display:block;width:${size}px;height:${size}px}</style>${svg}`);
