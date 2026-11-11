@@ -7,7 +7,8 @@ import {siteOut,panelOut} from './_lib/serialize.js';
 import {buildReport,buildLabels,buildLoads,buildCalcNote} from './_lib/pdf.js';
 import {entitlement} from './_lib/plans.js';
 import {adminEmails} from './_lib/auth.js';
-import {APP_VERSION,panelTitle} from '../public/model.js';
+import {APP_VERSION,panelTitle,calcFingerprint} from '../public/model.js';
+import {panelFromRecord} from './_lib/calcrecord.js';
 import {panelLink,qrAllowed} from '../public/qr.js';
 import {appUrl} from './_lib/mail.js';
 import {loadPdfSettings,resolveFooter} from './_lib/footers.js';
@@ -62,9 +63,14 @@ export default route(['GET','POST'],async(req,res)=>{
  const all=await sql`SELECT id,name,tag FROM app_panels WHERE site_id=${siteRow.id}`;
  const label=id=>{const f=all.find(x=>x.id===id);return f?panelTitle(f):'';};
  const panels=rows.map(r=>{const panel=panelOut(r);return {panel,fedFromLabel:label(panel.details?.fedFrom)};});
+ let calcMeta=null;
  if(p.kind==='loads'||p.kind==='calc'){
   const e=await entitlement(sql,userId);
-  if(!e.plan.features?.planning&&!adminEmails().includes(user.email))throw new HttpError(402,'Le bilan de charges est inclus dans les forfaits Électricien.',{quota:true});
+  // Sans forfait de calcul (ex. après une annulation) : seul un résultat déjà établi reste exportable, à partir de ses données d'origine.
+  const planning=!!e.plan.features?.planning||adminEmails().includes(user.email);
+  const rec=panels[0].panel.details?.calcRecord||null;
+  if(!planning&&!rec)throw new HttpError(402,'Le bilan de charges est inclus dans les forfaits Électricien.',{quota:true});
+  calcMeta={record:rec,historic:!planning,changed:false};
  }
  // Image de marque de l'entreprise : forfaits avec la fonction « branding » (et administrateurs).
  let brand=null;
@@ -74,10 +80,15 @@ export default route(['GET','POST'],async(req,res)=>{
  brand={...(brand||{}),footer:brand?foot.footer:'',legal:foot.legal};
  let children=[];
  if(p.kind==='loads'||p.kind==='calc'){const sitePanels=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${siteRow.id}`;const q=[rows[0].id],seen=new Set(q);while(q.length){const parent=q.shift();for(const x of sitePanels)if(x.details?.fedFrom===parent&&!seen.has(x.id)){seen.add(x.id);q.push(x.id);children.push(x);}}}
+ if(calcMeta){
+  const cur=panels[0].panel;
+  calcMeta.changed=!!calcMeta.record&&calcFingerprint(cur,children)!==calcMeta.record.fingerprint;
+  if(calcMeta.historic){panels[0]={...panels[0],panel:panelFromRecord(cur,calcMeta.record)};children=calcMeta.record.inputs.children;}
+ }
  // Code QR sur les étiquettes : forfaits qui l'incluent (et administrateurs).
  let qrUrl='';
  if(p.kind==='labels'){const e=await entitlement(sql,userId);if(qrAllowed(e.plan.features,adminEmails().includes(user.email)))qrUrl=panelLink(appUrl(req),panels[0].panel.id);}
- const bytes=p.kind==='calc'?await buildCalcNote({user,site,...panels[0],children,version:APP_VERSION,brand,lang:p.lang}):p.kind==='loads'?await buildLoads({user,site,...panels[0],children,version:APP_VERSION,brand,lang:p.lang}):p.kind==='labels'
+ const bytes=p.kind==='calc'?await buildCalcNote({user,site,...panels[0],children,version:APP_VERSION,brand,lang:p.lang,calcMeta}):p.kind==='loads'?await buildLoads({user,site,...panels[0],children,version:APP_VERSION,brand,lang:p.lang,calcMeta}):p.kind==='labels'
   ?await buildLabels({site,...panels[0],skipFree:p.skipFree==='1',brand,qrUrl,lang:p.lang})
   :await buildReport({kind:p.kind,format:p.format,user,site,panels,version:APP_VERSION,brand,lang:p.lang});
  const name={report:'rapport',door:'aide-memoire',labels:'etiquettes',loads:'bilan-charges',calc:'note-de-calcul'}[p.kind]+'-'+slug(p.panel?panelTitle(panels[0].panel):site.name)+'.pdf';

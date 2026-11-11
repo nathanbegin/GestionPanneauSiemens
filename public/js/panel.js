@@ -1,9 +1,9 @@
 // Vue d'un panneau : face avant, nomenclature, documents et fiche.
-import {h,toast,confirmDialog,fmtRelative,dialog} from './dom.js';
+import {h,toast,confirmDialog,fmtRelative,fmtDate,dialog} from './dom.js';
 import {api,openDocument,NATIVE,webUrl} from './api.js';
 import {qrMatrix,qrSvg,panelLink,qrAllowed} from '../qr.js';
 import {voltsOf} from '../voltage.js';
-import {designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
+import {calcFingerprint,CODE_EDITION,designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
@@ -353,8 +353,8 @@ export async function panelView({id,tab='panel',ctx}){
   const cards=[
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🗒'}),h('h3',{text:'Aide-mémoire de porte'}),h('p',{text:'Une page : tous les circuits en deux colonnes, comme sur le panneau. À fixer à l’intérieur de la porte.'}),h('div',{class:'opts'},f1),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'door',format:f1.value})},'Générer le PDF')),
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'📘'}),h('h3',{text:'Rapport complet'}),h('p',{text:'Informations du site et du panneau, répertoire, tableau détaillé avec notes et exceptions, préparé par et signature.'}),h('div',{class:'opts'},f2),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'report',format:f2.value})},'Générer le PDF')),
-   planning&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🧮'}),h('h3',{text:'Note de calcul de charge'}),h('p',{text:'Calcul de l’entrée électrique étape par étape, en langage clair, avec les règles du Code, les appareils comptés et exclus, et le verdict sur le principal installé.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'calc'})},'Générer le PDF')),
-   planning&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'⚡'}),h('h3',{text:'Bilan de charges et matériel'}),h('p',{text:'Liste de charges par circuit, phases L1/L2, capacité du panneau, calcul selon la règle 8-200, alertes et liste de disjoncteurs.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'Générer le PDF')),
+   (planning||panel.details?.calcRecord)&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🧮'}),h('h3',{text:'Note de calcul de charge'}),h('p',{text:'Calcul de l’entrée électrique étape par étape, en langage clair, avec les règles du Code, les appareils comptés et exclus, et le verdict sur le principal installé.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'calc'})},'Générer le PDF')),
+   (planning||panel.details?.calcRecord)&&h('article',{class:'card doc-card'},h('div',{class:'ico',text:'⚡'}),h('h3',{text:'Bilan de charges et matériel'}),h('p',{text:'Liste de charges par circuit, phases L1/L2, capacité du panneau, calcul selon la règle 8-200, alertes et liste de disjoncteurs.'}),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'loads'})},'Générer le PDF')),
    h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🏷'}),h('h3',{text:'Étiquettes autocollantes'}),h('p',{text:'Feuille Lettre Avery 5160 / 8160 (30 étiquettes 2⅝ × 1 po) : repère du panneau'+(qr?', code QR du panneau':'')+' puis un circuit par étiquette. Imprimez à 100 %.'}),h('label',{class:'opts'},skip,'Ignorer les positions libres'),h('button',{type:'button',class:'primary',onclick:()=>doc({kind:'labels',skipFree:skip.checked})},'Générer les étiquettes')),
   ];
   if(ctx.features.zebra)cards.push(h('article',{class:'card doc-card'},h('div',{class:'ico',text:'🖨'}),h('h3',{text:'Imprimante ZebraHD'}),h('p',{text:'Envoie les circuits à ZebraHD pour imprimer des étiquettes sur imprimante thermique.'}),h('button',{type:'button',onclick:zebra},'Envoyer à ZebraHD')));
@@ -435,6 +435,17 @@ export async function panelView({id,tab='panel',ctx}){
    rep.issues.length?rep.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.circuit?`Circuit ${i.circuit} : `:'')+i.text})):h('p',{class:'issue info',text:'Aucune alerte. Ajoutez les charges de chaque circuit pour un bilan complet.'}),
    ...(rep.notes||[]).map(n=>h('p',{class:'issue info',text:'ℹ '+n.text})));
   const sugg=h('div',{class:'card side-card'},h('h3',{text:'Suggestions'}),h('ul',{class:'small'},suggestions(rep).map(t=>h('li',{text:t}))));
+  if(!planning&&panel.details?.calcRecord){
+   // Forfait sans calculs payants (ex. après annulation) : le dernier résultat reste consultable et exportable.
+   const rec=panel.details.calcRecord,changed=calcFingerprint(panel,children)!==rec.fingerprint,sm=rec.summary||{};
+   body.replaceChildren(h('div',{class:'card'},h('h2',{text:'Résultat de calcul conservé'}),
+    h('p',{class:'notice '+(changed?'':'info'),text:changed?'Résultat historique — panneau modifié depuis ce calcul.':'Résultat historique — calcul conservé tel qu’il a été établi.'}),
+    h('dl',{class:'facts'},h('dt',{text:'Date du calcul'}),h('dd',{text:fmtDate(rec.at)}),h('dt',{text:'Version'}),h('dd',{text:'Disjonio v'+rec.version}),h('dt',{text:'Édition du code'}),h('dd',{text:rec.edition||CODE_EDITION}),
+     h('dt',{text:'Charge calculée'}),h('dd',{text:`${sm.designAmps??'—'} A${sm.mainAmps?` sur un principal de ${sm.mainAmps} A`:''}${sm.percent!=null?` (${sm.percent} %)`:''}`}),h('dt',{text:'Charge branchée'}),h('dd',{text:kw(sm.connectedW||0)})),
+    h('p',{class:'small muted',text:'Les données d’origine sont conservées avec le résultat. Pour refaire un calcul à jour, un forfait avec planification est nécessaire.'}),
+    h('div',{class:'page-actions'},h('button',{type:'button',onclick:()=>doc({kind:'calc'})},'🧮 Note de calcul (PDF)'),h('button',{type:'button',onclick:()=>doc({kind:'loads'})},'⚡ Bilan de charges (PDF)'),h('a',{class:'btn primary',href:'#/abonnement'},'Voir les forfaits'))));
+   return;
+  }
   if(!planning){
    body.replaceChildren(h('div',{class:'card empty-state'},h('div',{class:'ico',text:'⚡'}),h('h2',{text:'Planification et calcul de charges'}),
     h('p',{text:'Construisez le panneau pièce par pièce à partir du catalogue, ajoutez les charges de chaque circuit (bornes de recharge, thermopompes, chauffe-eau, piscine…), vérifiez la règle des 80 %, l’équilibre L1/L2 et la capacité du panneau, puis générez le bilan de charges et la liste de matériel.'}),

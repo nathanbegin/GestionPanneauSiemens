@@ -37,13 +37,24 @@ export async function billingView({ctx,sub,a,b}){
   if(NATIVE)return void window.open(webUrl('/app#/abonnement'),'_blank');
   try{toast('Redirection vers le paiement sécurisé…');await redirect('/api/billing?action=checkout',{pack:pack.id});}catch(e){toast(e.message,7000);}
  }
+ // Annulation immédiate avec remboursement au prorata (estimé avant de confirmer).
+ async function cancelNow(){
+  try{
+   const pre=await api('/api/billing?action=cancel-preview',{method:'POST',body:{}});
+   const refund=pre.refundCents>0?`Vous serez remboursé d’environ ${money(pre.refundCents)} (part inutilisée de la période payée, taxes comprises), sur votre moyen de paiement d’origine.`:'Aucun remboursement n’est dû pour cette période.';
+   if(!await confirmDialog('L’annulation prend effet immédiatement et arrête les renouvellements. '+refund+' Vos panneaux et vos résultats de calcul restent consultables et exportables ; la création de panneaux suivra les limites du forfait gratuit et les nouveaux calculs payants deviendront indisponibles.',{title:'Annuler mon abonnement',confirm:'Annuler maintenant',danger:true}))return;
+   const out=await api('/api/billing?action=cancel',{method:'POST',body:{confirm:true}});
+   toast(out.refundError?'Abonnement annulé. Le remboursement automatique a échoué : nous le traiterons manuellement.':out.refundCents>0?`Abonnement annulé. Remboursement de ${money(out.refundCents)} en cours.`:'Abonnement annulé.',8000);
+   setTimeout(()=>location.reload(),900);
+  }catch(e){toast(e.message,8000);}
+ }
  async function manage(){try{await redirect('/api/billing?action=portal',{});}catch(e){toast(e.message,7000);}}
 
  const thanks=sub==='merci'&&h('div',{class:'notice info'},'Merci ! Votre paiement est confirmé. L’activation peut prendre quelques secondes : ',h('a',{href:'#/abonnement',onclick:()=>setTimeout(()=>location.reload(),50),text:'actualiser'}),'.');
  const usage=h('section',{class:'card usage'},
   h('div',{class:'row page-head'},h('div',{},h('div',{class:'eyebrow',text:'Forfait actuel'}),h('div',{class:'big',text:me.plan.name}),
     subscription&&me.live&&h('div',{class:'small muted'},[subscription.source==='promo'?'Code promo':STATUS[subscription.status]||subscription.status,subscription.interval&&(subscription.interval==='year'?'annuel':'mensuel'),subscription.currentPeriodEnd&&(subscription.cancelAtPeriodEnd||subscription.status==='comp'?'jusqu’au ':'renouvellement le ')+fmtDate(subscription.currentPeriodEnd)].filter(Boolean).join(' · '))),
-   h('div',{class:'page-actions'},me.hasCustomer&&!NATIVE&&h('button',{type:'button',onclick:manage},'Factures, carte et annulation'))),
+   h('div',{class:'page-actions'},me.hasCustomer&&!NATIVE&&h('button',{type:'button',onclick:manage},'Factures et carte'),subscription&&me.live&&me.plan.id!=='gratuit'&&!NATIVE&&h('button',{type:'button',class:'danger',onclick:cancelNow},'Annuler mon abonnement'))),
   subscription?.status==='past_due'&&h('p',{class:'notice',text:'Le dernier paiement a échoué. Mettez à jour votre carte pour conserver votre forfait.'}),
   subscription?.cancelAtPeriodEnd&&h('p',{class:'notice',text:'Votre abonnement est annulé : il reste actif jusqu’à la fin de la période, puis votre compte reviendra au forfait gratuit.'}),
   h('div',{},h('div',{class:'progress-line'},h('div',{class:'progress'},h('i',{style:{width:used+'%'}})),h('span',{text:me.limit==null?`${me.used} ${period}`:`${me.used} / ${me.limit} ${period}`})),

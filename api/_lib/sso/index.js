@@ -8,6 +8,7 @@ import {PROVIDERS,clientOf,enabledProviders} from './providers.js';
 import {newState,authorizeUrl,exchangeCode,verifyIdToken} from './oidc.js';
 import {decide} from './decide.js';
 import * as store from './store.js';
+import {termsRecord} from '../terms.js';
 
 const CK='mp_sso';
 const secure=req=>!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(String(req.headers.host||''));
@@ -77,7 +78,7 @@ export async function handleSso(req,res,sql,action){
    let user=d.user;
    if(d.action==='create'){
     const name=String(claims.name||email.split('@')[0]).trim().slice(0,100);
-    user=await store.createUser(sql,{id:randomUUID(),email,name,profile:{accountType:'particulier',lang:st.l,termsAcceptedAt:new Date().toISOString(),signupVia:id}});
+    user=await store.createUser(sql,{id:randomUUID(),email,name,profile:{accountType:'particulier',lang:st.l,...termsRecord(),signupVia:id}});
    }
    if(d.action==='create'||d.action==='link-login')await store.addIdentity(sql,{provider:id,subject:claims.sub,userId:user.id,email});
    const token=await createSession(sql,user.id,'web');

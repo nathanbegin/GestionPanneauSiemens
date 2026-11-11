@@ -7,6 +7,7 @@ import {rateLimit,recordAttempt} from './_lib/auth.js';
 import {clientIp} from './_lib/http.js';
 import {stripe,stripeConfigured,ensureCustomer,syncPlanPrices,syncPackPrice,upsertSubscription,integrationId,billingMode} from './_lib/stripe.js';
 import {appUrl} from './_lib/mail.js';
+import {prorataRefund} from './_lib/refund.js';
 
 export default route(['GET','POST'],async(req,res)=>{
  const sql=await getSql();
@@ -78,6 +79,44 @@ export default route(['GET','POST'],async(req,res)=>{
    ON CONFLICT (user_id) DO UPDATE SET plan_id=EXCLUDED.plan_id,status='comp',source='promo',current_period_start=now(),current_period_end=EXCLUDED.current_period_end,note='Code promo',cancel_at_period_end=false,updated_at=now()`;
   await sql`INSERT INTO app_admin_audit(admin_email,action,target,details) VALUES(${'code promo'},'promo.redeem',${user.id},${JSON.stringify({plan:plan.id,days:promo.days})}::jsonb)`;
   return res.status(200).json({ok:true,plan:plan.name,until});
+ }
+ // Annulation immédiate : l'accès payant s'arrête tout de suite et la part inutilisée de la dernière période payée
+ // est remboursée sur le moyen de paiement d'origine (taxes ajustées au prorata). Le forfait gratuit s'applique ensuite.
+ if(action==='cancel-preview'||action==='cancel'){
+  const [sub]=await sql`SELECT * FROM app_subscriptions WHERE user_id=${user.id}`;
+  if(!sub||!LIVE.includes(sub.status))throw new HttpError(400,'Aucun abonnement actif à annuler.');
+  // Abonnement sans paiement (code promo, offert) : arrêt immédiat, rien à rembourser.
+  if(!sub.stripe_subscription){
+   if(action==='cancel-preview')return res.status(200).json({refundCents:0,currency:'cad',paid:false});
+   await sql`UPDATE app_subscriptions SET status='canceled',cancel_at_period_end=false,updated_at=now() WHERE user_id=${user.id}`;
+   await sql`INSERT INTO app_admin_audit(admin_email,action,target,details) VALUES(${user.email},'abonnement.annulation',${user.id},${JSON.stringify({source:sub.source})}::jsonb)`;
+   return res.status(200).json({ok:true,refundCents:0});
+  }
+  const live=await stripe('GET','/subscriptions/'+sub.stripe_subscription);
+  const item=live.items?.data?.[0];
+  const start=(live.current_period_start??item?.current_period_start)*1000,end=(live.current_period_end??item?.current_period_end)*1000;
+  // Dernière facture payée de cet abonnement et son paiement.
+  const invs=await stripe('GET','/invoices',{subscription:sub.stripe_subscription,status:'paid',limit:1,expand:['data.payments']});
+  const inv=invs.data?.[0];
+  let refundCents=0,pi=null,currency=inv?.currency||'cad';
+  if(inv&&inv.amount_paid>0&&(inv.created*1000)>=start-86400000){
+   const pay=inv.payments?.data?.find(x=>x.payment?.payment_intent)?.payment?.payment_intent||inv.payment_intent||null;
+   pi=typeof pay==='string'?pay:pay?.id||null;
+   let refunded=0;
+   if(pi){const p=await stripe('GET','/payment_intents/'+pi,{expand:['latest_charge']});refunded=p.latest_charge?.amount_refunded||0;}
+   refundCents=pi?prorataRefund({amountPaid:inv.amount_paid,alreadyRefunded:refunded,periodStart:start,periodEnd:end}).cents:0;
+  }
+  if(action==='cancel-preview')return res.status(200).json({refundCents,currency,paid:true,periodEnd:new Date(end).toISOString()});
+  if(data.confirm!==true)throw new HttpError(400,'Confirmation requise.');
+  const canceled=await stripe('DELETE','/subscriptions/'+sub.stripe_subscription,{prorate:false,invoice_now:false});
+  await upsertSubscription(sql,canceled);
+  let refundError=false;
+  if(refundCents>0&&pi){
+   try{await stripe('POST','/refunds',{payment_intent:pi,amount:refundCents,reason:'requested_by_customer',metadata:{subscription:sub.stripe_subscription,user_id:user.id,kind:'cancel_prorata'}},{idempotencyKey:'cancel-refund-'+sub.stripe_subscription});}
+   catch(e){refundError=true;console.error('refund',e?.message);}
+  }
+  await sql`INSERT INTO app_admin_audit(admin_email,action,target,details) VALUES(${user.email},'abonnement.annulation',${user.id},${JSON.stringify({refundCents,refundError,subscription:sub.stripe_subscription})}::jsonb)`;
+  return res.status(200).json({ok:true,refundCents,refundError});
  }
  if(action==='portal'){
   if(!user.stripe_customer)throw new HttpError(400,'Aucun historique de paiement pour ce compte.');

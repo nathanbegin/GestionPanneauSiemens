@@ -10,6 +10,7 @@ import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSIT
 import {siteAccess,panelAccess,need} from './_lib/shares.js';
 import {scanPanel,scanNameplate,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
 import {scanToPanel} from '../public/aiscan.js';
+import {makeCalcRecord} from './_lib/calcrecord.js';
 import {rateLimit,recordAttempt} from './_lib/auth.js';
 
 function checkPositions(v){
@@ -154,6 +155,16 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  if(data.meta){const m=check(()=>cleanPanelMeta(data.meta));if(m.details.appliances===undefined&&row.details?.appliances)m.details.appliances=row.details.appliances;await checkFedFrom(sql,m,row.site_id,id);await applyModel(sql,user,m,row.details);({name,tag,kind,location,details}=m);}
  if(data.circuits!==undefined)circuits=check(()=>validate(normalize(data.circuits,{positions}),{positions}));
  if(data.positions!==undefined&&data.positions!==positions){positions=checkPositions(data.positions);circuits=check(()=>resize(circuits,positions));}
+ // Dossier de calcul : conservé tel quel ; mis à jour seulement pour les forfaits avec planification
+ // (après une annulation, il reste figé : le résultat devient « historique » dès que le panneau change).
+ if(row.details?.calcRecord)details={...details,calcRecord:row.details.calcRecord};
+ if((data.circuits!==undefined||data.meta||data.positions!==undefined)&&await hasLibrary(sql,user)){
+  const sitePanels=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${row.site_id}`;
+  const children=[],queue=[row.id],seen=new Set(queue);
+  while(queue.length){const parent=queue.shift();for(const p of sitePanels)if(p.details?.fedFrom===parent&&!seen.has(p.id)){seen.add(p.id);queue.push(p.id);children.push(p);}}
+  try{const rec=makeCalcRecord({panel:{name,tag,kind,location,details,positions,circuits},children,prev:details.calcRecord});if(rec)details={...details,calcRecord:rec};}
+  catch(e){console.error('calcrecord',e?.message);}
+ }
  const [u]=await sql`UPDATE app_panels SET name=${name},tag=${tag},kind=${kind},location=${location},details=${JSON.stringify(details)}::jsonb,positions=${positions},circuits=${JSON.stringify(circuits)}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND revision=${data.revision} RETURNING *`;
  if(!u)throw new HttpError(409,'Ce panneau a été modifié ailleurs (autre appareil ou onglet). Rechargez la page pour voir la dernière version.',{conflict:true});
  await sql`UPDATE app_sites SET updated_at=now() WHERE id=${row.site_id}`;

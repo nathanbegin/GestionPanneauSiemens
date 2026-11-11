@@ -5,7 +5,7 @@ import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
 import {teamView,joinInviteView,shareDialog} from './team.js';
-import {h,toast,confirmDialog,fmtRelative,field,dialog,select,hasUnsaved,discardUnsaved} from './dom.js';
+import {h,toast,confirmDialog,fmtRelative,fmtDate,field,dialog,select,hasUnsaved,discardUnsaved} from './dom.js';
 import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
 import {siteDialog,panelDialog,siteFields,formData} from './forms.js';
@@ -265,7 +265,7 @@ function accountView(){
 
  const ssoSlot=h('div'); ssoCard().then(c=>c&&ssoSlot.replaceChildren(c)); // SSO
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Paramètres'}),h('h1',{text:'Mon compte'}))),
-  h('div',{class:'stack'},updateCard(),profile,ssoSlot,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Disjonio v${APP_VERSION}`})));
+  h('div',{class:'stack'},updateCard(),profile,ssoSlot,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Disjonio v${APP_VERSION}`}),state.user.profile?.termsVersion&&h('p',{class:'small muted'},`Conditions acceptées : version du ${state.user.profile.termsVersion}, le ${fmtDate(state.user.profile.termsAcceptedAt)}. `,h('a',{href:webUrl('/conditions'),target:'_blank',text:'Conditions'}),' · ',h('a',{href:webUrl('/confidentialite'),target:'_blank',text:'Confidentialité'}))));
 }
 
 // ---------- Routeur ----------

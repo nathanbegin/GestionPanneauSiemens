@@ -1,6 +1,6 @@
 // Génération des PDF : rapport complet, aide-mémoire de porte et étiquettes (feuille Avery 5160).
 import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
-import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,tagGroups,formatOf,breakerFormats} from '../../public/model.js';
+import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,tagGroups,formatOf,breakerFormats,CODE_EDITION,calcAssumptions,CALC_LIMITS} from '../../public/model.js';
 import {FAMILIES,serviceCheck} from '../../public/catalog.js';
 import LOGOS from '../_data/logos.js';
 import {qrMatrix} from '../../public/qr.js';
@@ -222,6 +222,35 @@ function preparedBlock(d,user,generatedAt){
  d.y-=h+14;
 }
 
+// Cadre du calcul : date, version, édition du code, données d'entrée, hypothèses et limites. Un résultat conservé
+// après une annulation (ou devenu obsolète) est signalé comme « Résultat historique ».
+function calcFrame(d,{rep,panel,children=[],calcMeta=null,generatedAt,version}){
+ const rec=calcMeta?.record||null,det=panel.details||{};
+ const para=(t,{size=8.2,color=d.C.ink,f=d.font}={})=>{for(const l of d.wrap(t,size,d.W-2*M,f)){d.ensure(size+3);d.text(l,M,d.y,{size,color,f});d.y-=size+2.6;}};
+ const kv=(k,v,size=8.2)=>{const kt=k+' : ',w=d.width(kt,size,d.bold);d.ensure(size+3);d.text(kt,M,d.y,{size,f:d.bold});const ls=d.wrap(String(v),size,d.W-2*M-w);ls.forEach((l,i)=>d.text(l,M+w,d.y-i*(size+2.6),{size}));d.y-=Math.max(1,ls.length)*(size+2.6);};
+ d.y-=6;sectionTitle(d,'Cadre du calcul');
+ if(calcMeta?.historic){
+  para(calcMeta.changed?'Résultat historique — panneau modifié depuis ce calcul.':'Résultat historique — calcul conservé tel qu’il a été établi.',{size:8.8,f:d.bold,color:d.C.danger});
+  para('Les données ci-dessous sont celles du moment du calcul.',{size:8,color:d.C.danger});
+  d.y-=2;
+ }
+ kv('Date du calcul',fmtDate(new Date(rec?.at||generatedAt)));
+ kv('Version','Disjonio v'+(rec?.version||version));
+ kv('Édition du code',rec?.edition||CODE_EDITION);
+ d.y-=2;para('Données d’entrée :',{f:d.bold});
+ const withLoads=panel.circuits.filter(c=>c.loads?.length).length,pending=(det.appliances||[]).length;
+ kv('Disjoncteur principal',det.mainAmps?det.mainAmps+' A':'non précisé',7.8);
+ if(det.livingArea)kv('Superficie hors sol',det.livingArea+' m²',7.8);
+ if(det.basementArea)kv('Superficie du sous-sol',det.basementArea+' m²',7.8);
+ if(det.voltage)kv('Tension',det.voltage,7.8);
+ kv('Circuits décrits',panel.circuits.filter(c=>!c.vacant).length,7.8);
+ kv('Circuits avec charges',withLoads,7.8);
+ if(pending)kv('Appareils non reliés à un circuit',pending,7.8);
+ if(children.length)kv('Sous-panneaux',children.length,7.8);
+ d.y-=2;para('Hypothèses :',{f:d.bold});
+ for(const a of calcAssumptions(rep))para('• '+a,{size:7.8,color:d.C.muted});
+ d.y-=2;para(CALC_LIMITS,{size:7.8,f:d.bold});
+}
 function sectionTitle(d,t,sub){
  d.ensure(40);
  d.text(t,M,d.y-12,{size:12.5,f:d.bold});
@@ -465,7 +494,7 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=
 }
 
 // Bilan de charges et liste de matériel d'un panneau (mode planification).
-export async function buildLoads({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null,lang='fr'}){
+export async function buildLoads({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null,lang='fr',calcMeta=null}){
  globalThis.MP_LOCALE=localeFor(lang);
  const {panelReport,materials}=await import('../../public/loadcalc.js');
  const {LOADS_SOURCES}=await import('../../public/catalog.js');
@@ -527,12 +556,13 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  d.text('Hypothèses et sources',M,d.y,{size:9,f:d.bold});d.y-=12;
  for(const t of ['Charges : valeurs saisies ou valeurs typiques de la bibliothèque. La plaque signalétique de chaque appareil a préséance.','Phases : les rangées alternent L1 / L2 (positions 1-2 sur L1, 3-4 sur L2, etc.).','Dimensionnement d’un circuit : charge continue × 1,25 (disjoncteur ≥ 125 %) ; charge non continue jusqu’à 100 % ; cuisinière : 8 000 W + 40 % de l’excédent de 12 kW (règle 8-300). Entrée de la maison : règle 8-200 (cuisinière à 6 000 W + 40 %, autres appareils selon leurs facteurs de demande).','Calcul simplifié inspiré du Code canadien de l’électricité (règles 8-104, 8-106, 8-200, section 86) et du Code de construction du Québec, chapitre V. Ne remplace pas l’analyse d’un maître électricien.',...LOADS_SOURCES.map(s=>'Source : '+s)])for(const l of d.wrap('• '+t,7.5,d.W-2*M)){d.ensure(10);d.text(l,M,d.y,{size:7.5,color:d.C.muted});d.y-=9.5;}
  signature(d,user);
+ calcFrame(d,{rep,panel,children,calcMeta,generatedAt,version});
  footers(d,'Disjonio · Bilan de charges indicatif — la conformité de l’installation relève d’un maître électricien.');
  return d.pdf.save();
 }
 
 // Note de calcul de la charge d'un logement : étape par étape, en langage clair, avec références au Code.
-export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null,lang='fr'}){
+export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],generatedAt=new Date(),version,brand=null,lang='fr',calcMeta=null}){
  globalThis.MP_LOCALE=localeFor(lang);
  const {panelReport}=await import('../../public/loadcalc.js');
  const G=await import('../../public/loadguide.js');
@@ -589,6 +619,7 @@ export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],ge
  d.y-=4;sectionTitle(d,'Références et avertissement');
  for(const r of G.GUIDE_REFS)para('• '+r,{size:7.6,color:d.C.muted});
  para(G.GUIDE_DISCLAIMER,{size:7.8,f:d.bold});
+ calcFrame(d,{rep,panel,children,calcMeta,generatedAt,version});
  signature(d,user);
  footers(d,'Disjonio · Note de calcul indicative — à valider par un maître électricien selon l’édition du Code en vigueur.');
  return d.pdf.save();

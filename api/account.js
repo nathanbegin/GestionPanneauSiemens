@@ -59,7 +59,9 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
  }
  if(req.method==='PUT'){
   const name=s(data.name,100);if(!name)throw new HttpError(400,'Indiquez votre nom.');
-  const profile=cleanProfile(data.profile);
+  // Les mentions d'acceptation des conditions et d'origine du compte ne se modifient pas depuis le profil.
+  const keep=Object.fromEntries(['termsVersion','termsAcceptedAt','signupVia'].filter(k=>user.profile?.[k]!==undefined).map(k=>[k,user.profile[k]]));
+  const profile={...cleanProfile(data.profile),...keep};
   const [u]=await sql`UPDATE app_users SET name=${name},profile=${JSON.stringify(profile)}::jsonb,updated_at=now() WHERE id=${user.id} RETURNING *`;
   return res.status(200).json({user:publicUser(u)});
  }

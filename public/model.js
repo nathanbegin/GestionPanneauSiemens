@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,STAGE_IDS,stageFromState} from './catalog.js';
-export const APP_VERSION='2.32.0';
+export const APP_VERSION='2.33.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -349,3 +349,30 @@ export function mergeSurvey(current,config){
  return out;
  });
 }
+
+// ---------- Dossier de calcul : empreinte des données d'entrée, édition du code, hypothèses ----------
+// Référence réglementaire des calculs. L'année d'édition n'est pas inscrite ici : à préciser avant publication.
+export const CODE_EDITION='CSA C22.1 — Code canadien de l’électricité, Première partie, tel qu’adopté au Québec (Code de construction, chapitre V — Électricité)';
+// Données qui influencent le calcul de charge (les désignations, notes et statuts n'en font pas partie).
+export const calcInputs=(panel,children=[])=>{
+ const d=panel.details||{};
+ const circ=c=>[c.id,c.slots,c.amps,c.usage,c.protection||'',c.vacant?1:0,c.loads||null,c.wire||null];
+ return {c:(panel.circuits||[]).map(circ),
+  d:[d.mainAmps??null,d.livingArea??null,d.basementArea??null,d.voltage||'',d.family||'',d.modelId||'',d.serviceGauge||'',d.serviceMaterial||'',d.serviceRoute||'',d.fedFrom||'',d.appliances||null],
+  k:children.map(p=>[p.id,(p.circuits||[]).map(circ)])};
+};
+export function calcFingerprint(panel,children=[]){
+ const s=JSON.stringify(calcInputs(panel,children));
+ let h1=0x811c9dc5,h2=0x1b873593;
+ for(let i=0;i<s.length;i++){const ch=s.charCodeAt(i);h1=Math.imul(h1^ch,16777619)>>>0;h2=Math.imul(h2+ch,2654435761)>>>0;}
+ return h1.toString(16).padStart(8,'0')+h2.toString(16).padStart(8,'0');
+}
+// Hypothèses du calcul, présentées avec le résultat (application et rapports).
+export const calcAssumptions=rep=>[
+ 'Charges continues comptées à 125 %, charges non continues à 100 %.',
+ rep?.isDwelling?'Logement : calcul de la règle 8-200 (facteurs de demande appliqués à la superficie habitable et aux gros appareils).':'Panneau non résidentiel principal : charge calculée à partir des charges continues et non continues déclarées.',
+ 'Cuisinière : demande selon la règle 8-300 (8 000 W + 40 % de l’excédent de 12 kW).',
+ 'Tensions : 120 V pour les circuits unipolaires et la tension bipolaire du site (240 V ou 208 V).',
+ 'Les résultats reposent sur les renseignements saisis et sur les appareils reliés à un circuit.',
+];
+export const CALC_LIMITS='Estimation fournie à titre indicatif : ce n’est ni une inspection, ni une certification de conformité, ni une autorisation de réaliser des travaux. Faites-la valider par une personne qualifiée avant d’agir.';
