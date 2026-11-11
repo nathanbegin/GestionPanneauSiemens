@@ -1016,3 +1016,11 @@ dialog.side .f:focus-within .hint{display:block}
 /* « overflow:hidden » sur le tableau l'empêchait de défiler avec sa première colonne figée : le conteneur défile à sa place */
 .table-wrap{border-radius:12px}
 .table-wrap table.data{overflow:visible;border-radius:0}
+/* En-tête à trois zones (bureau) : le fil d'Ariane est centré sur la page, indépendamment de la largeur des côtés */
+.tb-left,.tb-right{display:flex;align-items:center;gap:18px;min-width:0}
+.tb-right{justify-content:flex-end;gap:14px}
+@media (min-width:901px){
+ .topbar .container,body.app .topbar .container{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center}
+ .topbar .crumbs{flex:none;max-width:min(50vw,760px);justify-content:center}
+}
+@media (max-width:900px){.tb-left,.tb-right{display:contents}}

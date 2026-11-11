@@ -77,7 +77,10 @@ function crumbs(items){
   parts.splice(1,0,h('nav',{id:'worknav',class:'worknav','aria-label':'Navigation de travail'},link('#/sites','Sites',['sites','panneaux'].includes(cur)),link('#/comparer','Comparer',cur==='comparer'),link('#/equipe','Équipe',cur==='equipe')));
  }
  topbar.classList.toggle('has-menu',!!(state.user&&!state.demo));
- topbar.replaceChildren(...parts);
+ // Trois zones : logo + navigation de travail à gauche, fil d'Ariane réellement centré, profil + langue à droite.
+ const left=parts.filter(el=>el===brand||el.id==='worknav');
+ const right=parts.filter(el=>el!==nav&&el!==brand&&el.id!=='worknav');
+ topbar.replaceChildren(h('div',{class:'tb-left'},...left),nav,h('div',{class:'tb-right'},...right));
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Disjonio';
  syncChrome();
 }
