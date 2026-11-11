@@ -8,6 +8,12 @@
  },
  "headers": [
   {
+   "source": "/.well-known/microsoft-identity-association.json",
+   "headers": [
+    {"key": "Content-Type", "value": "application/json"}
+   ]
+  },
+  {
    "source": "/version.json",
    "headers": [
     {"key": "Cache-Control", "value": "no-store, max-age=0"},
