@@ -12,7 +12,10 @@ import {cacheable,remember,readResponse,setOffline} from './offline.js';
 let onAuthLost=()=>{};
 export const handleAuthLost=fn=>{onAuthLost=fn;};
 
+// Démonstration : un faux serveur en mémoire remplace l'API (voir demo.js).
+export const demo={active:false,handler:null};
 export async function api(path,{method='GET',body}={}){
+ if(demo.active&&demo.handler)return demo.handler(path,{method,body});
  const headers={'X-MP-Client':NATIVE?'native':'web'};
  if(body!==undefined)headers['Content-Type']='application/json';
  if(token)headers.Authorization='Bearer '+token;
@@ -36,6 +39,7 @@ export async function api(path,{method='GET',body}={}){
 
 // Ouvre un PDF généré côté serveur via un lien signé temporaire.
 export async function openDocument(params){
+ if(demo.active){window.open('/assets/exemple-rapport.pdf','_blank');return;}
  // Sur le web, ouvrir l'onglet tout de suite évite le blocage des fenêtres surgissantes.
  const win=NATIVE?null:window.open('','_blank');
  try{

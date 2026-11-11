@@ -8,7 +8,7 @@ import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
 import {teamView,joinInviteView,shareDialog} from './team.js';
 import {h,toast,confirmDialog,fmtRelative,fmtDate,field,dialog,select,hasUnsaved,discardUnsaved} from './dom.js';
-import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
+import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl,demo} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
 import {siteDialog,panelDialog,siteFields,formData} from './forms.js';
 import {panelView} from './panel.js';
@@ -31,7 +31,7 @@ function crumbs(items){
  const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Disjonio — accueil'},h('span',{class:'brand-icon','aria-hidden':'true',text:'ϟ'}),h('span',{text:'DISJONIO'}));
  const parts=[brand,nav];
  const isPro=state.user?.profile?.accountType==='pro';
- if(state.user){
+ if(state.user&&!state.demo){
   const menu=h('div',{class:'menu',role:'menu'},
    h('div',{class:'who'},h('b',{text:state.user.name}),state.user.email),
    h('a',{href:'#/sites',role:'menuitem'},'🏠 Mes sites'),
@@ -48,7 +48,8 @@ function crumbs(items){
   const btn=h('button',{type:'button',class:'ghost','aria-haspopup':'menu','aria-expanded':'false'},h('span',{class:'avatar',text:(state.user.name||'?').trim().charAt(0).toUpperCase()}),h('span',{class:'uname',text:state.user.name.split(' ')[0]}));
   btn.onclick=e=>{e.stopPropagation();const open=menu.classList.toggle('open');btn.setAttribute('aria-expanded',String(open));};
   parts.push(h('div',{class:'user-menu'},btn,menu));
- }else parts.push(h('a',{class:'btn sm',href:webUrl('/fonctionnement'),target:NATIVE?'_blank':null},'Fonctionnement'));
+ }else if(state.demo)parts.push(h('a',{class:'btn primary sm',href:'#/inscription',onclick:leaveDemo},'Créer mon compte gratuit'));
+ else parts.push(h('a',{class:'btn sm',href:webUrl('/fonctionnement'),target:NATIVE?'_blank':null},'Fonctionnement'));
  // Langue : FR / EN (le bouton montre la langue vers laquelle on bascule).
  parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:async()=>{const next=lang==='en'?'fr':'en';if(state.user){try{await api('/api/account',{method:'PUT',body:{name:state.user.name,profile:{...(state.user.profile||{}),lang:next}}});}catch{}}setLang(next);}},lang==='en'?'FR':'EN'));
  topbar.replaceChildren(...parts);
@@ -56,7 +57,7 @@ function crumbs(items){
  {let wn=document.getElementById('worknav');if(!wn){wn=h('nav',{id:'worknav',class:'worknav','aria-label':'Navigation de travail'});topbar.parentElement.append(wn);}
   const cur=location.hash.split('/')[1]||'';
   const link=(href,label,on)=>h('a',{href,class:on?'on':'','aria-current':on?'page':null,text:label});
-  wn.hidden=!(state.user&&isPro);
+  wn.hidden=!(state.user&&isPro&&!state.demo);
   wn.replaceChildren(...(wn.hidden?[]:[h('div',{class:'container'},link('#/sites','Sites',['sites','panneaux'].includes(cur)),link('#/comparer','Comparer',cur==='comparer'),link('#/equipe','Équipe',cur==='equipe'))]));}
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Disjonio';
 }
@@ -98,7 +99,7 @@ function loginView(){
   h('a',{href:'#/mot-de-passe-oublie',class:'small',text:'Mot de passe oublié ?'})],'Se connecter',async f=>{
   const out=await api('/api/auth?action=login',{method:'POST',body:f});await afterAuth(out,'Bon retour, '+out.user.name.split(' ')[0]+' !');});
  ssoButtons().then(b=>b&&form.before(b)); // SSO
- return authCard('Connexion','Retrouvez vos sites et vos panneaux.',form,['Pas encore de compte ? ',h('a',{href:'#/inscription',text:'Créer un compte gratuit'})]);
+ return authCard('Connexion','Retrouvez vos sites et vos panneaux.',form,['Pas encore de compte ? ',h('a',{href:'#/inscription',text:'Créer un compte gratuit'}),' · ',h('a',{href:'#/demo',text:'Essayer la démonstration'})]);
 }
 function signupView(){
  const radio=(v,title,desc,checked)=>h('label',{},h('input',{type:'radio',name:'accountType',value:v,checked}),h('span',{},h('b',{text:title}),h('span',{text:desc})));
@@ -283,9 +284,16 @@ function accountView(){
 }
 
 // ---------- Routeur ----------
+function leaveDemo(){demo.active=false;demo.handler=null;state.user=null;state.demo=false;document.querySelector('.demo-bar')?.remove();}
 async function route(){
  const token=++renderToken;
  const [,name='',id='',sub='',extra='']=(location.hash||'#/').replace(/^#/,'').split('/');
+ // Démonstration sans inscription : faux serveur en mémoire, données fictives (voir demo.js).
+ if(name==='demo'&&!state.user){
+  const m=await import('./demo.js');demo.handler=m.createDemoApi();demo.active=true;state.user=m.DEMO_USER;state.demo=true;state.features={};
+  document.body.prepend(h('div',{class:'demo-bar',role:'status'},'🎬 Démonstration — données fictives, rien n’est enregistré. ',h('a',{href:'#/inscription',onclick:leaveDemo,text:'Créer mon compte gratuit'})));
+  location.replace('#/sites');return;
+ }
  if(!state.user&&!publicRoutes.includes(name)){
   if(name&&name!=='sites')sessionStorage.setItem('mp_after_login',location.hash);
   location.replace('#/connexion');return;

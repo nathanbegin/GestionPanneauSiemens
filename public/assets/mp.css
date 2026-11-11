@@ -854,3 +854,9 @@ body.is-offline .topbar{top:36px}
 .diff-list{margin:8px 0;padding-left:18px;display:grid;gap:8px}
 .diff-list ul{margin:4px 0;padding-left:18px}
 @media (max-width:720px){.history-grid{grid-template-columns:1fr}.history-list{max-height:200px}}
+.todo-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.todo-list li{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line);border-radius:10px;border-left:4px solid #d0a04a}
+.todo-list li.error{border-left-color:#a33}.todo-list li.warn{border-left-color:#d0a04a}
+.todo-more{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;font-size:13px}
+.demo-bar{position:sticky;top:0;z-index:60;background:#e4f7a8;color:#183c32;border-bottom:1px solid #c5dd7f;padding:8px 14px;font-size:14px;text-align:center}
+.demo-bar a{color:inherit;font-weight:700}

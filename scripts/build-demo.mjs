@@ -1,0 +1,36 @@
+// Génère public/js/demo-data.js : un site et un panneau fictifs pour la démonstration sans inscription.
+import {writeFileSync} from 'node:fs';
+import {blank,reshape,validate,normalize} from '../public/model.js';
+import {panelReport} from '../public/loadcalc.js';
+const POS=24;
+let cs=blank(POS);
+const id=n=>cs.find(c=>c.slots.includes(n+'A')||c.id===String(n)).id;
+const set=(n,patch)=>{const c=cs.find(x=>x.id===String(n));Object.assign(c,patch);};
+const bipolar=n=>{cs=reshape(cs,String(n),'double',POS);};
+const L=(name,w,cat='basic',cont=false,v=120)=>({id:name,name,w,v,qty:1,cat,cont});
+set(1,{label:'Éclairage — rez-de-chaussée',room:'Rez-de-chaussée',usage:'Éclairage',amps:15,status:'Identifié',protection:'Standard',loads:[L('Éclairage',900)]});
+set(2,{label:'Prises salon et salle à manger',room:'Salon',usage:'Prises',amps:15,status:'Identifié',protection:'Anti-arc'});
+set(3,{label:'Prises comptoir cuisine (DDFT) 1',room:'Cuisine',usage:'Prises',amps:20,status:'Identifié',protection:'DDFT'});
+set(4,{label:'Prises comptoir cuisine (DDFT) 2',room:'Cuisine',usage:'Prises',amps:20,status:'Identifié',protection:'DDFT'});
+set(5,{label:'Réfrigérateur',room:'Cuisine',usage:'Électroménager',amps:15,status:'Identifié',loads:[L('Réfrigérateur',600,'basic',true)]});
+set(6,{label:'Lave-vaisselle',room:'Cuisine',usage:'Électroménager',amps:15,status:'Identifié',loads:[L('Lave-vaisselle',1500)]});
+set(7,{label:'Salle de bain — prises DDFT',room:'Salle de bain',usage:'Prises',amps:15,status:'Identifié',protection:'DDFT'});
+set(8,{label:'Chambre principale',room:'Chambre',usage:'Prises',amps:15,status:'Identifié',protection:'Anti-arc'});
+set(9,{label:'Chambres 2 et 3',room:'Chambres',usage:'Prises',amps:15,status:'Identifié',protection:'Anti-arc'});
+set(10,{label:'Laveuse',room:'Buanderie',usage:'Électroménager',amps:15,status:'Identifié',loads:[L('Laveuse',1200)]});
+set(11,{label:'Prises du sous-sol',room:'Sous-sol',usage:'Prises',amps:15,status:'À confirmer'});
+set(12,{label:'Pompe de puisard',room:'Sous-sol',usage:'Autre',amps:15,status:'Identifié',loads:[L('Pompe de puisard',700)]});
+set(13,{label:'Cuisinière',room:'Cuisine',usage:'Électroménager',amps:40,status:'Identifié',loads:[{...L('Cuisinière',12000,'range',false,240)}]});
+set(14,{label:'Sécheuse',room:'Buanderie',usage:'Électroménager',amps:30,status:'Identifié',loads:[L('Sécheuse',5000,'basic',false,240)]});
+set(17,{label:'Chauffe-eau',room:'Sous-sol',usage:'Chauffe-eau',amps:30,status:'Identifié',loads:[L('Chauffe-eau',3000,'basic',true,240)]});
+set(18,{label:'Borne de recharge niveau 2',room:'Garage',usage:'Borne de recharge',amps:40,status:'Identifié',loads:[L('Borne niveau 2 — 32 A',7680,'ev',true,240)]});
+set(21,{label:'À identifier — derrière le meuble',room:'',usage:'Autre',amps:15,status:'À confirmer'});
+for(const n of [13,14,17,18])bipolar(n);
+for(const c of cs)if(!c.label&&c.id!=='21'&&c.status==='À confirmer'&&!c.vacant)c.status='Libre';
+cs=validate(normalize(cs,{positions:POS}),{positions:POS});
+const panel={id:'demo-panel',name:'Panneau principal',tag:'P-1',kind:'Principal',location:'Sous-sol, mur nord',positions:POS,revision:1,
+ details:{brand:'Siemens',model:'EQ',mainAmps:200,voltage:'120/240 V monophasé',livingArea:140,basementArea:70,stage:'releve',state:'Existant',surveyDate:'2026-10-14',surveyedBy:'Démonstration',notes:'Données fictives.'},circuits:cs};
+const site={id:'demo-site',name:'Maison de démonstration',client:'Famille Exemple',street:'123, rue Exemple',city:'Québec',province:'QC',postalCode:'G1A 1A1',notes:'Site fictif pour la démonstration.',bipolarVolts:240};
+const rep=panelReport(panel,{children:[]});
+console.log('démo : charge calculée',rep.designAmps,'A sur',rep.mainAmps,'A ('+rep.percent+' %), alertes',rep.issues.length);
+writeFileSync(new URL('../public/js/demo-data.js',import.meta.url),'// Généré par scripts/build-demo.mjs — données fictives.\nexport const DEMO_SITE='+JSON.stringify(site)+';\nexport const DEMO_PANEL='+JSON.stringify(panel)+';\n');

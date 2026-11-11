@@ -6,6 +6,7 @@ import {voltsOf} from '../voltage.js';
 import {calcFingerprint,CODE_EDITION,designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {historyDialog} from './history.js';
+import {buildChecklist} from './checklist.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
 import {GUIDE_STEPS,GUIDE_DISCLAIMER} from '../loadguide.js';
@@ -131,6 +132,19 @@ export async function panelView({id,tab='panel',ctx}){
  // Garnir le panneau existant avec des photos analysées par l'IA.
  const garnir=()=>aiImportDialog({site,siblings,target:panel,onApplied:p=>{panel=p;renderHead();renderBody();}});
  // Une action principale selon l'étape ; partage, photos, QR et exports sont regroupés dans « Plus d'actions ».
+ // « À terminer » : points manquants ou incertains, avec accès direct à chaque correction.
+ function todoItems(){let rep=null;try{rep=panelReport(panel,{children});}catch{}return buildChecklist(panel,{report:rep});}
+ function runAction(a){
+  if(a.circuit)openCircuit(a.circuit);
+  else if(a.circuitPos){const c=panel.circuits.find(x=>designation(x)===a.circuitPos);c?openCircuit(c.id):go('plan');}
+  else if(a.tab)go(a.tab);
+ }
+ function checklistDialog(){
+  const items=todoItems();let d;
+  d=dialog({title:'À terminer',eyebrow:panelTitle(panel),wide:true,body:[items.length?h('ul',{class:'todo-list'},...items.map(it=>h('li',{class:it.level},
+    h('div',{},h('span',{text:it.text}),it.more&&h('div',{class:'todo-more'},...it.more.map(m=>h('button',{type:'button',class:'link',onclick:()=>{d.close();runAction(m.action);}},m.label)))),
+    h('button',{type:'button',class:'sm',onclick:()=>{d.close();runAction(it.action);}},'Corriger')))):h('p',{class:'notice info',text:'✓ Rien à terminer : toutes les informations essentielles sont renseignées.'})],actions:[{label:'Fermer',kind:'ghost'}]});
+ }
  function primaryAction(){
   const cur=stageOf(),todo=panel.circuits.filter(c=>!c.vacant&&c.status==='À confirmer'&&!c.label).length;
   if(data.access!=='view'&&cur==='releve'&&panel.circuits.some(c=>c.status==='À confirmer'&&!c.vacant)){
@@ -166,7 +180,7 @@ export async function panelView({id,tab='panel',ctx}){
     h('div',{class:'sub'},[panel.kind,panel.location||'Emplacement à préciser',det.building].filter(Boolean).join(' · ')),
     h('div',{class:'progress-line'},h('div',{class:'progress','aria-hidden':'true'},h('i',{style:{width:s.progress+'%'}})),h('span',{text:`${s.identified} identifiés · ${s.free} libres · ${s.toConfirm} à confirmer`})),
     fed&&h('div',{class:'sub small'},'Alimenté par ',h('a',{href:'#/panneaux/'+fed.id,text:panelTitle(fed)}),det.fedFromCircuit?` (circuit ${det.fedFromCircuit})`:'')),
-   h('div',{class:'page-actions'},primaryAction(),moreMenu())));
+   h('div',{class:'page-actions'},data.access!=='view'&&(n=>n?h('button',{type:'button',onclick:checklistDialog},`✅ À terminer (${n})`):null)(todoItems().length),primaryAction(),moreMenu())));
  }
  const mobile=()=>typeof matchMedia==='function'&&matchMedia('(max-width:720px)').matches;
  function renderTabs(){
