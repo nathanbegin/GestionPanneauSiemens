@@ -1,0 +1,9 @@
+# Disjonio — robots
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /ancien/
+Disallow: /api/
+Disallow: /sso/
+
+Sitemap: https://www.disjonio.app/sitemap.xml
