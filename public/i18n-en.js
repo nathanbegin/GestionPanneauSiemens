@@ -1801,4 +1801,5 @@ export default [
  ["Afficher tout le panneau dans la fenêtre", "Show the whole panel in the window"],
  ["Centrer sur le circuit sélectionné", "Center on the selected circuit"],
  ["● Modifications non enregistrées", "● Unsaved changes"],
+ ["ORGANISATION ÉLECTRIQUE", "ELECTRICAL ORGANIZATION"],
 ];

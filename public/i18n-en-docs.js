@@ -595,4 +595,6 @@ export default [
  ["Circuits avec charges", "Circuits with loads"],
  ["Appareils non reliés à un circuit", "Appliances not linked to a circuit"],
  ["Sous-panneaux", "Sub-panels"],
+ ["ORGANISATION ÉLECTRIQUE", "ELECTRICAL ORGANIZATION"],
+ ["Disjonio — organisation électrique", "Disjonio — electrical organization"],
 ];

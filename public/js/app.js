@@ -30,7 +30,7 @@ let renderToken=0;
 function crumbs(items){
  const nav=h('nav',{class:'crumbs','aria-label':'Fil d’Ariane'});
  items.forEach(([label,href],i)=>{if(i)nav.append(h('i',{'aria-hidden':'true',text:'›'}));nav.append(href&&i<items.length-1?h('a',{href,text:label}):h('span',{text:label,'aria-current':i===items.length-1?'page':null}));});
- const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Disjonio — accueil'},h('span',{class:'brand-icon','aria-hidden':'true',text:'ϟ'}),h('span',{text:'DISJONIO'}));
+ const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Disjonio — accueil'},h('img',{class:'brand-icon',src:'/branding/disjonio/svg/disjonio-symbol-simple-on-light.svg',alt:'',width:40,height:40}),h('span',{text:'DISJONIO'}));
  const parts=[brand,nav];
  const isPro=state.user?.profile?.accountType==='pro';
  if(state.user&&!state.demo){

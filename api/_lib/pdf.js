@@ -29,7 +29,7 @@ export function panelModelLine(panel){
 }
 
 const SIZES={letter:[612,792],legal:[612,1008]};
-const C={ink:rgb(.094,.235,.196),green:rgb(.133,.416,.318),muted:rgb(.42,.47,.44),line:rgb(.80,.84,.80),soft:rgb(.93,.95,.92),white:rgb(1,1,1),amber:rgb(.70,.52,.22),free:rgb(.62,.66,.62),lime:rgb(.89,.97,.66),danger:rgb(.64,.24,.2),warn:rgb(.55,.35,.1),track:rgb(.89,.91,.88),frame:rgb(.75,.8,.77)};
+const C={ink:rgb(.102,.251,.196),green:rgb(.133,.416,.318),muted:rgb(.42,.47,.44),line:rgb(.80,.84,.80),soft:rgb(.93,.95,.92),white:rgb(1,1,1),amber:rgb(.70,.52,.22),free:rgb(.62,.66,.62),lime:rgb(.541,.749,.573),danger:rgb(.64,.24,.2),warn:rgb(.55,.35,.1),track:rgb(.89,.91,.88),frame:rgb(.75,.8,.77)};
 const M=40;
 
 // ---------- Image de marque de l'entreprise (forfaits avec « branding ») ----------
