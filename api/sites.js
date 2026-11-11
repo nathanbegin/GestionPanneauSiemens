@@ -7,7 +7,7 @@ import {cleanSite,designation,panelTitle} from '../public/model.js';
 import {siteOut,panelSummary} from './_lib/serialize.js';
 import {sharesFor,siteAccess,need} from './_lib/shares.js';
 import {trashSite,listTrash,restoreTrash,purgeTrash} from './_lib/trash.js';
-import {createHandoff,listHandoffs,revokeHandoff,previewHandoff,acceptHandoff,declineHandoff,clientSiteIds} from './_lib/handoff.js';
+import {inboxFor,createHandoff,listHandoffs,revokeHandoff,previewHandoff,acceptHandoff,declineHandoff,clientSiteIds} from './_lib/handoff.js';
 import {entitlement} from './_lib/plans.js';
 import {adminEmails} from './_lib/auth.js';
 
@@ -28,8 +28,11 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  if(action.startsWith('handoff')){
   const hid=String(req.query?.hid||'');
   if(action==='handoff-preview'&&req.method==='GET')return res.status(200).json(await previewHandoff(sql,user,String(req.query?.token||'')));
-  if(action==='handoff-accept'&&req.method==='POST')return res.status(200).json({ok:true,...await acceptHandoff(sql,user,String(body(req).token||''))});
-  if(action==='handoff-decline'&&req.method==='POST'){await declineHandoff(sql,user,String(body(req).token||''));return res.status(200).json({ok:true});}
+  if(action==='handoff-inbox'&&req.method==='GET')return res.status(200).json({items:await inboxFor(sql,user)});
+  // Accepter / refuser : par jeton (lien) ou par identifiant (invitation reçue dans l'application, adressée à son courriel).
+  const ref=()=>{const d=body(req);return isUuid(String(d.hid||''))?{hid:String(d.hid)}:{token:String(d.token||'')};};
+  if(action==='handoff-accept'&&req.method==='POST')return res.status(200).json({ok:true,...await acceptHandoff(sql,user,ref())});
+  if(action==='handoff-decline'&&req.method==='POST'){await declineHandoff(sql,user,ref());return res.status(200).json({ok:true});}
   if(action==='handoff-revoke'&&req.method==='DELETE'){if(!isUuid(hid))throw new HttpError(404,'Introuvable.');await revokeHandoff(sql,user.id,hid);return res.status(200).json({ok:true});}
   const siteId=String(req.query?.siteId||body(req).siteId||'');if(!isUuid(siteId))throw new HttpError(404,'Site introuvable.');
   if(action==='handoff'&&req.method==='GET')return res.status(200).json({items:await listHandoffs(sql,user.id,siteId)});

@@ -948,3 +948,8 @@ dialog.side .f:focus-within .hint{display:block}
 .topbar .brand-logo{height:50px}
 @media (max-width:720px){.brand-logo{display:none}.brand-sym{display:block}}
 .brand{flex:none}.brand-logo,.brand-sym{flex:none;max-width:none}
+/* Invitations reçues (remise au client) */
+.invites{display:grid;gap:10px;margin:0 0 18px}
+.invite-card{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;border-left:4px solid #2f6fdd;background:#f3f7ff}
+.avatar.has-badge{position:relative}
+.avatar.has-badge::after{content:'';position:absolute;top:-2px;right:-2px;width:11px;height:11px;border-radius:50%;background:#d6473a;border:2px solid #fff}

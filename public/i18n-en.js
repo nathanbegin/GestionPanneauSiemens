@@ -1805,4 +1805,12 @@ export default [
  ["Nouveau lien à copier", "New link to copy"],
  ["Invitation envoyée par courriel (valide {} jours). Vous pouvez aussi transmettre ce lien par une autre application :", "Invitation sent by email (valid for {} days). You can also send this link through another app:"],
  ["Courriel non envoyé : copiez ce lien et transmettez-le vous-même (valide {} jours).", "Email not sent: copy this link and send it yourself (valid for {} days)."],
+ ["Invitations reçues", "Invitations received"],
+ ["Après acceptation, la copie vous appartient : les deux copies sont indépendantes.", "Once accepted, the copy belongs to you: the two copies are independent."],
+ ["Accès en lecture seule, que la personne peut retirer en tout temps.", "Read-only access, which the person can remove at any time."],
+ ["{} invitation(s) en attente", "{} pending invitation(s)"],
+ ["{} vous remet une copie du dossier « {} »", "{} is handing you a copy of the file “{}”"],
+ ["{} vous donne accès au dossier « {} »", "{} is giving you access to the file “{}”"],
+ ["Vous avez {} invitation en attente dans Mes sites.", "You have {} pending invitation in My sites."],
+ ["Vous avez {} invitations en attente dans Mes sites.", "You have {} pending invitations in My sites."],
 ];

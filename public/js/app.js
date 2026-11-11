@@ -23,7 +23,14 @@ import {designDialog} from './design.js';
 import {adminView} from './admin.js';
 
 const view=document.getElementById('view'),topbar=document.getElementById('topbar');
-const state={user:null,features:{}};
+const state={user:null,features:{},inbox:0};
+// Invitations reçues (remise au client) : pastille sur l'avatar et carte sur « Mes sites ».
+async function refreshInbox(){
+ if(!state.user||state.demo||net.offline){state.inbox=0;}
+ else{try{state.inbox=(await api('/api/sites?action=handoff-inbox')).items.length;}catch{state.inbox=0;}}
+ document.querySelector('.user-menu .avatar')?.classList.toggle('has-badge',state.inbox>0);
+ return state.inbox;
+}
 const publicRoutes=['connexion','inscription','mot-de-passe-oublie','reinitialiser'];
 let renderToken=0;
 
@@ -48,7 +55,7 @@ function crumbs(items){
    h('button',{type:'button',role:'menuitem',onclick:()=>feedbackDialog()},'💡 Suggérer une amélioration'),
    h('hr'),
    h('button',{type:'button',role:'menuitem',onclick:logout},'↩ Se déconnecter'));
-  const btn=h('button',{type:'button',class:'ghost','aria-haspopup':'menu','aria-expanded':'false'},h('span',{class:'avatar',text:(state.user.name||'?').trim().charAt(0).toUpperCase()}),h('span',{class:'uname',text:state.user.name.split(' ')[0]}));
+  const btn=h('button',{type:'button',class:'ghost','aria-haspopup':'menu','aria-expanded':'false'},h('span',{class:'avatar'+(state.inbox>0?' has-badge':''),title:state.inbox>0?`${state.inbox} invitation(s) en attente`:null,text:(state.user.name||'?').trim().charAt(0).toUpperCase()}),h('span',{class:'uname',text:state.user.name.split(' ')[0]}));
   btn.onclick=e=>{e.stopPropagation();const open=menu.classList.toggle('open');btn.setAttribute('aria-expanded',String(open));};
   parts.push(h('div',{class:'user-menu'},btn,menu));
  }else if(state.demo)parts.push(h('a',{class:'btn primary sm',href:'#/inscription',onclick:leaveDemo},'Créer mon compte gratuit'));
@@ -145,14 +152,20 @@ function viewToggle(key,target){
 // ---------- Sites ----------
 async function sitesView(){
  crumbs([['Mes sites']]);
- const [{sites:allSites},usage]=await Promise.all([api('/api/sites'),api('/api/billing').catch(()=>null)]);
+ const [{sites:allSites},usage,inv]=await Promise.all([api('/api/sites'),api('/api/billing').catch(()=>null),api('/api/sites?action=handoff-inbox').catch(()=>({items:[]}))]);
+ state.inbox=inv.items.length;document.querySelector('.user-menu .avatar')?.classList.toggle('has-badge',state.inbox>0);
+ // Invitations reçues : accepter ou refuser sans passer par le lien du courriel.
+ const answer=async(it,name,ok)=>{try{const r=await api('/api/sites?action='+name,{method:'POST',body:{hid:it.id}});toast(ok?(it.kind==='transfer'?'Copie ajoutée à votre compte.':'Accès ajouté à vos sites.'):'Invitation refusée.');await refreshInbox();ok?location.hash='#/sites/'+r.siteId:route();}catch(e){toast(e.message,8000);}};
+ const inviteBox=inv.items.length?h('section',{class:'invites','aria-label':'Invitations reçues'},...inv.items.map(it=>h('div',{class:'card invite-card'},
+  h('div',{},h('b',{text:`${it.from} ${it.kind==='transfer'?'vous remet une copie du dossier':'vous donne accès au dossier'} « ${it.site} »`}),h('div',{class:'small muted',text:it.kind==='transfer'?'Après acceptation, la copie vous appartient : les deux copies sont indépendantes.':'Accès en lecture seule, que la personne peut retirer en tout temps.'})),
+  h('div',{class:'page-actions'},h('button',{type:'button',class:'ghost',onclick:()=>answer(it,'handoff-decline',false)},'Refuser'),h('button',{type:'button',class:'primary',onclick:()=>answer(it,'handoff-accept',true)},it.kind==='transfer'?'Accepter la copie':'Accepter l’accès'))))):null;
  // Hors ligne : seuls les sites téléchargés sont consultables.
  let sites=allSites;
  if(net.offline){const ok=new Set((await listDownloads()).map(d=>d.id));sites=allSites.filter(x=>ok.has(x.id));}
  const chip=usage&&h('a',{class:'usage-chip',href:'#/abonnement'},h('b',{text:usage.plan.name}),usage.limit==null?`${usage.used} panneaux`:`${usage.used} / ${usage.limit} panneaux${usage.plan.quotaType==='monthly'?' ce mois-ci':''}`,usage.credits?` · +${usage.credits} prépayés`:'',usage.canCreatePanel?'':' · Augmenter →');
  const create=()=>siteDialog(null,async f=>{const {site}=await api('/api/sites',{method:'POST',body:f});toast('Site créé. Ajoutez maintenant un panneau.');location.hash='#/sites/'+site.id;});
  const first=state.user.name.split(' ')[0];
- if(!sites.length)return h('div',{class:'container'},h('div',{class:'card empty-state'},
+ if(!sites.length)return h('div',{class:'container'},inviteBox||'',h('div',{class:'card empty-state'},
   h('div',{class:'ico',text:'🏠'}),h('h2',{text:`Bienvenue, ${first} !`}),h('p',{text:'Commencez par ajouter un site : l’adresse d’une maison, d’un chalet ou d’un client. Vous y ajouterez ensuite ses panneaux électriques.'}),
   h('div',{class:'onboard'},h('div',{},h('b',{text:'1. Un site'}),h('span',{text:'Une adresse (maison, chalet, client).'})),h('div',{},h('b',{text:'2. Ses panneaux'}),h('span',{text:'Principal, sous-panneau du garage…'})),h('div',{},h('b',{text:'3. Les circuits'}),h('span',{text:'Touchez chaque disjoncteur et décrivez-le.'}))),
   h('button',{type:'button',class:'primary lg',onclick:create},'+ Ajouter mon premier site'),
@@ -178,7 +191,7 @@ async function sitesView(){
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
  return h('div',{class:'container'},
   h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',onclick:()=>trashDialog({onRestored:route})},'🗑 Corbeille'),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
-  gsearch,found,(()=>{gridWrap.append(resumeBox||'',grid);return gridWrap;})());
+  inviteBox||'',gsearch,found,(()=>{gridWrap.append(resumeBox||'',grid);return gridWrap;})());
 }
 
 function tree(panels){
@@ -366,7 +379,7 @@ window.addEventListener('hashchange',async()=>{
 });
 
 async function boot(){
- try{const me=await api('/api/auth');applyFont(me.site?.font);state.user=me.user;state.features=me.features||{};if(me.user&&!net.offline)bindUser(me.user.id);followAccountLang(me.user?.profile);}
+ try{const me=await api('/api/auth');applyFont(me.site?.font);state.user=me.user;state.features=me.features||{};if(me.user&&!net.offline){bindUser(me.user.id);refreshInbox().then(n=>{if(n)setTimeout(()=>toast(`Vous avez ${n} invitation${n>1?'s':''} en attente dans Mes sites.`,7000),800);});}followAccountLang(me.user?.profile);}
  catch(e){if(!state.user&&e.offline){view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:'📡'}),h('h2',{text:'Hors ligne'}),h('p',{text:e.message}),h('button',{type:'button',class:'primary',onclick:()=>location.reload()},'Réessayer'))));return;}}
  lastPath=location.hash.split('/').slice(0,3).join('/');
  handleSsoReturn(); // SSO

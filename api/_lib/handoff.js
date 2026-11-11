@@ -39,6 +39,16 @@ export async function revokeHandoff(sql,userId,hid){
  await sql`UPDATE app_handoffs SET status='revoked' WHERE id=${hid} AND (owner_id=${userId} OR accepted_by=${userId}) AND kind='access'`;
  await sql`UPDATE app_handoffs SET status='revoked' WHERE id=${hid} AND owner_id=${userId} AND kind='transfer' AND status='pending'`;
 }
+// Invitations en attente adressées à l'utilisateur (même courriel que son compte) : notification dans l'application.
+export async function inboxFor(sql,user){
+ const rows=await sql`SELECT h.id,h.kind,h.site_name,h.created_at,h.expires_at,u.name AS owner_name,(SELECT count(*)::int FROM app_panels p WHERE p.site_id=h.site_id) AS panels
+  FROM app_handoffs h JOIN app_users u ON u.id=h.owner_id WHERE lower(h.email)=${normEmail(user.email)} AND h.status='pending' AND h.expires_at>now() AND h.owner_id<>${user.id} ORDER BY h.created_at DESC`;
+ return rows.map(r=>({id:r.id,kind:r.kind,site:r.site_name,from:r.owner_name,panels:r.panels,createdAt:r.created_at,expiresAt:r.expires_at}));
+}
+const byRef=async(sql,{token,hid})=>{
+ if(hid){const [h]=await sql`SELECT h.*,u.name AS owner_name,(SELECT count(*)::int FROM app_panels p WHERE p.site_id=h.site_id) AS panels FROM app_handoffs h JOIN app_users u ON u.id=h.owner_id WHERE h.id=${hid}`;return h||null;}
+ return byToken(sql,token);
+};
 const byToken=async(sql,token)=>{
  const [h]=await sql`SELECT h.*,u.name AS owner_name,(SELECT count(*)::int FROM app_panels p WHERE p.site_id=h.site_id) AS panels FROM app_handoffs h JOIN app_users u ON u.id=h.owner_id WHERE h.token_hash=${sha(token)}`;
  return h||null;
@@ -56,8 +66,8 @@ export async function clientAccessOf(sql,userId,siteId){
  return h?{by:h.owner_name}:null;
 }
 
-export async function acceptHandoff(sql,user,token){
- const h=await byToken(sql,token);
+export async function acceptHandoff(sql,user,ref){
+ const h=await byRef(sql,typeof ref==='string'?{token:ref}:ref);
  if(!h||h.status==='revoked')throw new HttpError(404,'Invitation introuvable ou retirée.');
  if(h.status==='accepted')throw new HttpError(409,'Cette invitation a déjà été acceptée.');
  if(h.status!=='pending'||new Date(h.expires_at)<new Date())throw new HttpError(410,'Cette invitation a expiré : demandez-en une nouvelle.');
@@ -85,8 +95,8 @@ export async function acceptHandoff(sql,user,token){
  await sql`UPDATE app_handoffs SET status='accepted',accepted_by=${user.id},accepted_at=now(),new_site_id=${newSite} WHERE id=${h.id}`;
  return {kind:'transfer',siteId:newSite};
 }
-export async function declineHandoff(sql,user,token){
- const h=await byToken(sql,token);
+export async function declineHandoff(sql,user,ref){
+ const h=await byRef(sql,typeof ref==='string'?{token:ref}:ref);
  if(!h||normEmail(user.email)!==normEmail(h.email))throw new HttpError(404,'Invitation introuvable.');
  if(h.status==='pending')await sql`UPDATE app_handoffs SET status='declined' WHERE id=${h.id}`;
 }
