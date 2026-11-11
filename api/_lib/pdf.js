@@ -173,7 +173,7 @@ async function header(d,{overline,title,subtitle,right,logos=[],model=''}){
  // Logo de l'entreprise (plaque blanche à gauche) ou barre d'accent.
  let tx=M+14;
  if(d.companyLogo){
-  const bh=h-24,lh=bh-12,lw=Math.min(d.companyLogo.w/d.companyLogo.h*lh,130),sh=lw/(d.companyLogo.w/d.companyLogo.h);
+  const bh=h-24,lh=bh-(d.companyLogo.isDefault?6:12),lw=Math.min(d.companyLogo.w/d.companyLogo.h*lh,d.companyLogo.isDefault?150:130),sh=lw/(d.companyLogo.w/d.companyLogo.h);
   d.rect(M,d.H-h+12,lw+12,bh,{color:d.C.white});
   d.p.drawImage(d.companyLogo.img,{x:M+6,y:d.H-h+12+(bh-sh)/2,width:lw,height:sh});
   d.rect(M+lw+12,d.H-h+12,3,bh,{color:d.C.lime});
