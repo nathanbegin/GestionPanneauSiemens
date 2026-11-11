@@ -8,6 +8,7 @@ try{token=NATIVE?localStorage.getItem(TOKEN_KEY)||'':'';}catch{}
 // Adresse absolue d'une page publique (dans l'app native, ouverte sur le serveur).
 export const webUrl=path=>NATIVE?API_BASE+path:path;
 export function setToken(t){if(!NATIVE)return;token=t||'';try{t?localStorage.setItem(TOKEN_KEY,t):localStorage.removeItem(TOKEN_KEY);}catch{}}
+import {cacheable,remember,readResponse,setOffline} from './offline.js';
 let onAuthLost=()=>{};
 export const handleAuthLost=fn=>{onAuthLost=fn;};
 
@@ -17,13 +18,19 @@ export async function api(path,{method='GET',body}={}){
  if(token)headers.Authorization='Bearer '+token;
  let res;
  try{res=await fetch(API_BASE+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:NATIVE?'omit':'same-origin',cache:'no-store'});}
- catch{throw Object.assign(Error('Connexion impossible. Vérifiez votre accès Internet.'),{offline:true});}
+ catch{
+  // Lecture sans réseau : copie locale d'un site téléchargé (ou de l'identité, de la liste des sites, du forfait).
+  if(method==='GET'&&cacheable(path)){const hit=await readResponse(path);if(hit?.data){setOffline(true);return hit.data;}}
+  throw Object.assign(Error('Connexion impossible. Vérifiez votre accès Internet.'),{offline:true});
+ }
+ setOffline(false);
  let data={};
  try{data=await res.json();}catch{}
  if(!res.ok){
   if(res.status===401&&data.auth)onAuthLost();
   throw Object.assign(Error(data.error||'Erreur '+res.status),{status:res.status,data});
  }
+ if(method==='GET'&&cacheable(path)&&!(path==='/api/auth'&&!data.user))remember(path,data);
  return data;
 }
 

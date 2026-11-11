@@ -213,3 +213,11 @@ Module **autonome et amovible**, ajouté au système de comptes existant (scéna
 4. (facultatif) `DROP TABLE app_identities;`. Les comptes SSO restent des lignes `app_users` avec courriel : ils pourront se réidentifier par courriel chez le nouveau fournisseur.
 
 Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/providers.js`.
+
+## Mode hors ligne (consultation)
+
+« Rendre disponible hors ligne » (page d'un site) conserve le site et tous ses panneaux dans IndexedDB, sur l'appareil seulement (`public/js/offline.js`). Sans réseau, l'application s'ouvre (service worker), affiche un bandeau « Hors ligne » et sert ces copies pour la lecture : liste des sites téléchargés, panneaux, circuits, nomenclature, charges.
+
+- **Pas encore possible hors ligne** : modifier (l'enregistrement échoue avec « Réessayer »), générer des PDF, analyser des photos.
+- Les copies sont effacées à la déconnexion et si un autre compte se connecte sur l'appareil.
+- Rafraîchir une copie : bouton « 📥 Hors ligne ✓ » → Actualiser.

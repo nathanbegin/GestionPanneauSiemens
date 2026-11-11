@@ -838,3 +838,9 @@ body:has(#worknav:not([hidden])) dialog.side{inset-block-start:111px;height:calc
  .save-state{left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px))}
  body:has(dialog.circuit-dlg[open]) .save-state{display:none}
 }
+/* Mode hors ligne */
+.offline-bar{position:sticky;top:0;z-index:60;background:#fff3cd;color:#6b4e00;border-bottom:1px solid #e6cf85;padding:8px 14px;font-size:14px;text-align:center}
+body.is-offline .topbar{top:36px}
+/* Mode hors ligne */
+.offline-bar{position:sticky;top:0;z-index:60;background:#fff3cd;color:#6b4e00;border-bottom:1px solid #e6cf85;padding:8px 14px;font-size:14px;text-align:center}
+body.is-offline .topbar{top:36px}

@@ -1,6 +1,7 @@
 // Application Disjonio : routeur, authentification, sites, compte.
 import {brandingCard} from './branding.js';
 import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
+import {net,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
@@ -67,6 +68,7 @@ const ctx={crumbs,remember,get features(){return state.features;},get user(){ret
 
 async function logout(){
  try{await api('/api/auth?action=logout',{method:'POST',body:{}});}catch{}
+ await clearOffline();
  setToken('');state.user=null;location.hash='#/connexion';toast('Vous êtes déconnecté.');
 }
 handleAuthLost(()=>{state.user=null;setToken('');if(!publicRoutes.includes(location.hash.split('/')[1]))location.hash='#/connexion';});
@@ -84,7 +86,7 @@ function authForm(fields,submitLabel,onSubmit){
  return form;
 }
 async function afterAuth(out,welcome){
- setToken(out.token);state.user=out.user;if(followAccountLang(out.user.profile))return;
+ setToken(out.token);state.user=out.user;bindUser(out.user.id);if(followAccountLang(out.user.profile))return;
  const redirect=sessionStorage.getItem('mp_after_login');sessionStorage.removeItem('mp_after_login');
  location.hash=redirect||'#/sites';toast(welcome);
 }
@@ -136,7 +138,10 @@ function viewToggle(key,target){
 // ---------- Sites ----------
 async function sitesView(){
  crumbs([['Mes sites']]);
- const [{sites},usage]=await Promise.all([api('/api/sites'),api('/api/billing').catch(()=>null)]);
+ const [{sites:allSites},usage]=await Promise.all([api('/api/sites'),api('/api/billing').catch(()=>null)]);
+ // Hors ligne : seuls les sites téléchargés sont consultables.
+ let sites=allSites;
+ if(net.offline){const ok=new Set((await listDownloads()).map(d=>d.id));sites=allSites.filter(x=>ok.has(x.id));}
  const chip=usage&&h('a',{class:'usage-chip',href:'#/abonnement'},h('b',{text:usage.plan.name}),usage.limit==null?`${usage.used} panneaux`:`${usage.used} / ${usage.limit} panneaux${usage.plan.quotaType==='monthly'?' ce mois-ci':''}`,usage.credits?` · +${usage.credits} prépayés`:'',usage.canCreatePanel?'':' · Augmenter →');
  const create=()=>siteDialog(null,async f=>{const {site}=await api('/api/sites',{method:'POST',body:f});toast('Site créé. Ajoutez maintenant un panneau.');location.hash='#/sites/'+site.id;});
  const first=state.user.name.split(' ')[0];
@@ -198,6 +203,13 @@ async function siteView(id){
    choice('📋','Panneau existant','Il est déjà installé : le relever par photo (IA), par questions ou par saisie.',()=>{d.close();releveChoices();}),
    choice('✏️','Projet de panneau','Il n’existe pas encore : concevoir un nouveau panneau ou un agrandissement.',()=>{d.close();designDialog({site,onCreated:p=>{location.hash='#/panneaux/'+p.id;},onManual:()=>createPanel({stage:'conception',state:'Planifié'},'Nouveau panneau à concevoir')});})),
    panels.length>0&&h('p',{class:'small'},h('button',{type:'button',class:'link',onclick:()=>{d.close();verifyChoices();}},'Vérifier la charge d’un panneau existant'),' (électroménagers et calcul).')],actions:[{label:'Annuler',kind:'ghost'}]});};
+ // Disponible hors ligne : conserve le site et ses panneaux sur cet appareil (consultation sans réseau).
+ const dlRec=await getDownload(site.id);
+ const offlineBtn=net.offline?null:h('button',{type:'button',onclick:()=>{
+  const run=async()=>{try{toast('Téléchargement du site…');const r=await downloadSite(site.id,p=>api(p));toast(`Site disponible hors ligne (${r.panels} panneau${r.panels>1?'x':''}).`);route();}catch(e){toast(e.message,7000);}};
+  if(!dlRec)return run();
+  const d=dialog({title:'Disponible hors ligne',eyebrow:site.name,body:[h('p',{class:'muted',text:`Copie enregistrée ${fmtRelative(dlRec.savedAt)} sur cet appareil. Les PDF, les photos et les modifications exigent une connexion.`})],actions:[{label:'Fermer',kind:'ghost'},{label:'Retirer de cet appareil',kind:'danger',onClick:async()=>{await removeDownload(site.id);toast('Copie hors ligne retirée.');route();}},{label:'Actualiser',kind:'primary',onClick:()=>{run();}}]});
+ }},dlRec?'📥 Hors ligne ✓':'📥 Rendre disponible hors ligne');
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
  const remove=async()=>{if(!await confirmDialog(`Supprimer « ${site.name} », ses ${panels.length} panneau(x) et tous leurs circuits ? Cette action est irréversible.`,{title:'Supprimer le site',confirm:'Supprimer définitivement',danger:true}))return;await api('/api/sites?id='+site.id,{method:'DELETE'});toast('Site supprimé.');location.hash='#/sites';};
  const report=async()=>{try{toast('Génération du rapport du site…');await openDocument({site:site.id,kind:'report'});}catch(e){toast(e.message);}};
@@ -209,7 +221,7 @@ async function siteView(id){
  return h('div',{class:'container'},
   h('div',{class:'page-head'},
    h('div',{},h('div',{class:'eyebrow',text:'Site'}),h('h1',{text:site.name}),h('div',{class:'sub',text:siteAddress(site)||'Adresse à préciser'}),site.client&&h('div',{class:'sub',text:'Client : '+site.client})),
-   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
+   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,offlineBtn,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
     panels.length?(()=>{const g=h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'));return h('div',{},h('div',{class:'cards-toolbar'},viewToggle('mp_panels_view',g)),g);})()
@@ -304,6 +316,11 @@ async function route(){
   view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:e.offline?'📡':'⚠️'}),h('h2',{text:e.status===404?'Introuvable':'Un problème est survenu'}),h('p',{text:e.message}),h('div',{class:'page-actions'},h('button',{type:'button',onclick:route},'Réessayer'),h('a',{class:'btn primary',href:'#/sites'},'Retour à mes sites')))));
  }
 }
+// Bandeau « hors ligne » : les lectures viennent de la copie locale, les modifications sont désactivées.
+{const bar=h('div',{class:'offline-bar',role:'status',hidden:true,text:'📡 Hors ligne — vous consultez les sites téléchargés sur cet appareil. Les modifications, PDF et photos exigent une connexion.'});
+ document.body.prepend(bar);
+ globalThis.addEventListener('mp-offline',e=>{bar.hidden=!e.detail;document.body.classList.toggle('is-offline',!!e.detail);});
+ globalThis.addEventListener('online',()=>{if(net.offline)route();});}
 let lastPath='';
 let settledHash=location.hash,guarding=false;
 window.addEventListener('hashchange',async()=>{
@@ -322,7 +339,7 @@ window.addEventListener('hashchange',async()=>{
 });
 
 async function boot(){
- try{const me=await api('/api/auth');state.user=me.user;state.features=me.features||{};followAccountLang(me.user?.profile);}
+ try{const me=await api('/api/auth');state.user=me.user;state.features=me.features||{};if(me.user&&!net.offline)bindUser(me.user.id);followAccountLang(me.user?.profile);}
  catch(e){if(!state.user&&e.offline){view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:'📡'}),h('h2',{text:'Hors ligne'}),h('p',{text:e.message}),h('button',{type:'button',class:'primary',onclick:()=>location.reload()},'Réessayer'))));return;}}
  lastPath=location.hash.split('/').slice(0,3).join('/');
  handleSsoReturn(); // SSO
