@@ -23,7 +23,7 @@ export function appliancesView({panel,children=[],save,onChange,canEdit=true}){
  const circuitOptions=(app,current)=>{
   const sug=suggestCircuits(panel,app),best=new Set(sug.filter(s=>s.score>=3).slice(0,3).map(s=>s.circuit.id));
   const opts=[['','— Pas encore relié à un circuit —']];
-  for(const s of sug)opts.push([s.circuit.id,`${best.has(s.circuit.id)?'★ ':''}${designation(s.circuit)} · ${s.circuit.label||'sans désignation'}${s.circuit.amps?' · '+s.circuit.amps+' A':''}${s.why&&best.has(s.circuit.id)?' ('+s.why+')':''}`]);
+  for(const s of sug)opts.push([s.circuit.id,`${best.has(s.circuit.id)?'★ ':''}${designation(s.circuit)} · ${s.circuit.label||'sans désignation'}${s.circuit.amps?' · '+s.circuit.amps+' A':''}`]);
   const sel=select('circuit',opts,current||'');return sel;
  };
  const apply=async fn=>{try{const next=fn();await save(next);onChange();}catch(e){toast(e.message,7000);}};
@@ -34,13 +34,13 @@ export function appliancesView({panel,children=[],save,onChange,canEdit=true}){
    sel.addEventListener('change',()=>apply(()=>moveAppliance(panel,r.id,sel.value||null)));
    return h('tr',{class:r.pending?'cmp-diff':''},
     h('td',{},h('b',{text:r.name}),r.qty>1&&h('span',{class:'small muted',text:' × '+r.qty}),r.model&&h('div',{class:'small app-model',text:'Modèle : '+r.model}),inferLoad(r.name,r.w).cat==='range'&&r.cat!=='range'&&h('div',{class:'app-warn'},'⚠ ',h('span',{class:'long',text:'Catégorie à corriger : « Cuisinière » (touchez ✎) pour appliquer la règle 8-300.'}),h('span',{class:'short',text:'Catégorie à corriger ✎'})),h('div',{class:'small muted',text:r.v+' V'})),
-    h('td',{text:fmtW(r.total)}),h('td',{},sel,r.pending&&h('div',{class:'app-warn'},'⚠ ',h('span',{class:'long',text:'À relier à un circuit pour compter dans le calcul.'}),h('span',{class:'short',text:'À relier'}))),
+    h('td',{text:fmtW(r.total)}),h('td',{},h('span',{class:'app-lbl',text:'Relier au circuit'}),sel,r.pending&&h('div',{class:'app-warn'},'⚠ ',h('span',{class:'long',text:'À relier à un circuit pour compter dans le calcul.'}),h('span',{class:'short',text:'À relier'}))),
     h('td',{class:'app-actions'},canEdit&&h('button',{type:'button',class:'ghost sm','aria-label':'Modifier '+r.name,title:'Modifier',onclick:()=>addDialog({panel,save,onChange,edit:r})},'✎'),canEdit&&h('button',{type:'button',class:'ghost sm','aria-label':'Retirer '+r.name,title:'Retirer',onclick:()=>apply(()=>removeAppliance(panel,r.id))},'✕')));
   }))))
   :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'🔌'}),h('h3',{text:'Aucun électroménager inscrit'}),h('p',{text:'Inscrivez les appareils qui consomment le plus (cuisinière, sécheuse, chauffe-eau, thermopompe, borne…) et reliez-les au bon circuit. Vous pouvez photographier leur plaque signalétique : l’IA lit la puissance.'}));
  const gauge=rep&&h('div',{class:'card side-card'},h('h3',{text:'Charge du panneau'}),
   h('div',{class:'gauge '+rep.status},h('div',{class:'big',text:rep.percent!=null?rep.percent+' %':'—'}),h('div',{},h('b',{text:{ok:'Bonne marge',medium:'Marge correcte',high:'Marge réduite (> 80 %)',over:'Surcharge',unknown:'À compléter'}[rep.status]}),
-   h('div',{class:'small muted',text:rep.mainAmps?`${rep.designAmps} A sur un principal de ${rep.mainAmps} A`:'Indiquez le principal dans la fiche du panneau pour obtenir le pourcentage.'}))),
+   h('div',{class:'small muted',text:rep.mainAmps?`${(Number(rep.designAmps)).toLocaleString(globalThis.MP_LOCALE||'fr-CA',{maximumFractionDigits:1})} A sur un principal de ${rep.mainAmps} A`:'Indiquez le principal dans la fiche du panneau pour obtenir le pourcentage.'}))),
   h('p',{class:'small muted mt',text:`Charge branchée : ${fmtW(Math.round(rep.connectedW))} · seuls les appareils reliés à un circuit comptent.`}));
  const pending=rows.filter(r=>r.pending).length;
  return h('div',{class:'container-narrow'},

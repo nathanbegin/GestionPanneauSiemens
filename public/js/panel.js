@@ -189,8 +189,8 @@ export async function panelView({id,tab='panel',ctx}){
    const more=['plan','appliances','docs','info'],inMore=more.includes(state.tab);
    const t=(k,label)=>h('button',{type:'button',role:'tab','aria-selected':String(state.tab===k),onclick:()=>go(k)},label);
    const moreBtn=h('button',{type:'button',role:'tab','aria-selected':String(inMore),'aria-haspopup':'dialog',onclick:()=>{
-    const d=dialog({title:'Plus',eyebrow:panelTitle(panel),body:[h('div',{class:'more-list'},...more.map(k=>h('button',{type:'button',class:state.tab===k?'on':'',onclick:()=>{d.close();go(k);}},tabNames[k])))],actions:[{label:'Fermer',kind:'ghost'}]});}},inMore?tabNames[state.tab]+' ▾':'⋯ Plus');
-   tabs.className='tabs tabs-3';tabs.replaceChildren(t('list','☷ Circuits'),t('panel','▦ Vue du panneau'),moreBtn);return;
+    const d=dialog({title:'Plus',eyebrow:panelTitle(panel)+(inMore?' · '+tabNames[state.tab].replace(/^\S+\s/,''):''),body:[h('div',{class:'more-list'},...more.map(k=>h('button',{type:'button',class:state.tab===k?'on':'',onclick:()=>{d.close();go(k);}},tabNames[k])))],actions:[{label:'Fermer',kind:'ghost'}]});}},'⋯ Plus');
+   tabs.className='tabs tabs-3';tabs.replaceChildren(t('list','☷ Circuits'),t('panel','▦ Panneau'),moreBtn);return;
   }
   tabs.className='tabs';
   // Tous les outils sont accessibles quelle que soit l'étape (l'étape n'est qu'un indicateur d'avancement).

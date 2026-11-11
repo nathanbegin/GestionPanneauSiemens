@@ -970,3 +970,20 @@ dialog.side .f:focus-within .hint{display:block}
 .ai-line{padding:2px 8px;border-left:3px solid #8ABF92;background:#f3f7f1;border-radius:4px;animation:aiIn .25s ease}
 @keyframes aiIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .ai-prog-box:empty{display:none}.ai-prog-box{margin:10px 0}
+/* Mobile : corrections UX (carte de charge, onglets, circuit relié, fil d'Ariane) */
+.gauge .big{white-space:nowrap;flex:none;font-size:clamp(26px,9vw,34px)}
+.gauge{flex-wrap:wrap}
+.app-lbl{display:none}
+.tabs.tabs-3 button{white-space:nowrap;min-width:0;padding:8px 4px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.tabs.tabs-3 button .ic{margin-right:0}
+@media (max-width:720px){
+ .app-lbl{display:block;font-size:12px;color:var(--muted);margin:6px 0 2px}
+ .app-table select{text-overflow:ellipsis;font-size:15px}
+ .cmp-head h2{font-size:22px;line-height:1.2}
+ /* Fil d'Ariane : retour « ‹ » vers le parent et nom de la page courante en entier */
+ .topbar .crumbs a{display:none}
+ .topbar .crumbs i{display:none}
+ .topbar .crumbs a:last-of-type{display:inline-flex;align-items:center;min-height:44px;min-width:32px;font-size:0;padding:0 6px;flex:none}
+ .topbar .crumbs a:last-of-type::before{content:'‹';font-size:30px;line-height:1;color:var(--ink)}
+ .topbar .crumbs span{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

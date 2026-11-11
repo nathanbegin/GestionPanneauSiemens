@@ -44,10 +44,22 @@ export function enhanceIcons(root=document.body){
   el.classList.add('has-ic');
  }
 }
+// Français : « 112.5 A » → « 112,5 A » (nombre décimal suivi d'une unité), dans les textes affichés seulement.
+const NUM=/(\d+)\.(\d+)(?=\s?(?:kVA|kW|W|V|A|m²|mm|%)(?![\p{L}\d]))/gu;
+export function localizeNumbers(root=document.body){
+ if(globalThis.MP_LANG==='en')return;
+ const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const hits=[];
+ for(let n=w.nextNode();n;n=w.nextNode()){
+  const par=n.parentElement;
+  if(!par||par.closest('script,style,textarea,input,[contenteditable]'))continue;
+  if(NUM.test(n.nodeValue)){hits.push(n);}NUM.lastIndex=0;
+ }
+ for(const n of hits)n.nodeValue=n.nodeValue.replace(NUM,'$1,$2');
+}
 let timer=0;
 export function watchIcons(){
  if(typeof MutationObserver!=='function')return;
- const run=()=>{timer=0;try{enhanceIcons(document.body);}catch{}};
+ const run=()=>{timer=0;try{enhanceIcons(document.body);localizeNumbers(document.body);}catch{}};
  // Après la traduction : l'observateur de langue s'exécute avant ce délai.
  new MutationObserver(()=>{if(!timer)timer=setTimeout(run,40);}).observe(document.body,{childList:true,subtree:true});
  setTimeout(run,60);
