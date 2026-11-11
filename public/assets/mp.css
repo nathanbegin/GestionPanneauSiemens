@@ -1041,3 +1041,10 @@ dialog.side .f:focus-within .hint{display:block}
  .more-menu{position:relative}
  .more-menu .menu{left:0;right:auto;min-width:min(280px,calc(100vw - 32px));max-width:calc(100vw - 32px);z-index:60}
 }
+
+/* Hors ligne : actions qui exigent une connexion */
+body.is-offline .needs-net{opacity:.45;pointer-events:none}
+.save-state.pending{color:#8a5a00;border-color:#e6cf85;background:#fff8e1}
+.conflict-row{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+.conflict-title{font-weight:600;margin-bottom:6px}
+.conflict-opt{display:flex;gap:8px;align-items:flex-start;padding:6px 4px;cursor:pointer}

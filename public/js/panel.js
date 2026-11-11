@@ -1,11 +1,14 @@
 // Vue d'un panneau : face avant, nomenclature, documents et fiche.
 import {h,toast,confirmDialog,fmtRelative,fmtDate,dialog} from './dom.js';
 import {api,openDocument,NATIVE,webUrl} from './api.js';
+import {queueEdit,getQueued} from './offline.js';
+import {syncPending} from './sync.js';
 import {qrMatrix,qrSvg,panelLink,qrAllowed} from '../qr.js';
 import {voltsOf} from '../voltage.js';
 import {calcFingerprint,CODE_EDITION,designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {historyDialog} from './history.js';
+import {net} from './offline.js';
 import {buildChecklist} from './checklist.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
@@ -66,11 +69,22 @@ export async function panelView({id,tab='panel',ctx}){
   // Sérialise les écritures pour garder les numéros de révision cohérents.
   const run=saving.then(async()=>{
    saveState.className='save-state busy';saveState.textContent='Enregistrement…';
+   // Hors ligne (ou modifications déjà en attente) : l'enregistrement va dans la file de l'appareil, puis se synchronise.
+   const keepLocal=async()=>{
+    const next=await queueEdit(panel,update,site.name);if(!next)return null;
+    panel=next;
+    if(!net.offline&&navigator.onLine!==false){await syncPending();}
+    if(await getQueued(panel.id)){saveState.className='save-state pending';saveState.textContent='📴 Gardé sur l’appareil — en attente de synchronisation';return panel;}
+    try{panel=(await api('/api/panels?id='+panel.id)).panel;}catch{}
+    saveState.className='save-state ok';saveState.textContent='✓ Enregistré';return panel;
+   };
    try{
+    if(await getQueued(panel.id)){const r=await keepLocal();if(r)return r;}
     const out=await api('/api/panels?id='+panel.id,{method:'PUT',body:{revision:panel.revision,...update}});
     panel=out.panel;saveState.className='save-state ok';saveState.textContent='✓ Enregistré';
     return panel;
    }catch(e){
+    if(e.offline){const r=await keepLocal().catch(()=>null);if(r)return r;}
     saveState.className='save-state fail';
     // Échec : le bouton relance l'enregistrement avec les mêmes données (sauf conflit de révision).
     if(e.status===409)saveState.textContent='⚠ Non enregistré';
@@ -154,7 +168,8 @@ export async function panelView({id,tab='panel',ctx}){
   return h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes');
  }
  function moreMenu(){
-  const item=(label,fn)=>h('button',{type:'button',role:'menuitem',onclick:fn},label);
+  const NET=/Garnir|Code QR|Historique|Rapports|Aide-mémoire|Planifier|Partager/;
+  const item=(label,fn)=>h('button',{type:'button',role:'menuitem',class:NET.test(label)?'needs-net':'',onclick:fn},label);
   const menu=h('div',{class:'menu',role:'menu'},
    data.access&&data.access!=='owner'?h('div',{class:'who',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):item('👥 Partager',()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})),
    data.access!=='view'&&item('📷 Garnir par photos (IA)',garnir),

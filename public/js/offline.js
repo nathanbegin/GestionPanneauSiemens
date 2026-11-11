@@ -2,12 +2,13 @@
 // - « Télécharger » un site conserve le site et tous ses panneaux pour les relire sans réseau.
 // - L'identité, la liste des sites et le forfait sont aussi gardés pour que l'application s'ouvre hors ligne.
 // - Tout est effacé à la déconnexion ou si un autre compte se connecte sur l'appareil.
-// Les modifications hors ligne ne sont pas permises : l'enregistrement échoue avec « Connexion impossible ».
+// Modifications hors ligne : les enregistrements de circuits / de fiche sont gardés dans une file (store « queue », un
+// enregistrement par panneau) puis synchronisés au retour du réseau (voir sync.js et merge.js).
 const DB='mp-offline';
 const open=()=>new Promise((res,rej)=>{
  if(typeof indexedDB==='undefined')return rej(new Error('indexedDB indisponible'));
- const r=indexedDB.open(DB,1);
- r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('resp',{keyPath:'key'});d.createObjectStore('sites',{keyPath:'id'});};
+ const r=indexedDB.open(DB,2);
+ r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('resp'))d.createObjectStore('resp',{keyPath:'key'});if(!d.objectStoreNames.contains('sites'))d.createObjectStore('sites',{keyPath:'id'});if(!d.objectStoreNames.contains('queue'))d.createObjectStore('queue',{keyPath:'panelId'});};
  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
 });
 async function run(store,mode,fn){
@@ -51,7 +52,7 @@ export async function removeDownload(siteId){
  await run('sites','readwrite',s=>s.delete(siteId));
 }
 export async function clearOffline(){
- await run('resp','readwrite',s=>s.clear());await run('sites','readwrite',s=>s.clear());
+ await run('resp','readwrite',s=>s.clear());await run('sites','readwrite',s=>s.clear());await run('queue','readwrite',s=>s.clear());
  try{localStorage.removeItem('mp_offline_uid');}catch{}
 }
 // Un seul compte à la fois sur l'appareil : si l'identité change, les données conservées sont effacées.
@@ -62,3 +63,26 @@ export async function bindUser(uid){
 // État réseau : « hors ligne » dès qu'une lecture est servie depuis la copie locale.
 export const net={offline:false};
 export function setOffline(v){if(net.offline===v)return;net.offline=v;try{globalThis.dispatchEvent(new CustomEvent('mp-offline',{detail:v}));}catch{}}
+
+// ---------- File des modifications faites hors ligne ----------
+const snap=p=>({revision:p.revision,name:p.name,tag:p.tag,kind:p.kind,location:p.location,details:structuredClone(p.details||{}),circuits:structuredClone(p.circuits||[])});
+export const listQueue=async()=>(await run('queue','readonly',s=>s.getAll()))||[];
+export const getQueued=id=>run('queue','readonly',s=>s.get(id));
+export const removeQueued=id=>run('queue','readwrite',s=>s.delete(id));
+export async function queueCount(){return (await listQueue()).length;}
+function notifyQueue(){try{globalThis.dispatchEvent(new CustomEvent('mp-queue'));}catch{}}
+// Applique `update` ({circuits?, meta?}) au panneau en mémoire, le garde dans la file et met à jour la copie locale.
+// Retourne le panneau modifié, ou null si ce type de modification exige le serveur (taille du panneau, liaison…).
+export async function queueEdit(panel,update,siteName=''){
+ if(update.positions!==undefined||update.feed!==undefined)return null;
+ const prev=await getQueued(panel.id);
+ const next={...panel};
+ if(update.circuits!==undefined)next.circuits=structuredClone(update.circuits);
+ if(update.meta){const m=update.meta;for(const k of ['name','tag','kind','location'])if(m[k]!==undefined)next[k]=m[k];if(m.details)next.details=structuredClone(m.details);}
+ const rec={panelId:panel.id,label:(panel.tag?panel.tag+' · ':'')+panel.name,siteName:siteName||prev?.siteName||'',base:prev?.base||snap(panel),local:snap(next),at:Date.now()};
+ await run('queue','readwrite',s=>s.put(rec));
+ const path='/api/panels?id='+panel.id,hit=await readResponse(path);
+ if(hit?.data)await saveResponse(path,{...hit.data,panel:next});
+ notifyQueue();
+ return next;
+}

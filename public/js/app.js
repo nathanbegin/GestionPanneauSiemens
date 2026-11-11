@@ -5,7 +5,8 @@ import {trashDialog} from './trash.js';
 import {watchIcons,icon} from './icons.js';
 import {applyFont} from './sitefont.js';
 import {handoffDialog,handoffView} from './handoff.js';
-import {net,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
+import {net,queueCount,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
+import {syncPending} from './sync.js';
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
@@ -92,6 +93,7 @@ function remember(r){try{const all=[{...r,uid:state.user?.id,at:Date.now()},...r
 const ctx={crumbs,remember,get features(){return state.features;},get user(){return state.user;}};
 
 async function logout(){
+ if(await queueCount()&&!await confirmDialog('Des modifications faites hors ligne n’ont pas encore été synchronisées. Si vous vous déconnectez maintenant, elles seront perdues. Reconnectez-vous au réseau pour les synchroniser d’abord.',{title:'Modifications en attente',confirm:'Me déconnecter quand même',danger:true}))return;
  try{await api('/api/auth?action=logout',{method:'POST',body:{}});}catch{}
  await clearOffline();
  setToken('');state.user=null;location.hash='#/connexion';toast('Vous êtes déconnecté.');
@@ -297,7 +299,7 @@ async function siteView(id){
  return h('div',{class:'container'},
   h('div',{class:'page-head'},
    h('div',{},h('div',{class:'eyebrow',text:'Site'}),h('h1',{text:site.name}),h('div',{class:'sub',text:siteAddress(site)||'Adresse à préciser'}),site.client&&h('div',{class:'sub',text:'Client : '+site.client})),
-   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,offlineBtn,!site.shared&&!net.offline&&!state.demo?h('button',{type:'button',onclick:handoff},'🤝 Remettre au client'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
+   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',class:'needs-net',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,offlineBtn,!site.shared&&!net.offline&&!state.demo?h('button',{type:'button',class:'needs-net',onclick:handoff},'🤝 Remettre au client'):null,panels.length?h('button',{type:'button',class:'needs-net',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary needs-net',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
     panels.length?(()=>{const g=h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'));const bm=panels.length>1&&!site.shared&&!state.demo&&!net.offline?batchManage({grid:g,cardSel:'.panel-card',items:panels,noun:'panneau',url:'/api/panels?id=',after:route}):null;return h('div',{},h('div',{class:'cards-toolbar'},bm?.btn||'',viewToggle('mp_panels_view',g)),bm?.bar||'',g);})()
@@ -306,7 +308,7 @@ async function siteView(id){
     panels.length>0&&h('div',{class:'card side-card'},h('h3',{text:'Hiérarchie d’alimentation'}),tree(panels)),
     h('div',{class:'card side-card'},h('h3',{text:'Informations'}),h('dl',{class:'facts'},h('dt',{text:'Adresse'}),h('dd',{text:siteAddress(site)||'—'}),h('dt',{text:'Client'}),h('dd',{text:site.client||'—'}),h('dt',{text:'Panneaux'}),h('dd',{text:String(panels.length)}),h('dt',{text:'Modifié'}),h('dd',{text:fmtRelative(site.updatedAt)})),site.notes&&h('p',{class:'small muted mt',text:site.notes})),
     panels.length>=2&&library&&h('a',{class:'btn',href:`#/comparer/${panels[0].id}/${panels[1].id}`},'⇄ Comparer des panneaux'),
-    site.shared?null:h('button',{type:'button',class:'danger',onclick:remove},'Supprimer ce site'))));
+    site.shared?null:h('button',{type:'button',class:'danger needs-net',onclick:remove},'Supprimer ce site'))));
 }
 
 // ---------- Compte ----------
@@ -400,11 +402,23 @@ async function route(){
   view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:e.offline?'📡':'⚠️'}),h('h2',{text:e.status===404?'Introuvable':'Un problème est survenu'}),h('p',{text:e.message}),h('div',{class:'page-actions'},h('button',{type:'button',onclick:route},'Réessayer'),h('a',{class:'btn primary',href:'#/sites'},'Retour à mes sites')))));
  }
 }
-// Bandeau « hors ligne » : les lectures viennent de la copie locale, les modifications sont désactivées.
-{const bar=h('div',{class:'offline-bar',role:'status',hidden:true,text:'📡 Hors ligne — vous consultez les sites téléchargés sur cet appareil. Les modifications, PDF et photos exigent une connexion.'});
+// Bandeau « hors ligne » : consultation des sites téléchargés ; les modifications de circuits et de fiche sont gardées
+// sur l'appareil puis synchronisées au retour du réseau. PDF, IA, partage, etc. exigent une connexion.
+{const bar=h('div',{class:'offline-bar',role:'status',hidden:true});
  document.body.prepend(bar);
- globalThis.addEventListener('mp-offline',e=>{bar.hidden=!e.detail;document.body.classList.toggle('is-offline',!!e.detail);});
- globalThis.addEventListener('online',()=>{if(net.offline)route();});}
+ let pending=0;
+ const paint=()=>{
+  const off=net.offline;
+  bar.hidden=!off&&!pending;document.body.classList.toggle('is-offline',!!off);
+  bar.replaceChildren(off?'📡 Hors ligne — vos modifications de circuits et de fiche sont gardées sur cet appareil et synchronisées au retour du réseau. PDF, IA, partage et photos exigent une connexion.':'🔄 Modifications faites hors ligne en attente de synchronisation…',pending?` · ${pending} en attente`:'');
+  setTimeout(syncChrome,0);
+ };
+ const count=async()=>{try{pending=await queueCount();}catch{pending=0;}paint();};
+ const trySync=async()=>{if(net.offline||navigator.onLine===false||state.demo||!state.user)return;if(!(await queueCount()))return;const r=await syncPending();await count();if(r?.done)route();};
+ globalThis.addEventListener('mp-offline',e=>{paint();if(!e.detail)trySync();});
+ globalThis.addEventListener('mp-queue',count);
+ globalThis.addEventListener('online',()=>{if(net.offline)route();trySync();});
+ count();setTimeout(trySync,2500);}
 // Hauteur réelle de l'en-tête (barres hors ligne / démo comprises) : sert à positionner la fiche latérale et la zone du panneau.
 function syncChrome(){
  const bars=[...document.querySelectorAll('.offline-bar,.demo-bar')].filter(b=>!b.hidden&&b.offsetHeight).reduce((n,b)=>n+b.offsetHeight,0);
