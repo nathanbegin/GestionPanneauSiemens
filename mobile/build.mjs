@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 const here=new URL('.',import.meta.url),www=new URL('www/',here),pub=new URL('../public/',here);
 const api=(process.env.API_URL||'https://gestion-panneau-siemens.vercel.app').replace(/\/$/,'');
 await rm(www,{recursive:true,force:true});await mkdir(www,{recursive:true});
-for(const dir of ['assets','js','branding'])await cp(new URL(dir,pub),new URL(dir,www),{recursive:true});
+for(const dir of ['assets','js','branding','fonts'])await cp(new URL(dir,pub),new URL(dir,www),{recursive:true});
 await cp(new URL('model.js',pub),new URL('model.js',www));
 for(const f of ['qr.js','i18n.js','i18n-core.js','i18n-en.js','i18n-load.js','i18n-en-docs.js','i18n-en-admin.js'])await cp(new URL(f,pub),new URL(f,www));
 await cp(new URL('vendor/',pub),new URL('vendor/',www),{recursive:true});

@@ -239,3 +239,8 @@ Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/
 - Le **circuit en cours** est entouré de bleu (distinct des couleurs de statut) et suit « Enregistrer et suivant »; le cadrage « Circuits » est privilégié pendant l'édition et rétabli à la fermeture; « Ajuster » et « Centrer » sont dans la barre du panneau.
 - **Positionnement mesuré** : `--chrome-h` (hauteur réelle de l'en-tête, barres démo/hors ligne comprises) est calculée dans `public/js/app.js` (`syncChrome`).
 - **Téléphone** : fiche plein écran avec un repère du circuit actif et de ses voisins; « ▦ Panneau » ouvre un aperçu temporaire du panneau.
+
+## Police du site et identité visuelle
+
+- **Police** : Manrope (identité Disjonio, par défaut) ou Inter, hébergées dans `public/fonts/` (licence OFL, `@font-face` dans `mp.css`), ou la police du système. Réglage : **Administration → Site** (stocké dans `app_settings` clé `site`, renvoyé par `GET /api/auth` et appliqué par `public/js/sitefont.js` sur l'application et les pages publiques).
+- **Logo** : `public/branding/disjonio/` (kit d'identité). Le symbole est dans l'en-tête, les icônes PWA/mobiles (`node scripts/icons.mjs`) et le pied de page des PDF (`node scripts/brandmark-png.mjs` régénère `api/_data/brandmark.js`).

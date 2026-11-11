@@ -26,7 +26,8 @@ export default route(['GET','POST'],async(req,res)=>{
   const u=await currentUser(req,sql);
   // ZebraHD : réservé à l'administrateur (courriel de ADMIN_EMAILS).
   const zebra=!!(u&&adminEmails().includes(u.email)&&(process.env.PANELS_API_KEY||process.env.ETIQUETTES_API_KEY||process.env.ZEBRAHD_API_KEY));
-  return res.status(200).json({user:u?publicUser(u):null,features:{mail:mailConfigured(),zebra}});
+  const [st]=await sql`SELECT value FROM app_settings WHERE key='site'`;
+  return res.status(200).json({user:u?publicUser(u):null,features:{mail:mailConfigured(),zebra},site:{font:['manrope','inter','system'].includes(st?.value?.font)?st.value.font:'manrope'}});
  }
  if(!req.headers['x-mp-client'])throw new HttpError(403,'Requête refusée.');
  const data=body(req),ip=clientIp(req);

@@ -179,5 +179,14 @@ export default [
  ["Chaque PDF se termine par : [texte de l’entreprise] · [mention]. La mention par défaut s’applique à tous les documents de tous les comptes. Les modèles sont proposés aux entrepreneurs (forfaits avec personnalisation) dans Mon compte → Documents à l’image de votre entreprise ; ils peuvent aussi écrire leur propre texte.", "Each PDF ends with: [company text] · [notice]. The default notice applies to all documents of all accounts. Templates are offered to contractors (plans with branding) in My account → Documents in your company's look; they can also write their own text."],
  ["Mention par défaut (tous les PDF)", "Default notice (all PDFs)"],
  ["Modèles proposés aux entrepreneurs", "Templates offered to contractors"],
- ["Pieds de page enregistrés.", "Footers saved."]
+ ["Pieds de page enregistrés.", "Footers saved."],
+ ["Site", "Site"],
+ ["Police du site", "Site font"],
+ ["Police", "Font"],
+ ["Manrope — identité Disjonio (recommandée)", "Manrope — Disjonio identity (recommended)"],
+ ["Inter — sobre et très lisible", "Inter — clean and very readable"],
+ ["Police du système — aucun téléchargement", "System font — no download"],
+ ["S’applique à l’application, aux pages publiques et à l’anglais comme au français. Les polices sont hébergées sur le site (licence libre OFL). Les PDF gardent leur police intégrée.", "Applies to the app and public pages, in English and French. Fonts are hosted on the site (open OFL licence). PDFs keep their embedded font."],
+ ["Police enregistrée.", "Font saved."],
+ ["Police invalide.", "Invalid font."],
 ];

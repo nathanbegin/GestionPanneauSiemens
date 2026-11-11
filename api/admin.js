@@ -67,6 +67,7 @@ export default route(['GET','POST'],async(req,res)=>{
     envModel:process.env.OPENAI_MODEL||'',defaults:DEFAULT_MODELS,catalog:AI_CATALOG,details:IMAGE_DETAILS,usage});
   }
   if(action==='pdf')return res.status(200).json(await loadPdfSettings(sql));
+  if(action==='site'){const [st]=await sql`SELECT value FROM app_settings WHERE key='site'`;return res.status(200).json({font:['manrope','inter','system'].includes(st?.value?.font)?st.value.font:'manrope'});}
   if(action==='feedback'){
    const status=text(q.status,20);
    const rows=await sql`SELECT id,user_id,email,name,category,message,page,app_version,client,status,admin_note,created_at,updated_at FROM app_feedback WHERE (${status}='' OR status=${status}) ORDER BY created_at DESC LIMIT 300`;
@@ -77,6 +78,13 @@ export default route(['GET','POST'],async(req,res)=>{
   throw new HttpError(404,'Action inconnue.');
  }
  const d=body(req);
+ if(action==='site'){
+  const font=String(d.font||'');
+  if(!['manrope','inter','system'].includes(font))throw new HttpError(400,'Police invalide.');
+  await sql`INSERT INTO app_settings(key,value,updated_by) VALUES('site',${JSON.stringify({font})}::jsonb,${admin.email}) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now(),updated_by=EXCLUDED.updated_by`;
+  await audit(sql,admin,'site-settings','site',{font});
+  return res.status(200).json({font});
+ }
  if(action==='pdf'){
   const clean=cleanPdfSettings(d);
   await sql`INSERT INTO app_settings(key,value,updated_by) VALUES('pdf',${JSON.stringify(clean)}::jsonb,${admin.email}) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now(),updated_by=EXCLUDED.updated_by`;

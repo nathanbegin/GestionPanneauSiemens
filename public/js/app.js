@@ -3,6 +3,7 @@ import {brandingCard} from './branding.js';
 import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
 import {trashDialog} from './trash.js';
 import {watchIcons} from './icons.js';
+import {applyFont} from './sitefont.js';
 import {handoffDialog,handoffView} from './handoff.js';
 import {net,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
 import {aiImportDialog} from './aiimport.js';
@@ -365,7 +366,7 @@ window.addEventListener('hashchange',async()=>{
 });
 
 async function boot(){
- try{const me=await api('/api/auth');state.user=me.user;state.features=me.features||{};if(me.user&&!net.offline)bindUser(me.user.id);followAccountLang(me.user?.profile);}
+ try{const me=await api('/api/auth');applyFont(me.site?.font);state.user=me.user;state.features=me.features||{};if(me.user&&!net.offline)bindUser(me.user.id);followAccountLang(me.user?.profile);}
  catch(e){if(!state.user&&e.offline){view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:'📡'}),h('h2',{text:'Hors ligne'}),h('p',{text:e.message}),h('button',{type:'button',class:'primary',onclick:()=>location.reload()},'Réessayer'))));return;}}
  lastPath=location.hash.split('/').slice(0,3).join('/');
  handleSsoReturn(); // SSO

@@ -1,8 +1,14 @@
+/* Polices hébergées (SIL OFL) : Manrope (identité Disjonio) et Inter ; le choix se règle dans Administration → Site. */
+@font-face{font-family:Manrope;font-style:normal;font-weight:200 800;font-display:swap;src:url(/fonts/manrope-latin-wght-normal.woff2) format('woff2-variations');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:Inter;font-style:normal;font-weight:100 900;font-display:swap;src:url(/fonts/inter-latin-wght-normal.woff2) format('woff2-variations');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{--font:Manrope,Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+html[data-font=inter]{--font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+html[data-font=system]{--font:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
 /* Disjonio — styles communs (site public + application). */
 :root{--ink:#1A4032;--ink-2:#2c5748;--muted:#66746b;--line:#dde3dc;--paper:#F3F4EF;--card:#fbfcf8;--soft:#e9ede5;--green:#226a51;--lime:#8ABF92;--amber:#b0823a;--danger:#a33e32;--radius:12px;--shadow:0 1px 2px #183c320d,0 8px 24px #183c320f;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.5}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5}
 a{color:var(--green)}
 img,svg{max-width:100%}
 h1,h2,h3{line-height:1.15;letter-spacing:-.02em;margin:0 0 .5em;font-weight:600}

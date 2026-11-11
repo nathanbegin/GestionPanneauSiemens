@@ -3,6 +3,7 @@ import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
 import {sortCircuits,designation,slotOrder,slotPos,stats,siteAddress,panelTitle,tagGroups,formatOf,breakerFormats,CODE_EDITION,calcAssumptions,CALC_LIMITS} from '../../public/model.js';
 import {FAMILIES,serviceCheck} from '../../public/catalog.js';
 import LOGOS from '../_data/logos.js';
+import BRANDMARK from '../_data/brandmark.js';
 import {qrMatrix} from '../../public/qr.js';
 import {translatorFor,localeFor} from './i18n.js';
 // Langue du document en cours de fabrication (un document à la fois par exécution).
@@ -74,6 +75,7 @@ class Doc{
   const d=new Doc();d.tr=translatorFor(lang);LOC=localeFor(lang);globalThis.MP_LOCALE=LOC;title=d.tr(title);d.pdf=await PDFDocument.create();d.size=SIZES[format]||SIZES.letter;
   d.C=brandTheme(brand);d.brand=brand||null;
   if(brand?.logo){try{const l=decodeLogo(brand.logo);if(l){const img=l.type==='png'?await d.pdf.embedPng(l.buf):await d.pdf.embedJpg(l.buf);d.companyLogo={img,w:img.width,h:img.height};}}catch{}}
+  try{d.mark=await d.pdf.embedPng(Buffer.from(BRANDMARK.png,'base64'));}catch{d.mark=null;}
   d.font=await d.pdf.embedFont(StandardFonts.Helvetica);d.bold=await d.pdf.embedFont(StandardFonts.HelveticaBold);
   d.pdf.setTitle(title);d.pdf.setCreator('Disjonio');d.pdf.setProducer('Disjonio');d.pdf.setLanguage(LOC);
   d.cache=new Map();d.images=new Map();return d;
@@ -152,7 +154,10 @@ function footers(d,label){
  if(d.brand?.footer)label=d.brand.footer+'  ·  '+label;
  pages.forEach((p,i)=>{
   p.drawLine({start:{x:M,y:M+8},end:{x:d.W-M,y:M+8},color:d.C.line,thickness:.6});
-  p.drawText(d.fit(label,7,d.W-2*M-80),{x:M,y:M-4,size:7,font:d.font,color:d.C.muted});
+  // Symbole Disjonio en pied de page (identité visuelle), suivi de la mention.
+  const mx=d.mark?15:0;
+  if(d.mark)p.drawImage(d.mark,{x:M,y:M-7,width:11,height:11});
+  p.drawText(d.fit(label,7,d.W-2*M-80-mx),{x:M+mx,y:M-4,size:7,font:d.font,color:d.C.muted});
   const n=`Page ${i+1} / ${pages.length}`;
   p.drawText(n,{x:d.W-M-d.width(n,7),y:M-4,size:7,font:d.font,color:d.C.muted});
  });

@@ -3,7 +3,7 @@ import {h,toast,money,fmtDate,fmtRelative,field,select,dialog,confirmDialog} fro
 import {api} from './api.js';
 
 const STATUS={active:'Actif',trialing:'Essai',past_due:'Paiement en retard',canceled:'Annulé',comp:'Offert',gratuit:'Gratuit'};
-const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['suggestions','Suggestions'],['ia','Intelligence artificielle'],['documents','Documents PDF'],['journal','Journal']];
+const tabs=[['tableau','Tableau de bord'],['abonnes','Abonnés'],['forfaits','Forfaits et prix'],['suggestions','Suggestions'],['ia','Intelligence artificielle'],['documents','Documents PDF'],['site','Site'],['journal','Journal']];
 const centsInput=(name,cents)=>h('input',{name,type:'number',step:'0.01',min:0,value:cents==null?'':(cents/100).toFixed(2),inputmode:'decimal'});
 const toCents=v=>v===''||v==null?null:Math.round(Number(String(v).replace(',','.'))*100);
 
@@ -18,6 +18,7 @@ export async function adminView({ctx,tab='tableau',id}){
  else if(tab==='ia')content=await aiSettings();
  else if(tab==='suggestions')content=await suggestions();
  else if(tab==='documents')content=await pdfSettings();
+ else if(tab==='site')content=await siteSettings();
  else content=await overview();
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Console'}),h('h1',{text:'Administration'}))),nav,content);
 }
@@ -231,6 +232,19 @@ async function suggestions(){
 }
 
 // ---------- Documents PDF : mention par défaut et modèles de pied de page ----------
+async function siteSettings(){
+ const d=await api('/api/admin?action=site');
+ const fonts=[['manrope','Manrope — identité Disjonio (recommandée)'],['inter','Inter — sobre et très lisible'],['system','Police du système — aucun téléchargement']];
+ const sel=select('font',fonts,d.font);
+ const err=h('p',{class:'error',role:'alert'});
+ const sample=h('p',{class:'font-sample',text:'Disjonio — Circuit 13B : Lave-vaisselle, 15 A. 0123456789 àéèêçô'});
+ const preview=()=>{document.documentElement.dataset.font=sel.value;};
+ sel.addEventListener('change',preview);
+ return h('div',{class:'card form-card'},h('h2',{text:'Police du site'}),
+  h('p',{class:'small muted',text:'S’applique à l’application, aux pages publiques et à l’anglais comme au français. Les polices sont hébergées sur le site (licence libre OFL). Les PDF gardent leur police intégrée.'}),
+  field('Police',sel),sample,err,
+  h('div',{class:'form-actions'},h('button',{type:'button',class:'primary',onclick:async()=>{err.textContent='';try{const r=await api('/api/admin?action=site',{method:'POST',body:{font:sel.value}});try{localStorage.setItem('mp_font',r.font);}catch{}toast('Police enregistrée.');}catch(e){err.textContent=e.message;}}},'Enregistrer')));
+}
 async function pdfSettings(){
  const d=await api('/api/admin?action=pdf');
  const legal=h('textarea',{rows:2,maxlength:240,placeholder:'Vide : mention propre à chaque document (ex. « Répertoire indicatif établi à partir d’un relevé visuel… »)'});legal.value=d.legal||'';
