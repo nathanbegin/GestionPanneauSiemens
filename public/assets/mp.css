@@ -987,3 +987,17 @@ dialog.side .f:focus-within .hint{display:block}
  .topbar .crumbs a:last-of-type::before{content:'‹';font-size:30px;line-height:1;color:var(--ink)}
  .topbar .crumbs span{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+/* Mobile : le profil, ses options et la langue passent dans un menu hamburger à gauche (plus de place pour le fil d'Ariane) */
+.burger{display:none}
+.menu .menu-lang{display:none}
+@media (max-width:720px){
+ .topbar .user-menu{order:-2}
+ .topbar .brand{order:-1}
+ .topbar .user-menu>button{padding:0;border:0;background:none;min-width:44px;min-height:44px;justify-content:center}
+ .topbar .user-menu .avatar,.topbar .user-menu .uname{display:none}
+ .topbar .user-menu .burger{display:inline-flex;position:relative;color:var(--ink)}
+ .burger.has-badge::after{content:'';position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:#d6473a;border:2px solid #fff}
+ .topbar .user-menu .menu{left:0;right:auto;min-width:min(300px,88vw)}
+ .menu .menu-lang{display:flex}
+ .topbar .user-menu ~ .lang-switch{display:none}
+}

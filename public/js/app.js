@@ -2,7 +2,7 @@
 import {brandingCard} from './branding.js';
 import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
 import {trashDialog} from './trash.js';
-import {watchIcons} from './icons.js';
+import {watchIcons,icon} from './icons.js';
 import {applyFont} from './sitefont.js';
 import {handoffDialog,handoffView} from './handoff.js';
 import {net,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
@@ -35,6 +35,11 @@ const publicRoutes=['connexion','inscription','mot-de-passe-oublie','reinitialis
 let renderToken=0;
 
 // ---------- Barre supérieure ----------
+async function switchLang(){
+ const next=lang==='en'?'fr':'en';
+ if(state.user){try{await api('/api/account',{method:'PUT',body:{name:state.user.name,profile:{...(state.user.profile||{}),lang:next}}});}catch{}}
+ setLang(next);
+}
 function crumbs(items){
  const nav=h('nav',{class:'crumbs','aria-label':'Fil d’Ariane'});
  items.forEach(([label,href],i)=>{if(i)nav.append(h('i',{'aria-hidden':'true',text:'›'}));nav.append(href&&i<items.length-1?h('a',{href,text:label}):h('span',{text:label,'aria-current':i===items.length-1?'page':null}));});
@@ -54,14 +59,15 @@ function crumbs(items){
    h('a',{href:webUrl('/fonctionnement'),role:'menuitem',target:NATIVE?'_blank':null},'❓ Fonctionnement'),
    h('button',{type:'button',role:'menuitem',onclick:()=>feedbackDialog()},'💡 Suggérer une amélioration'),
    h('hr'),
+   h('button',{type:'button','data-i18n-skip':'',role:'menuitem',class:'menu-lang',onclick:switchLang},lang==='en'?'Français':'English'),
    h('button',{type:'button',role:'menuitem',onclick:logout},'↩ Se déconnecter'));
-  const btn=h('button',{type:'button',class:'ghost','aria-haspopup':'menu','aria-expanded':'false'},h('span',{class:'avatar'+(state.inbox>0?' has-badge':''),title:state.inbox>0?`${state.inbox} invitation(s) en attente`:null,text:(state.user.name||'?').trim().charAt(0).toUpperCase()}),h('span',{class:'uname',text:state.user.name.split(' ')[0]}));
+  const btn=h('button',{type:'button',class:'ghost','aria-haspopup':'menu','aria-expanded':'false'},h('span',{class:'avatar'+(state.inbox>0?' has-badge':''),title:state.inbox>0?`${state.inbox} invitation(s) en attente`:null,text:(state.user.name||'?').trim().charAt(0).toUpperCase()}),h('span',{class:'uname',text:state.user.name.split(' ')[0]}),h('span',{class:'burger'+(state.inbox>0?' has-badge':'')},icon('menu',26)));
   btn.onclick=e=>{e.stopPropagation();const open=menu.classList.toggle('open');btn.setAttribute('aria-expanded',String(open));};
   parts.push(h('div',{class:'user-menu'},btn,menu));
  }else if(state.demo)parts.push(h('a',{class:'btn primary sm',href:'#/inscription',onclick:leaveDemo},'Créer mon compte gratuit'));
  else parts.push(h('a',{class:'btn sm',href:webUrl('/fonctionnement'),target:NATIVE?'_blank':null},'Fonctionnement'));
  // Langue : FR / EN (le bouton montre la langue vers laquelle on bascule).
- parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:async()=>{const next=lang==='en'?'fr':'en';if(state.user){try{await api('/api/account',{method:'PUT',body:{name:state.user.name,profile:{...(state.user.profile||{}),lang:next}}});}catch{}}setLang(next);}},lang==='en'?'FR':'EN'));
+ parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:switchLang},lang==='en'?'FR':'EN'));
  // Navigation de travail des professionnels, dans l'en-tête, juste après le logo : Sites · Comparer · Équipe.
  document.getElementById('worknav')?.remove();
  if(state.user&&isPro&&!state.demo){

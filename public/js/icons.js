@@ -17,7 +17,7 @@ const P={
  clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',check:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12l3 3 5-6',
  pencil:'M4 20l1-5L16 4l4 4L9 19zM14 6l4 4',printer:'M7 9V3h10v6M6 17H4v-6h16v6h-2M7 14h10v7H7z',
  handshake:'M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z',film:'M4 5h16v14H4zM8 5v14M16 5v14M4 9h4M16 9h4M4 15h4M16 15h4',
- compass:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM16 8l-2.5 5.5L8 16l2.5-5.5z',checksq:'M4 4h16v16H4zM8 12l3 3 5-6',more:'M5 12h.01M12 12h.01M19 12h.01',
+ compass:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM16 8l-2.5 5.5L8 16l2.5-5.5z',checksq:'M4 4h16v16H4zM8 12l3 3 5-6',more:'M5 12h.01M12 12h.01M19 12h.01',menu:'M4 6h16M4 12h16M4 18h16',
 };
 const MAP={'🏠':'house','👤':'user','🔄':'refresh','⇄':'swap','⭐':'star','👥':'users','🛠':'gear','⚙':'gear','❓':'help','💡':'bulb','↩':'logout','📷':'camera','📄':'file','▦':'grid','☷':'list','⚡':'zap','🔌':'plug','🧮':'calc','📥':'download','📡':'offline','🗑':'trash','🕘':'clock','✅':'check','✏️':'pencil','✏':'pencil','🖨':'printer','🤝':'handshake','🎬':'film','🧭':'compass','☑':'checksq','⋯':'more'};
 const KEYS=Object.keys(MAP).sort((a,b)=>b.length-a.length);
