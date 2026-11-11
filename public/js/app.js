@@ -48,6 +48,7 @@ function crumbs(items){
  const isPro=state.user?.profile?.accountType==='pro';
  if(state.user&&!state.demo){
   const menu=h('div',{class:'menu',role:'menu'},
+   h('a',{href:'#/sites',class:'menu-brand','aria-label':'Disjonio — accueil'},h('img',{src:'/branding/disjonio/svg/outlined/disjonio-horizontal-no-tagline-on-light.svg',alt:'Disjonio',width:160,height:33})),
    h('div',{class:'who'},h('b',{text:state.user.name}),state.user.email),
    h('a',{href:'#/sites',role:'menuitem'},'🏠 Mes sites'),
    h('a',{href:'#/compte',role:'menuitem'},'👤 Mon compte'),
@@ -75,6 +76,7 @@ function crumbs(items){
   const link=(href,label,on)=>h('a',{href,class:on?'on':'','aria-current':on?'page':null,text:label});
   parts.splice(1,0,h('nav',{id:'worknav',class:'worknav','aria-label':'Navigation de travail'},link('#/sites','Sites',['sites','panneaux'].includes(cur)),link('#/comparer','Comparer',cur==='comparer'),link('#/equipe','Équipe',cur==='equipe')));
  }
+ topbar.classList.toggle('has-menu',!!(state.user&&!state.demo));
  topbar.replaceChildren(...parts);
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Disjonio';
  syncChrome();

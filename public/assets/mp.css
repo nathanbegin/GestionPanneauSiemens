@@ -1001,3 +1001,10 @@ dialog.side .f:focus-within .hint{display:block}
  .menu .menu-lang{display:flex}
  .topbar .user-menu ~ .lang-switch{display:none}
 }
+/* Mobile connecté : le logo passe dans le menu (la barre garde hamburger + fil d'Ariane) */
+.menu .menu-brand{display:none}
+@media (max-width:720px){
+ #topbar.has-menu .brand{display:none}
+ .menu .menu-brand{display:flex;align-items:center;padding:12px 14px 6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+ .menu .menu-brand img{height:34px;width:auto}
+}
