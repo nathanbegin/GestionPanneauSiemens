@@ -1,6 +1,6 @@
 {
- "name": "Mon Panneau — répertoire électrique",
- "short_name": "Mon Panneau",
+ "name": "Disjonio — répertoire électrique",
+ "short_name": "Disjonio",
  "description": "Nomenclature de vos panneaux électriques : sites, panneaux, circuits, rapports PDF et étiquettes.",
  "lang": "fr-CA",
  "start_url": "/app#/sites",

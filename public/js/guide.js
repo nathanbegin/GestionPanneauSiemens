@@ -27,6 +27,6 @@ document.getElementById('g-body').replaceChildren(
    h('tr',{},h('td',{},h('b',{text:'Total'})),h('td',{class:'small',text:`${ex.totalW} W ÷ 240 V`}),h('td',{},h('b',{text:`${ex.amps} A`})))))),
  h('p',{text:`Résultat : ${ex.amps} A. Minimum du Code pour cette superficie : ${ex.minService} A. Entrée recommandée : ${ex.recommended} A (200 A pour garder une marge).`}),
  h('p',{class:'small muted',text:'Le réfrigérateur et le lave-vaisselle (1500 W ou moins) ne sont pas additionnés : ils sont couverts par la charge de base. La thermopompe (climatisation) n’est pas comptée, car le chauffage est plus élevé.'}),
- h('div',{class:'cta-band mt'},h('div',{},h('h2',{text:'Faites le calcul de votre panneau'}),h('p',{text:'L’onglet « Planification et charges » applique ces étapes automatiquement et génère une note de calcul PDF.'})),h('a',{class:'btn lg',href:'/app#/sites'},'Ouvrir Mon Panneau')),
+ h('div',{class:'cta-band mt'},h('div',{},h('h2',{text:'Faites le calcul de votre panneau'}),h('p',{text:'L’onglet « Planification et charges » applique ces étapes automatiquement et génère une note de calcul PDF.'})),h('a',{class:'btn lg',href:'/app#/sites'},'Ouvrir Disjonio')),
  h('p',{class:'notice mt',text:'⚠️ '+GUIDE_DISCLAIMER}),
  h('details',{class:'faq'},h('summary',{text:'Références'}),h('ul',{},GUIDE_REFS.map(r=>h('li',{text:r})))));

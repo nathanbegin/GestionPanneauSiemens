@@ -32,7 +32,7 @@ export async function openDocument(params){
  // Sur le web, ouvrir l'onglet tout de suite évite le blocage des fenêtres surgissantes.
  const win=NATIVE?null:window.open('','_blank');
  try{
-  try{if(win){win.document.title='Mon Panneau';win.document.body.textContent='Préparation du document…';}}catch{}
+  try{if(win){win.document.title='Disjonio';win.document.body.textContent='Préparation du document…';}}catch{}
   const {url}=await api('/api/report',{method:'POST',body:{lang:globalThis.MP_LANG==='en'?'en':'fr',...params}});
   const full=url.startsWith('http')?url:API_BASE+url;
   const browser=window.Capacitor?.Plugins?.Browser;

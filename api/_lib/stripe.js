@@ -74,8 +74,8 @@ export async function ensureCustomer(sql,user){
 export async function syncPlanPrices(sql,plan){
  if(!stripeConfigured()||!(plan.price_month>0||plan.price_year>0))return plan;
  let product=plan.stripe_product;
- if(!product){product=(await stripe('POST','/products',{name:'Mon Panneau — '+plan.name,metadata:{plan_id:plan.id}})).id;}
- else await stripe('POST','/products/'+product,{name:'Mon Panneau — '+plan.name});
+ if(!product){product=(await stripe('POST','/products',{name:'Disjonio — '+plan.name,metadata:{plan_id:plan.id}})).id;}
+ else await stripe('POST','/products/'+product,{name:'Disjonio — '+plan.name});
  const updates={product,month:plan.stripe_price_month,year:plan.stripe_price_year};
  for(const [interval,amount,current] of [['month',plan.price_month,plan.stripe_price_month],['year',plan.price_year,plan.stripe_price_year]]){
   if(!(amount>0)){updates[interval]=null;continue;}
@@ -88,7 +88,7 @@ export async function syncPlanPrices(sql,plan){
 export async function syncPackPrice(sql,pack){
  if(!stripeConfigured())return pack;
  if(pack.stripe_price){const p=await stripe('GET','/prices/'+pack.stripe_price);if(p.unit_amount===pack.price&&p.active)return pack;await stripe('POST','/prices/'+pack.stripe_price,{active:false});}
- const price=await stripe('POST','/prices',{currency:'cad',unit_amount:pack.price,tax_behavior:'exclusive',product_data:{name:'Mon Panneau — '+pack.name,metadata:{pack_id:pack.id}},metadata:{pack_id:pack.id}});
+ const price=await stripe('POST','/prices',{currency:'cad',unit_amount:pack.price,tax_behavior:'exclusive',product_data:{name:'Disjonio — '+pack.name,metadata:{pack_id:pack.id}},metadata:{pack_id:pack.id}});
  const [row]=await sql`UPDATE app_packs SET stripe_price=${price.id} WHERE id=${pack.id} RETURNING *`;
  return row;
 }

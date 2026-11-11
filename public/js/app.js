@@ -1,4 +1,4 @@
-// Application Mon Panneau : routeur, authentification, sites, compte.
+// Application Disjonio : routeur, authentification, sites, compte.
 import {brandingCard} from './branding.js';
 import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
 import {aiImportDialog} from './aiimport.js';
@@ -26,7 +26,7 @@ let renderToken=0;
 function crumbs(items){
  const nav=h('nav',{class:'crumbs','aria-label':'Fil d’Ariane'});
  items.forEach(([label,href],i)=>{if(i)nav.append(h('i',{'aria-hidden':'true',text:'›'}));nav.append(href&&i<items.length-1?h('a',{href,text:label}):h('span',{text:label,'aria-current':i===items.length-1?'page':null}));});
- const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Mon Panneau — accueil'},h('span',{class:'brand-icon','aria-hidden':'true',text:'ϟ'}),h('span',{text:'MON PANNEAU'}));
+ const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Disjonio — accueil'},h('span',{class:'brand-icon','aria-hidden':'true',text:'ϟ'}),h('span',{text:'DISJONIO'}));
  const parts=[brand,nav];
  if(state.user){
   const menu=h('div',{class:'menu',role:'menu'},
@@ -49,7 +49,7 @@ function crumbs(items){
  // Langue : FR / EN (le bouton montre la langue vers laquelle on bascule).
  parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:async()=>{const next=lang==='en'?'fr':'en';if(state.user){try{await api('/api/account',{method:'PUT',body:{name:state.user.name,profile:{...(state.user.profile||{}),lang:next}}});}catch{}}setLang(next);}},lang==='en'?'FR':'EN'));
  topbar.replaceChildren(...parts);
- document.title=(items.at(-1)?.[0]||'Mon espace')+' · Mon Panneau';
+ document.title=(items.at(-1)?.[0]||'Mon espace')+' · Disjonio';
 }
 document.addEventListener('click',()=>document.querySelectorAll('.menu.open').forEach(m=>{m.classList.remove('open');m.previousElementSibling?.setAttribute('aria-expanded','false');}));
 const ctx={crumbs,get features(){return state.features;},get user(){return state.user;}};
@@ -63,7 +63,7 @@ handleAuthLost(()=>{state.user=null;setToken('');if(!publicRoutes.includes(locat
 // ---------- Authentification ----------
 function authCard(title,sub,form,alt){
  crumbs([[title]]);
- return h('div',{class:'container auth-wrap'},h('div',{class:'card auth-card'},h('div',{class:'eyebrow',text:'Mon Panneau'}),h('h1',{text:title}),sub&&h('p',{class:'muted',text:sub}),form,alt&&h('p',{class:'alt'},alt)));
+ return h('div',{class:'container auth-wrap'},h('div',{class:'card auth-card'},h('div',{class:'eyebrow',text:'Disjonio'}),h('h1',{text:title}),sub&&h('p',{class:'muted',text:sub}),form,alt&&h('p',{class:'alt'},alt)));
 }
 function authForm(fields,submitLabel,onSubmit){
  const e=h('p',{class:'error',role:'alert'});
@@ -242,7 +242,7 @@ function accountView(){
 
  const ssoSlot=h('div'); ssoCard().then(c=>c&&ssoSlot.replaceChildren(c)); // SSO
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Paramètres'}),h('h1',{text:'Mon compte'}))),
-  h('div',{class:'stack'},updateCard(),profile,ssoSlot,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Mon Panneau v${APP_VERSION}`})));
+  h('div',{class:'stack'},updateCard(),profile,ssoSlot,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Disjonio v${APP_VERSION}`})));
 }
 
 // ---------- Routeur ----------

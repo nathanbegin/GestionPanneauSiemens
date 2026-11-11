@@ -112,7 +112,7 @@ export async function panelView({id,tab='panel',ctx}){
   const save=(blob,name)=>{const a=h('a',{href:URL.createObjectURL(blob),download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);};
   const fname='qr-'+(panel.tag||panel.name).normalize('NFD').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'');
   const png=()=>{const m=qrMatrix(url),n=m.length,s=12,q=4,W=(n+2*q)*s,cv=document.createElement('canvas');cv.width=cv.height=W;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,W);g.fillStyle='#000';for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])g.fillRect((c+q)*s,(r+q)*s,s,s);cv.toBlob(b=>b&&save(b,fname+'.png'));};
-  const print=()=>{const box=h('div',{id:'qrPrint'},h('h2',{text:panelTitle(panel)}),node.cloneNode(true),h('p',{text:'Scannez pour ouvrir ce panneau dans Mon Panneau (connexion requise).'}),h('p',{class:'small',text:url}));document.body.append(box);window.print();setTimeout(()=>box.remove(),500);};
+  const print=()=>{const box=h('div',{id:'qrPrint'},h('h2',{text:panelTitle(panel)}),node.cloneNode(true),h('p',{text:'Scannez pour ouvrir ce panneau dans Disjonio (connexion requise).'}),h('p',{class:'small',text:url}));document.body.append(box);window.print();setTimeout(()=>box.remove(),500);};
   const copy=async()=>{try{await navigator.clipboard.writeText(url);toast('Lien copié.');}catch{toast(url,8000);}};
   dialog({title:'Code QR · '+panelTitle(panel),eyebrow:'Ouvre ce panneau dans l’application',body:[h('div',{class:'qr-box'},node),h('p',{class:'small muted',text:'Collez-le sur la porte du panneau. Le lien ouvre ce panneau seulement pour les personnes connectées à un compte qui y a accès (vous, votre équipe, ou les personnes avec qui il est partagé).'}),h('input',{class:'qr-url',readOnly:true,value:url,'aria-label':'Lien du code QR',onfocus:e=>e.target.select()}),h('div',{class:'page-actions'},h('button',{type:'button',onclick:copy},'Copier le lien'),h('button',{type:'button',onclick:()=>save(new Blob([svgText],{type:'image/svg+xml'}),fname+'.svg')},'Télécharger SVG'),h('button',{type:'button',onclick:png},'Télécharger PNG'),h('button',{type:'button',class:'primary',onclick:print},'Imprimer'))],actions:[{label:'Fermer',kind:'ghost'}]});
  }
@@ -309,7 +309,7 @@ export async function panelView({id,tab='panel',ctx}){
   catch(e){win?.close();toast(e.message);}
  }
  function exportJson(){
-  const data={schema:3,app:'Mon Panneau',exportedAt:new Date().toISOString(),panel:panel.name,tag:panel.tag,kind:panel.kind,location:panel.location,positions:panel.positions,details:panel.details,site:{name:site.name,address:siteAddress(site)},circuits:panel.circuits};
+  const data={schema:3,app:'Disjonio',exportedAt:new Date().toISOString(),panel:panel.name,tag:panel.tag,kind:panel.kind,location:panel.location,positions:panel.positions,details:panel.details,site:{name:site.name,address:siteAddress(site)},circuits:panel.circuits};
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
   const a=h('a',{href:url,download:`${(panel.tag||panel.name).replace(/[^\p{L}\p{N}-]+/gu,'-')}.json`});document.body.append(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),2000);

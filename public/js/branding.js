@@ -61,7 +61,7 @@ export function brandingCard(){
   for(const el of [primary,accent,tableHead])el.addEventListener('input',refresh);
   const form=h('form',{class:'',novalidate:true},
    h('fieldset',{class:'form-section'},h('legend',{text:'Documents à l’image de votre entreprise'}),
-    h('p',{class:'small muted',text:'Votre logo et vos couleurs remplacent l’en-tête Mon Panneau sur tous les PDF. Le logo du fabricant du panneau reste affiché à droite.'}),
+    h('p',{class:'small muted',text:'Votre logo et vos couleurs remplacent l’en-tête Disjonio sur tous les PDF. Le logo du fabricant du panneau reste affiché à droite.'}),
     preview,
     h('div',{class:'fields'},
      h('div',{class:'f'},h('span',{},'Logo'),h('div',{class:'page-actions'},h('label',{class:'btn',for:'brandLogo'},'Choisir une image…'),file,removeBtn),h('span',{class:'hint',text:'PNG avec fond transparent idéalement. Redimensionné automatiquement.'})),

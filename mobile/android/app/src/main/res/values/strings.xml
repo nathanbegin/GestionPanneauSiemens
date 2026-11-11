@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Mon Panneau</string>
-    <string name="title_activity_main">Mon Panneau</string>
+    <string name="app_name">Disjonio</string>
+    <string name="title_activity_main">Disjonio</string>
     <string name="package_name">xyz.nathanbegin.monpanneau</string>
     <string name="custom_url_scheme">xyz.nathanbegin.monpanneau</string>
 </resources>

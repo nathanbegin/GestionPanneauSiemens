@@ -70,12 +70,12 @@ export function decodeLogo(dataUrl){
 }
 
 class Doc{
- static async create(format='letter',title='Mon Panneau',brand=null,lang='fr'){
+ static async create(format='letter',title='Disjonio',brand=null,lang='fr'){
   const d=new Doc();d.tr=translatorFor(lang);LOC=localeFor(lang);globalThis.MP_LOCALE=LOC;title=d.tr(title);d.pdf=await PDFDocument.create();d.size=SIZES[format]||SIZES.letter;
   d.C=brandTheme(brand);d.brand=brand||null;
   if(brand?.logo){try{const l=decodeLogo(brand.logo);if(l){const img=l.type==='png'?await d.pdf.embedPng(l.buf):await d.pdf.embedJpg(l.buf);d.companyLogo={img,w:img.width,h:img.height};}}catch{}}
   d.font=await d.pdf.embedFont(StandardFonts.Helvetica);d.bold=await d.pdf.embedFont(StandardFonts.HelveticaBold);
-  d.pdf.setTitle(title);d.pdf.setCreator('Mon Panneau');d.pdf.setProducer('Mon Panneau');d.pdf.setLanguage(LOC);
+  d.pdf.setTitle(title);d.pdf.setCreator('Disjonio');d.pdf.setProducer('Disjonio');d.pdf.setLanguage(LOC);
   d.cache=new Map();d.images=new Map();return d;
  }
  // Remplace les caractères absents de l'encodage WinAnsi des polices standard.
@@ -359,7 +359,7 @@ function panelInfoRows(panel,site,fedFromLabel){
 
 async function panelPages(d,{panel,site,fedFromLabel,user,kind,generatedAt,version}){
  d.page();
- await header(d,{overline:kind==='door'?'AIDE-MÉMOIRE DU PANNEAU ÉLECTRIQUE':'RAPPORT DE PANNEAU ÉLECTRIQUE',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:panelLogos(panel.details),model:panelModelLine(panel)});
+ await header(d,{overline:kind==='door'?'AIDE-MÉMOIRE DU PANNEAU ÉLECTRIQUE':'RAPPORT DE PANNEAU ÉLECTRIQUE',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Disjonio v'+version],logos:panelLogos(panel.details),model:panelModelLine(panel)});
  if(kind==='door'){
   const det=panel.details||{};
   const info=[siteAddress(site),det.mainAmps&&'Principal '+det.mainAmps+' A',det.voltage,fedFromLabel&&'Alimenté par '+fedFromLabel+(det.fedFromCircuit?' (circuit '+det.fedFromCircuit+')':'')].filter(Boolean).join('  ·  ');
@@ -394,7 +394,7 @@ export async function buildReport({kind='report',format='letter',user,site,panel
  const d=await Doc.create(format,(kind==='door'?'Aide-mémoire — ':'Rapport — ')+(panels.length===1?panelTitle(panels[0].panel):site.name),brand,lang);
  if(panels.length>1&&kind==='report'){
   d.page();
-  await header(d,{overline:'RAPPORT DES PANNEAUX ÉLECTRIQUES',title:site.name,subtitle:siteAddress(site),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:[...new Set(panels.flatMap(x=>panelLogos(x.panel.details)))].slice(0,3)});
+  await header(d,{overline:'RAPPORT DES PANNEAUX ÉLECTRIQUES',title:site.name,subtitle:siteAddress(site),right:[fmtDate(generatedAt),'Disjonio v'+version],logos:[...new Set(panels.flatMap(x=>panelLogos(x.panel.details)))].slice(0,3)});
   infoGrid(d,[['Site',site.name],['Client',site.client],['Adresse',siteAddress(site)],['Panneaux',String(panels.length)]]);
   preparedBlock(d,user,generatedAt);
   sectionTitle(d,'Panneaux du site','Hiérarchie d’alimentation et avancement de l’identification.');
@@ -412,7 +412,7 @@ export async function buildReport({kind='report',format='letter',user,site,panel
   if(site.notes){d.y-=10;sectionTitle(d,'Notes sur le site');d.wrap(site.notes,8.5,d.W-2*M).forEach(l=>{d.ensure(12);d.text(l,M,d.y,{size:8.5});d.y-=11;});}
  }
  for(const p of panels)await panelPages(d,{...p,site,user,kind,generatedAt,version});
- footers(d,'Mon Panneau · Répertoire indicatif établi à partir d’un relevé visuel — ne remplace pas une inspection par un maître électricien.');
+ footers(d,'Disjonio · Répertoire indicatif établi à partir d’un relevé visuel — ne remplace pas une inspection par un maître électricien.');
  return d.pdf.save();
 }
 
@@ -474,7 +474,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  const d=await Doc.create('letter','Bilan de charges — '+panelTitle(panel),brand,lang);
  const kw=w=>(w/1000).toLocaleString(LOC,{maximumFractionDigits:2})+' kW';
  d.page();
- await header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version,(panel.details?.state||'Existant').toUpperCase()],logos:panelLogos(panel.details),model:panelModelLine(panel)});
+ await header(d,{overline:'BILAN DE CHARGES ET LISTE DE MATÉRIEL',title:panelTitle(panel),subtitle:[panel.location,site.name].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Disjonio v'+version,(panel.details?.state||'Existant').toUpperCase()],logos:panelLogos(panel.details),model:panelModelLine(panel)});
  infoGrid(d,[['Site',site.name],['Adresse',siteAddress(site)],['Modèle',rep.model?rep.model.id+' — '+rep.model.label:[panel.details?.brand,panel.details?.model].filter(Boolean).join(' ')],['Principal',rep.mainAmps?rep.mainAmps+' A':'—'],['Alimenté par',fedFromLabel||'Entrée électrique'],['Superficie habitable',panel.details?.livingArea?panel.details.livingArea+' m²':'—'],...(serviceLine(panel.details||{})?[['Conducteurs d’entrée',serviceLine(panel.details)]]:[])]);
  preparedBlock(d,user,generatedAt);
  // Synthèse.
@@ -527,7 +527,7 @@ export async function buildLoads({user,site,panel,fedFromLabel,children=[],gener
  d.text('Hypothèses et sources',M,d.y,{size:9,f:d.bold});d.y-=12;
  for(const t of ['Charges : valeurs saisies ou valeurs typiques de la bibliothèque. La plaque signalétique de chaque appareil a préséance.','Phases : les rangées alternent L1 / L2 (positions 1-2 sur L1, 3-4 sur L2, etc.).','Dimensionnement d’un circuit : charge continue × 1,25 (disjoncteur ≥ 125 %) ; charge non continue jusqu’à 100 % ; cuisinière : 8 000 W + 40 % de l’excédent de 12 kW (règle 8-300). Entrée de la maison : règle 8-200 (cuisinière à 6 000 W + 40 %, autres appareils selon leurs facteurs de demande).','Calcul simplifié inspiré du Code canadien de l’électricité (règles 8-104, 8-106, 8-200, section 86) et du Code de construction du Québec, chapitre V. Ne remplace pas l’analyse d’un maître électricien.',...LOADS_SOURCES.map(s=>'Source : '+s)])for(const l of d.wrap('• '+t,7.5,d.W-2*M)){d.ensure(10);d.text(l,M,d.y,{size:7.5,color:d.C.muted});d.y-=9.5;}
  signature(d,user);
- footers(d,'Mon Panneau · Bilan de charges indicatif — la conformité de l’installation relève d’un maître électricien.');
+ footers(d,'Disjonio · Bilan de charges indicatif — la conformité de l’installation relève d’un maître électricien.');
  return d.pdf.save();
 }
 
@@ -542,7 +542,7 @@ export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],ge
  const kw=w=>(w/1000).toLocaleString(LOC,{maximumFractionDigits:2})+' kW';
  const para=(t,{size=8.6,color=d.C.ink,f=d.font,indent=0}={})=>{for(const l of d.wrap(t,size,d.W-2*M-indent,f)){d.ensure(size+3);d.text(l,M+indent,d.y,{size,color,f});d.y-=size+2.6;}};
  d.page();
- await header(d,{overline:'NOTE DE CALCUL — CHARGE DU LOGEMENT',title:panelTitle(panel),subtitle:[site.name,siteAddress(site)].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Mon Panneau v'+version],logos:panelLogos(det),model:panelModelLine(panel)});
+ await header(d,{overline:'NOTE DE CALCUL — CHARGE DU LOGEMENT',title:panelTitle(panel),subtitle:[site.name,siteAddress(site)].filter(Boolean).join(' · '),right:[fmtDate(generatedAt),'Disjonio v'+version],logos:panelLogos(det),model:panelModelLine(panel)});
  infoGrid(d,[['Site',site.name+(site.client?' — '+site.client:'')],['Adresse',siteAddress(site)],['Panneau',`${panelTitle(panel)} (${panel.kind})`],['Disjoncteur principal installé',det.mainAmps?det.mainAmps+' A':'—'],
   ['Superficie hors sol',det.livingArea?det.livingArea+' m²':'—'],['Superficie du sous-sol',det.basementArea?det.basementArea+' m² (compte à 75 %)':'—'],['Superficie habitable retenue',calc.area?calc.area+' m²':'—'],['Sous-panneaux inclus',children.length?children.map(c=>c.tag||c.name).join(', '):'Aucun'],['Conducteurs d’entrée',serviceLine(det)||'Non précisés']]);
  preparedBlock(d,user,generatedAt);
@@ -590,6 +590,6 @@ export async function buildCalcNote({user,site,panel,fedFromLabel,children=[],ge
  for(const r of G.GUIDE_REFS)para('• '+r,{size:7.6,color:d.C.muted});
  para(G.GUIDE_DISCLAIMER,{size:7.8,f:d.bold});
  signature(d,user);
- footers(d,'Mon Panneau · Note de calcul indicative — à valider par un maître électricien selon l’édition du Code en vigueur.');
+ footers(d,'Disjonio · Note de calcul indicative — à valider par un maître électricien selon l’édition du Code en vigueur.');
  return d.pdf.save();
 }

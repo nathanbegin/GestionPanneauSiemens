@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Application iOS et Android de Mon Panneau (Capacitor) : réutilise l'interface web de ../public.",
+  "description": "Application iOS et Android de Disjonio (Capacitor) : réutilise l'interface web de ../public.",
   "scripts": {
     "build": "node build.mjs",
     "sync": "node build.mjs && cap sync",

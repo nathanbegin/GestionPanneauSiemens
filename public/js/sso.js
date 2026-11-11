@@ -53,7 +53,7 @@ export async function ssoCard(){
 
 // Message au retour du fournisseur (?sso=… ou ?sso_error=…), puis nettoyage de l'adresse.
 const ERRORS={unavailable:'Cette connexion n’est pas activée.',denied:'Connexion annulée.',state:'La connexion a expiré. Réessayez.',session:'Session expirée. Connectez-vous d’abord.',
- taken:'Ce compte externe est déjà lié à un autre compte Mon Panneau.',no_email:'Le fournisseur n’a pas communiqué de courriel.',
+ taken:'Ce compte externe est déjà lié à un autre compte Disjonio.',no_email:'Le fournisseur n’a pas communiqué de courriel.',
  unverified_exists:'Un compte existe déjà avec ce courriel. Connectez-vous avec votre mot de passe, puis ajoutez la connexion dans « Mon compte ».',
  unverified:'Le fournisseur n’a pas confirmé votre courriel.',rate:'Trop de tentatives. Patientez quelques minutes.',failed:'La connexion externe a échoué. Réessayez.'};
 export function handleSsoReturn(){

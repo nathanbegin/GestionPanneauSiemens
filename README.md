@@ -1,4 +1,4 @@
-# Mon Panneau — v2.2.0
+# Disjonio — v2.2.0
 
 Application grand public (et pro) pour faire la **nomenclature des panneaux électriques** : comptes utilisateurs, plusieurs sites (adresses), plusieurs panneaux par site, fiche de chaque disjoncteur, rapports PDF professionnels, étiquettes, et applications iOS / Android.
 

@@ -30,7 +30,7 @@ test('dictionnaire cohérent',()=>{
   const n=fr.split('{}').length-1,ph=[...en.matchAll(/\{(\d*)\}/g)].map(m=>m[1]);
   assert.ok(ph.every(p=>p===''?true:Number(p)>=1&&Number(p)<=n),'marqueur invalide : '+fr+' → '+en);
   if(n&&ph.every(p=>p===''))assert.equal(ph.length,n,'nombre de {} différent : '+fr);
-  assert.ok(!/[àâçéèêëîïôûùü]{1}.*\b(le|la|les|des|pour|avec)\b/.test(en)||/Mon Panneau|Hydro|Québec/.test(en),'traduction encore en français ? '+en);
+  assert.ok(!/[àâçéèêëîïôûùü]{1}.*\b(le|la|les|des|pour|avec)\b/.test(en)||/Disjonio|Hydro|Québec/.test(en),'traduction encore en français ? '+en);
  }
 });
 

@@ -1,6 +1,6 @@
 {
   "appId": "xyz.nathanbegin.monpanneau",
-  "appName": "Mon Panneau",
+  "appName": "Disjonio",
   "webDir": "www",
   "server": {
     "androidScheme": "https"

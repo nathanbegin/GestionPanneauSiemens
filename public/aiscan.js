@@ -1,4 +1,4 @@
-// Conversion d'une lecture par IA (photo ou fichier récapitulatif) en panneau Mon Panneau.
+// Conversion d'une lecture par IA (photo ou fichier récapitulatif) en panneau Disjonio.
 // Partagé navigateur / serveur : le serveur produit la proposition, le navigateur la construit
 // pas à pas et la fait confirmer avant la création.
 import {blank,reshape,validate,ampsList,protections,voltages,MIN_POSITIONS,MAX_POSITIONS,sortCircuits,slotPos,nextSlot,isLinkedPair,groupCircuits,suggestLinks} from './model.js';

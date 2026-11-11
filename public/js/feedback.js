@@ -18,7 +18,7 @@ export function feedbackDialog(){
  const err=h('p',{class:'error',role:'alert'});
  const platform=window.Capacitor?.getPlatform?.();
  const d=dialog({title:'Suggérer une amélioration',eyebrow:'Votre avis compte',form:true,
-  body:[h('p',{class:'muted',text:'Votre message est transmis directement à l’équipe de Mon Panneau. Merci de nous aider à améliorer l’application !'}),
+  body:[h('p',{class:'muted',text:'Votre message est transmis directement à l’équipe de Disjonio. Merci de nous aider à améliorer l’application !'}),
    h('div',{class:'f'},h('span',{},'Type de message'),chips,hint),
    h('label',{class:'f full'},h('span',{},'Votre message'),message,count),
    h('p',{class:'small muted',text:`Page jointe automatiquement : ${page} · version ${APP_VERSION}`}),err],

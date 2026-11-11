@@ -1,4 +1,4 @@
-/* Mon Panneau — styles communs (site public + application). */
+/* Disjonio — styles communs (site public + application). */
 :root{--ink:#183c32;--ink-2:#2c5748;--muted:#66746b;--line:#dde3dc;--paper:#f5f6f1;--card:#fbfcf8;--soft:#e9ede5;--green:#226a51;--lime:#e3f7a9;--amber:#b0823a;--danger:#a33e32;--radius:12px;--shadow:0 1px 2px #183c320d,0 8px 24px #183c320f;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}

@@ -1,6 +1,6 @@
 {
   "name": "gestion-panneau-siemens",
-  "version": "2.28.2",
+  "version": "2.29.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,5 +19,5 @@
   "devDependencies": {
     "pg": "^8.23.1"
   },
-  "description": "Mon Panneau — nomenclature de panneaux électriques (web, iOS, Android)."
+  "description": "Disjonio — nomenclature de panneaux électriques (web, iOS, Android)."
 }

@@ -40,4 +40,4 @@ http.createServer(async(req,res)=>{
  res.json=o=>{if(!res.getHeader('Content-Type'))res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(o));return res;};
  res.send=b=>{res.end(b);return res;};
  try{await mod.default(req,res);}catch(e){console.error(e);if(!res.headersSent)res.writeHead(500).end('error');}
-}).listen(port,()=>console.log('Mon Panneau — http://localhost:'+port));
+}).listen(port,()=>console.log('Disjonio — http://localhost:'+port));
