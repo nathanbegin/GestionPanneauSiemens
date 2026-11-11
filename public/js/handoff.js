@@ -29,7 +29,7 @@ export function handoffDialog({site}){
     (it.kind==='access'&&['pending','accepted'].includes(it.status)||it.kind==='transfer'&&it.status==='pending')&&h('button',{type:'button',class:'danger sm',onclick:async()=>{if(!await confirmDialog(it.kind==='access'?`Retirer l’accès de ${it.email} ?`:'Annuler cette invitation ?',{title:'Retirer',confirm:'Retirer',danger:true}))return;await api('/api/sites?action=handoff-revoke&hid='+it.id,{method:'DELETE'});refresh();}},it.kind==='access'?'Retirer l’accès':'Annuler l’invitation')))):'');
   }catch{list.replaceChildren();}
  }
- const d=dialog({title:'Remettre au client',eyebrow:site.name,form:true,wide:true,body:[
+ const d=dialog({title:'Remettre au client',eyebrow:site.name,form:true,wide:true,dirty:()=>!!email.value.trim(),body:[
   h('div',{class:'stage-opts'},radios),desc,
   field('Courriel du client',email,{hint:'Le client doit se connecter (ou créer un compte) avec cette adresse pour accepter.'}),
   h('label',{class:'check'},auth,h('span',{text:'Je confirme être autorisé à transmettre les renseignements de ce dossier à cette personne.'})),
