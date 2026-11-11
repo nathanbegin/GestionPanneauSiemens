@@ -1,0 +1,10 @@
+/* Disjonio — palette officielle. Ce fichier n'est pas importé par l'application. */
+:root {
+  --disjonio-forest: #1A4032;
+  --disjonio-mint: #8ABF92;
+  --disjonio-charcoal: #394039;
+  --disjonio-slate: #878C81;
+  --disjonio-ivory: #F3F4EF;
+  --disjonio-mist: #EEF1EA;
+  --disjonio-font: "Manrope", Inter, ui-sans-serif, system-ui, sans-serif;
+}

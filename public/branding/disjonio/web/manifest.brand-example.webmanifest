@@ -1,0 +1,18 @@
+{
+  "name": "Disjonio — Organisation électrique",
+  "short_name": "Disjonio",
+  "description": "Concevoir, relever et analyser des panneaux électriques",
+  "lang": "fr-CA",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#F3F4EF",
+  "theme_color": "#1A4032",
+  "icons": [
+    {
+      "src": "/branding/disjonio/web/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
