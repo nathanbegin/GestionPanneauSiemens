@@ -754,7 +754,8 @@ body.app .container{max-width:min(1760px,96vw)}
 /* Connexions externes (SSO) */
 .sso{display:grid;gap:12px;margin-bottom:6px}
 .sso-btns{display:grid;gap:8px}
-.sso-btn{justify-content:center;text-decoration:none;min-height:44px}
+.sso-btn{display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;min-height:44px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;font-weight:500}
+.sso-logo{flex:none}
 .sso-or{display:flex;align-items:center;gap:10px;color:var(--muted,#6b7a72);font-size:13px}
 .sso-or::before,.sso-or::after{content:'';flex:1;height:1px;background:currentColor;opacity:.25}
 .sso-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0}
