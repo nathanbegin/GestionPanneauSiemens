@@ -942,3 +942,9 @@ dialog.side .f:focus-within .hint{display:block}
 /* États : sélection (bleu), modification non enregistrée (ambre), succès (vert), erreur (rouge), lecture seule (gris) */
 .notice.readonly,.badge.shared{background:#eef1ee;color:#4a574f}
 .save-state.fail{background:#fdecec}
+/* Logo complet (tracés, vraie police Manrope) ; le symbole seul remplace le logo sur petit écran */
+.brand-logo{height:44px;width:auto;display:block}
+.brand-sym{display:none;width:40px;height:40px}
+.topbar .brand-logo{height:50px}
+@media (max-width:720px){.brand-logo{display:none}.brand-sym{display:block}}
+.brand{flex:none}.brand-logo,.brand-sym{flex:none;max-width:none}
