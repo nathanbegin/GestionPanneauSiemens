@@ -1631,4 +1631,9 @@ export default [
  ["Bon retour !", "Welcome back!"],
  ["Ajoutez d’abord un mot de passe (« Mot de passe oublié ») ou une autre connexion : vous ne pourriez plus accéder au compte.", "First add a password (“Forgot password”) or another sign-in method: you would otherwise lose access to the account."],
  ["Tapez SUPPRIMER pour confirmer", "Type SUPPRIMER to confirm"],
+ ["Politique de confidentialité", "Privacy policy"],
+ [" et la ", " and the "],
+ ["Conditions", "Terms"],
+ ["Confidentialité", "Privacy"],
+ ["Conditions d’utilisation", "Terms of use"],
 ];

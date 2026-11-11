@@ -27,7 +27,7 @@ export async function ssoButtons(){
  const ps=await list();if(!ps.length)return null;
  return h('div',{class:'sso'},
   h('div',{class:'sso-btns'},...ps.map(p=>h('a',{class:'btn sso-btn',href:href(p.id,'login'),'data-provider':p.id},logo(p.id),h('span',{text:'Continuer avec '+p.label})))),
-  h('p',{class:'small muted'},'En continuant, vous acceptez les ',h('a',{href:'/conditions',target:'_blank',text:'conditions d’utilisation'}),'.'),
+  h('p',{class:'small muted'},'En continuant, vous acceptez les ',h('a',{href:'/conditions',target:'_blank',text:'conditions d’utilisation'}),' et la ',h('a',{href:'/confidentialite',target:'_blank',text:'politique de confidentialité'}),'.'),
   h('div',{class:'sso-or',text:'ou par courriel'}));
 }
 

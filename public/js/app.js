@@ -94,7 +94,7 @@ function signupView(){
   field('Mot de passe',h('input',{name:'password',type:'password',autocomplete:'new-password',required:true,minlength:10}),{hint:'Au moins 10 caractères.'}),
   field('Langue / Language',select('lang',[['fr','Français'],['en','English']],lang)),
   h('div',{class:'radio-cards',role:'radiogroup','aria-label':'Type de compte'},radio('particulier','Particulier','Ma maison, mon chalet…',true),radio('pro','Électricien / entrepreneur','Rapports à mon nom, plusieurs clients')),
-  h('label',{class:'check'},h('input',{type:'checkbox',name:'acceptTerms',value:'1'}),h('span',{},'J’accepte les ',h('a',{href:webUrl('/conditions'),target:'_blank',text:'conditions d’utilisation et la politique de confidentialité'}),'.'))],'Créer mon compte',async f=>{
+  h('label',{class:'check'},h('input',{type:'checkbox',name:'acceptTerms',value:'1'}),h('span',{},'J’accepte les ',h('a',{href:webUrl('/conditions'),target:'_blank',text:'conditions d’utilisation'}),' et la ',h('a',{href:webUrl('/confidentialite'),target:'_blank',text:'politique de confidentialité'}),'.'))],'Créer mon compte',async f=>{
   storeLang(f.lang);const out=await api('/api/auth?action=signup',{method:'POST',body:{...f,acceptTerms:!!f.acceptTerms}});await afterAuth(out,'Bienvenue, '+out.user.name.split(' ')[0]+' ! Ajoutez votre premier site.');});
  ssoButtons().then(b=>b&&form.before(b)); // SSO
  return authCard('Créer un compte','Gratuit. Vos données restent privées.',form,['Déjà inscrit ? ',h('a',{href:'#/connexion',text:'Se connecter'})]);
