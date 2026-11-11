@@ -15,7 +15,7 @@ test('borne 32 A : disjoncteur de 40 A exigé (80 %)',()=>{
 });
 test('appareil 240 V sur unipolaire refusé',()=>{const c=blank(4)[0];c.loads=[L('dryer')];c.amps=30;assert.ok(circuitLoad(c).issues.some(i=>/bipolaire/.test(i.text)));});
 test('cuisinière 12 kW sur 40 A acceptée (facteur de demande)',()=>{const c=reshape(blank(8),'1','double',8).find(x=>x.id==='1');c.loads=[L('range-12')];c.amps=40;c.wire={gauge:'8 AWG'};assert.equal(circuitLoad(c).issues.filter(i=>i.level!=='info').length,0);});
-test('équilibre des phases',()=>{const d=blank(8);d[0].loads=[{name:'A',w:1200,v:120,qty:1,cat:'basic',cont:false}];d[2].loads=[{name:'B',w:600,v:120,qty:1,cat:'basic',cont:false}];const b=phaseBalance(d);assert.equal(b.L1,10);assert.equal(b.L2,5);assert.equal(b.imbalance,50);});
+test('équilibre des phases',()=>{const d=blank(8);d[0].loads=[{name:'A',w:1200,v:120,qty:1,cat:'basic',cont:false}];d[2].loads=[{name:'B',w:600,v:120,qty:1,cat:'basic',cont:false}];const b=phaseBalance(d);assert.equal(b.L1,10);assert.equal(b.L2,5);assert.equal(b.diff,5);assert.equal(b.index,66.7);assert.equal(b.neutral,5);});
 test('calcul 8-200 : maison de 150 m² avec cuisinière, sécheuse, chauffe-eau, plinthes 14 kW et borne',()=>{
  const d=blank(40);
  d[0].loads=[L('range-12')];d[1].loads=[L('dryer')];d[2].loads=[L('wh-4500')];d[3].loads=[L('bb-2000',7)];d[4].loads=[L('ev-l2-30')];
@@ -59,4 +59,12 @@ test('conducteurs d’entrée : vérification et validation',()=>{
  const m=cleanPanelMeta({name:'P',details:{mainAmps:200,serviceGauge:'4/0 AWG',serviceMaterial:'Aluminium',serviceRoute:'Aérienne — mât'}});
  assert.equal(m.details.serviceGauge,'4/0 AWG');assert.equal(m.details.serviceRoute,'Aérienne — mât');
  assert.throws(()=>cleanPanelMeta({name:'P',details:{serviceGauge:'99 AWG'}}));
+});
+
+import {balanceStats} from '../public/loadcalc.js';
+test('indice de déséquilibre L1/L2 (fiche technique Québec)',()=>{
+ const b=balanceStats(85,55);
+ assert.equal(b.diff,30);assert.equal(b.mean,70);assert.equal(b.index,42.9);assert.equal(b.neutral,30);
+ assert.equal(balanceStats(0,0).index,null); // courant moyen nul : « non applicable »
+ assert.equal(balanceStats(40,40).index,0);
 });

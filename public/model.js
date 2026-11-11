@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,STAGE_IDS,stageFromState} from './catalog.js';
-export const APP_VERSION='2.45.1';
+export const APP_VERSION='2.46.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -352,7 +352,7 @@ export function mergeSurvey(current,config){
 
 // ---------- Dossier de calcul : empreinte des données d'entrée, édition du code, hypothèses ----------
 // Référence réglementaire des calculs. L'année d'édition n'est pas inscrite ici : à préciser avant publication.
-export const CODE_EDITION='CSA C22.1 — Code canadien de l’électricité, Première partie, tel qu’adopté au Québec (Code de construction, chapitre V — Électricité)';
+export const CODE_EDITION='Code de construction du Québec, chapitre V — Électricité (édition 2026), intégrant CSA C22.1:21 et les modifications du Québec — en vigueur depuis le 26 mars 2026 (l’édition 2018 reste admissible pour certains travaux commencés avant le 17 octobre 2027)';
 // Données qui influencent le calcul de charge (les désignations, notes et statuts n'en font pas partie).
 export const calcInputs=(panel,children=[])=>{
  const d=panel.details||{};

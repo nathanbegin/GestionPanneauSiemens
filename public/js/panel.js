@@ -472,8 +472,9 @@ export async function panelView({id,tab='panel',ctx}){
    rep.percent!=null&&h('div',{class:'progress mt'+(rep.percent>100?' over':rep.percent>80?' high':'')},h('i',{style:{width:Math.min(100,rep.percent)+'%'}})),
    h('p',{class:'small muted mt',text:`Charge branchée : ${kw(rep.connectedW)}${children.length?` (dont ${children.length} sous-panneau(x))`:''} · ${rep.free} position(s) libre(s)${rep.remainingAmps!=null?` · marge de prudence (80 %) : ${rep.remainingAmps} A`:''}`}),
    rep.model&&h('p',{class:'small muted',text:`Modèle : ${rep.model.id} — ${rep.model.label}`}),
-   h('div',{class:'legs mt'},h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L1'}),h('b',{text:rep.balance.L1+' A'})),h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L2'}),h('b',{text:rep.balance.L2+' A'}))),
-   h('p',{class:'small muted',text:`Déséquilibre : ${rep.balance.imbalance} %`}));
+   h('div',{class:'legs mt'},h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L1 (estimée)'}),h('b',{text:rep.balance.L1+' A'})),h('div',{class:'leg'},h('span',{class:'small muted',text:'Phase L2 (estimée)'}),h('b',{text:rep.balance.L2+' A'}))),
+   h('p',{class:'small muted',text:rep.balance.index==null?'Écart L1/L2 : non applicable (courant moyen nul).':`Écart L1/L2 : ${rep.balance.diff} A · indice de déséquilibre : ${rep.balance.index} % · courant du neutre ≈ ${rep.balance.neutral} A`}),
+   h('p',{class:'small muted',text:'Valeurs estimées à partir des charges saisies (ce ne sont pas des mesures). Aucun seuil réglementaire de déséquilibre ne s’applique à une résidence monophasée 120/240 V ; une répartition plus équilibrée reste souhaitable.'}));
   const issues=h('div',{class:'card side-card'},h('h3',{text:`Alertes (${rep.issues.length})`}),
    rep.issues.length?rep.issues.map(i=>h('p',{class:'issue '+i.level,text:(i.circuit?`Circuit ${i.circuit} : `:'')+i.text})):h('p',{class:'issue info',text:'Aucune alerte. Ajoutez les charges de chaque circuit pour un bilan complet.'}),
    ...(rep.notes||[]).map(n=>h('p',{class:'issue info',text:'ℹ '+n.text})));

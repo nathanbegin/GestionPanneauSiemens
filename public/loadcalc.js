@@ -92,8 +92,14 @@ export function phaseBalance(circuits,vs=DEFAULT_VOLTS,{effective=false}={}){
   if(r.volts===vs.bi){legs.L1+=w/vs.bi;legs.L2+=w/vs.bi;}
   else legs[legOf(slotPos(c.slots[0]))]+=w/vs.uni;
  }
- const max=Math.max(legs.L1,legs.L2),min=Math.min(legs.L1,legs.L2);
- return {L1:round(legs.L1),L2:round(legs.L2),imbalance:max?round((max-min)/max*100,0):0};
+
+ return {L1:round(legs.L1),L2:round(legs.L2),...balanceStats(legs.L1,legs.L2)};
+}
+// Écart de courant, courant moyen et indice de déséquilibre (%) = écart / moyenne × 100 ; « non applicable » (null) si la moyenne est nulle.
+// L'indice est une information de comparaison, pas un seuil de conformité en monophasé 120/240 V ; le courant du neutre est ≈ l'écart (charges 120 V sinusoïdales).
+export function balanceStats(L1,L2){
+ const diff=Math.abs(L1-L2),mean=(L1+L2)/2,index=mean>0?round(diff/mean*100,1):null;
+ return {diff:round(diff),mean:round(mean),index,imbalance:index??0,neutral:round(diff)};
 }
 
 // Calcul de charge d'un logement unifamilial (règle 8-200 du CCÉ, simplifiée), détaillé étape par étape.
@@ -163,7 +169,7 @@ export function panelReport(panel,{children=[]}={}){
  const balance=phaseBalance(circuits,vs);
  // Sous-panneaux : charge répartie sur les deux phases.
  const childAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c,vs).watts,0),0)/vs.bi;
- balance.L1=round(balance.L1+childAmps);balance.L2=round(balance.L2+childAmps);
+ balance.L1=round(balance.L1+childAmps);balance.L2=round(balance.L2+childAmps);Object.assign(balance,balanceStats(balance.L1,balance.L2));
  // Dimensionnement : charges continues × 1,25 (disjoncteur ≥ 125 %), charges non continues à 100 %.
  const eff=phaseBalance(circuits,vs,{effective:true});
  const childEffAmps=children.reduce((s,p)=>s+p.circuits.reduce((t,c)=>t+circuitLoad(c,vs).effW,0),0)/vs.bi;
@@ -185,7 +191,9 @@ export function panelReport(panel,{children=[]}={}){
  else if(percent!=null&&percent>80)notes.push({level:'info',text:isDwelling?`La charge de calcul (règle 8-200, facteurs de demande déjà appliqués) atteint ${percent} % du principal : c’est permis jusqu’à 100 %, mais il reste peu de marge pour des ajouts futurs (marge de prudence : 80 %).`:`La charge (charges continues × 1,25) atteint ${percent} % du principal : permis jusqu’à 100 %, mais peu de marge pour des ajouts futurs.`});
  const service=det.fedFrom?null:serviceCheck(det);
  if(service?.status==='warn')issues.push({level:'warn',text:service.text});
- if(balance.imbalance>30&&Math.max(balance.L1,balance.L2)>20)issues.push({level:'warn',text:`Déséquilibre de ${balance.imbalance} % entre L1 et L2 : déplacez des circuits 120 V.`});
+ // Déséquilibre L1/L2 : simple information (aucun seuil réglementaire résidentiel monophasé) ; avertissement seulement si l'estimation dépasse la capacité d'une ligne.
+ if(balance.index!=null&&balance.index>30&&Math.max(balance.L1,balance.L2)>20)notes.push({level:'info',text:`Écart L1/L2 estimé : ${balance.diff} A (indice de déséquilibre ${balance.index} %). Ce n’est pas une limite réglementaire pour une résidence monophasée 120/240 V ; une répartition plus équilibrée reste toutefois souhaitable.`});
+ if(mainAmps&&Math.max(balance.L1,balance.L2)>mainAmps)issues.push({level:'warn',text:`Le courant estimé sur ${balance.L1>=balance.L2?'L1':'L2'} (${Math.max(balance.L1,balance.L2)} A, total des charges branchées) dépasse le principal de ${mainAmps} A. Ce total ne tient pas compte des facteurs de demande : vérifiez le calcul de charge (règle 8-200).`});
  const free=circuits.filter(c=>c.status==='Libre'||(!c.label&&!c.loads?.length&&c.amps==null)).length;
  return {vs,model,mainAmps,service,rows,connectedW,balance,calc,isDwelling,designAmps,percent,status:percent==null?'unknown':percent>100?'over':percent>80?'high':percent>70?'medium':'ok',issues,notes,free,remainingAmps:mainAmps?round(mainAmps*CONTINUOUS_FACTOR-designAmps):null,remaining100:mainAmps?round(mainAmps-designAmps):null,_ctx:{circuits,det,vs,children,panelTag:panel.tag||''}};
 }
