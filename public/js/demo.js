@@ -14,6 +14,8 @@ export function createDemoApi(){
   const u=new URL(path,'http://demo.local'),p=u.pathname,q=u.searchParams;
   if(p==='/api/auth')return {user:DEMO_USER,features:{}};
   if(p==='/api/billing')return {plan:PLAN,live:true,subscription:null,limit:null,used:1,activePanels:1,sites:1,credits:0,canCreatePanel:true,canCreateSite:true,seats:1,teamSize:1,creditPacks:[],promo:false};
+  if(p==='/api/sites'&&q.get('action')==='handoff-inbox')return {items:[]};
+  if(p==='/api/sites'&&q.get('action')==='trash')return {items:[]};
   if(p==='/api/sites'&&q.get('search')!==null)return {results:[]};
   if(p==='/api/sites'&&!q.get('id'))return {sites:[{...siteOut(),panelCount:1,panels:[summary()]}]};
   if(p==='/api/sites'&&q.get('id'))return {site:siteOut(),panels:[summary()],access:'owner'};

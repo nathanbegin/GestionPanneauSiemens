@@ -1008,3 +1008,11 @@ dialog.side .f:focus-within .hint{display:block}
  .menu .menu-brand{display:flex;align-items:center;padding:12px 14px 6px;border-bottom:1px solid var(--line);margin-bottom:4px}
  .menu .menu-brand img{height:34px;width:auto}
 }
+/* Tableaux larges : la première colonne (position du circuit, nom…) reste visible quand on défile horizontalement */
+.table-wrap{-webkit-overflow-scrolling:touch}
+.table-wrap table.data th:first-child,.table-wrap table.data td:first-child{position:sticky;left:0;z-index:2;background:#fff;box-shadow:2px 0 4px -2px #0b241b33}
+.table-wrap table.data th:first-child{background:#f0f3ee;z-index:3}
+.table-wrap table.data tr.click:hover td:first-child{background:#f5f8f3}
+/* « overflow:hidden » sur le tableau l'empêchait de défiler avec sa première colonne figée : le conteneur défile à sa place */
+.table-wrap{border-radius:12px}
+.table-wrap table.data{overflow:visible;border-radius:0}
