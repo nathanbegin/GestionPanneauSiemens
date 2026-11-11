@@ -173,7 +173,7 @@ async function sitesView(){
  // Hors ligne : seuls les sites téléchargés sont consultables.
  let sites=allSites;
  if(net.offline){const ok=new Set((await listDownloads()).map(d=>d.id));sites=allSites.filter(x=>ok.has(x.id));}
- const chip=usage&&h('a',{class:'usage-chip',href:'#/abonnement'},h('b',{text:usage.plan.name}),usage.limit==null?`${usage.used} panneaux`:`${usage.used} / ${usage.limit} panneaux${usage.plan.quotaType==='monthly'?' ce mois-ci':''}`,usage.credits?` · +${usage.credits} prépayés`:'',usage.canCreatePanel?'':' · Augmenter →');
+ const chip=usage&&h('a',{class:'usage-chip',href:'#/abonnement'},h('b',{text:usage.plan.name}),usage.limit==null?`${usage.used} panneaux`:`${usage.used} / ${usage.limit} panneaux${usage.plan.quotaType==='monthly'?' ce mois-ci':''}`,usage.credits?` · +${usage.credits} prépayés`:'',usage.canCreatePanel?'':' · Augmenter →',usage.limit>0?(()=>{const pc=Math.min(100,Math.round(usage.used/usage.limit*100));return h('span',{class:'usage-bar'+(pc>=100?' full':pc>=80?' warn':''),role:'progressbar','aria-valuemin':'0','aria-valuemax':String(usage.limit),'aria-valuenow':String(usage.used),'aria-label':`Quota utilisé : ${pc} %`},h('i',{style:{width:pc+'%'}}));})():null);
  const create=()=>siteDialog(null,async f=>{const {site}=await api('/api/sites',{method:'POST',body:f});toast('Site créé. Ajoutez maintenant un panneau.');location.hash='#/sites/'+site.id;});
  const first=state.user.name.split(' ')[0];
  if(!sites.length)return h('div',{class:'container'},inviteBox||'',h('div',{class:'card empty-state'},
@@ -202,7 +202,7 @@ async function sitesView(){
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
  const bmS=sites.length>1&&!state.demo&&!net.offline?batchManage({grid,cardSel:'.site-card',items:sites,noun:'site',url:'/api/sites?id=',after:route}):null;
  return h('div',{class:'container'},
-  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),bmS?.btn||'',h('button',{type:'button',onclick:()=>trashDialog({onRestored:route})},'🗑 Corbeille'),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
+  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau${sites.reduce((n,s)=>n+s.panelCount,0)>1?'x':''}`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),bmS?.btn||'',h('button',{type:'button',onclick:()=>trashDialog({onRestored:route})},'🗑 Corbeille'),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
   inviteBox||'',bmS?.bar||'',gsearch,found,(()=>{gridWrap.append(resumeBox||'',grid);return gridWrap;})());
 }
 

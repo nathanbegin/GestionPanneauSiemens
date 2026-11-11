@@ -1030,3 +1030,8 @@ dialog.side .f:focus-within .hint{display:block}
 .cards.selecting .card{cursor:pointer;outline:2px dashed transparent}
 .cards.selecting .card.selected{outline:2px solid #c0392b;background:rgba(192,57,43,.07)}
 .cards.selecting .add-card{display:none}
+
+.usage-chip{flex-wrap:wrap;border-radius:18px}
+.usage-bar{flex:1 0 100%;height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.usage-bar i{display:block;height:100%;background:var(--brand,#1b4332);border-radius:99px}
+.usage-bar.warn i{background:#d98e04}.usage-bar.full i{background:#c0392b}

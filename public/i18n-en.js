@@ -154,6 +154,8 @@ export default [
  ["Modifié ", "Modified "],
  ["+ Ajouter un site", "+ Add a site"],
  ["{} site{} · {} panneau(x)", "{1} site{2} · {3} panel(s)"],
+ ["{} site{} · {} panneau", "{1} site{2} · {3} panel"],
+ ["{} site{} · {} panneaux", "{1} site{2} · {3} panels"],
  ["⚡ Entrée électrique", "⚡ Electrical service"],
  ["Nouveau panneau", "New panel"],
  ["Panneau créé. Touchez un disjoncteur pour commencer.", "Panel created. Tap a breaker to start."],
