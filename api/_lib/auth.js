@@ -54,7 +54,7 @@ export function clearSessionCookie(req,res){
  res.setHeader('Set-Cookie',`${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secureCookie(req)?'; Secure':''}`);
 }
 export const adminEmails=()=>String(process.env.ADMIN_EMAILS||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
-export const publicUser=u=>({id:u.id,email:u.email,name:u.name,profile:u.profile||{},createdAt:u.created_at,isAdmin:adminEmails().includes(u.email)});
+export const publicUser=u=>({id:u.id,email:u.email,name:u.name,profile:u.profile||{},hasPassword:!!u.password_hash,createdAt:u.created_at,isAdmin:adminEmails().includes(u.email)});
 export async function currentUser(req,sql){
  const {token,via}=readToken(req);
  if(!token)return null;

@@ -25,6 +25,8 @@ async function serveStatic(req,res,path){
 
 http.createServer(async(req,res)=>{
  const url=new URL(req.url,'http://localhost');
+ const cb=/^\/sso\/callback\/([a-z]+)$/.exec(url.pathname);
+ if(cb){url.searchParams.set('action','sso-callback');url.searchParams.set('provider',cb[1]);url.pathname='/api/auth';}
  if(!url.pathname.startsWith('/api/'))return serveStatic(req,res,url.pathname);
  const name=url.pathname.slice(5).replace(/\/$/,'');
  if(!/^[a-z-]+$/.test(name))return res.writeHead(404).end();

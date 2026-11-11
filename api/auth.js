@@ -4,6 +4,7 @@ import {route,body,HttpError,clientIp} from './_lib/http.js';
 import {hashPassword,verifyPassword,checkPassword,checkEmail,newId,createSession,destroySession,readToken,setSessionCookie,clearSessionCookie,publicUser,currentUser,rateLimit,recordAttempt,createResetToken,consumeResetToken} from './_lib/auth.js';
 import {sendMail,mailConfigured,appUrl} from './_lib/mail.js';
 import {mailText} from './_lib/mail-text.js';
+import {handleSso} from './_lib/sso/index.js'; // SSO
 
 // Empreinte factice pour garder un temps de réponse comparable quand le compte n'existe pas.
 const DUMMY='scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$'+Buffer.alloc(64).toString('base64');
@@ -18,6 +19,7 @@ async function startSession(req,res,sql,user,status=200){
 export default route(['GET','POST'],async(req,res)=>{
  const sql=await getSql();
  const action=String(req.query?.action||(req.method==='GET'?'me':''));
+ {const r=await handleSso(req,res,sql,action);if(r!==false)return r;} // SSO
  if(req.method==='GET'){
   if(action!=='me')throw new HttpError(404,'Action inconnue.');
   const u=await currentUser(req,sql);

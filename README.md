@@ -190,3 +190,26 @@ Le bouton **FR / EN** (barre du haut de l'application et en-tête des pages publ
 - **Courriels :** `api/_lib/mail-text.js` (réinitialisation du mot de passe, invitation, demande d'équipe) selon `profile.lang` du destinataire.
 - **Ajouter une phrase :** une ligne `["texte français", "English text"]` au bon dictionnaire (`{}` = valeur variable, `{1}`, `{2}` pour réordonner) ; sans entrée, le texte reste en français. Un test vérifie la cohérence des dictionnaires.
 - Les données saisies par l'utilisateur ne sont pas traduites (seuls les textes connus du dictionnaire changent).
+
+## Connexion avec Google et Microsoft (SSO)
+
+Module **autonome et amovible**, ajouté au système de comptes existant (scénario « B ») : les comptes, mots de passe, sessions (`mp_session`), forfaits et identifiants (`uuid`) ne changent pas.
+
+**Activation** : renseigner `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` et/ou `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET` (voir `.env.example`). Déclarer chez le fournisseur l'URI de redirection `https://VOTRE-DOMAINE/sso/callback/google` (ou `/microsoft`). Sans variables, rien n'apparaît dans l'interface.
+
+**Fonctionnement** : flux OpenID Connect « code d'autorisation » + PKCE, jeton d'identité validé localement (signature RS256, émetteur, audience, expiration, nonce). Une table `app_identities(provider, subject, user_id)` lie l'identité externe à `app_users`. Règles (`api/_lib/sso/decide.js`) :
+- identité déjà liée → connexion ;
+- courriel **vérifié** correspondant à un compte existant → liaison automatique ; courriel non vérifié → refus (anti prise de contrôle) ;
+- sinon → création d'un compte sans mot de passe (acceptation des conditions affichée sous les boutons) ;
+- Microsoft : le courriel n'est jugé vérifié que pour les comptes personnels ou si `xms_edov` l'atteste.
+« Mon compte → Connexions externes » permet de lier/retirer ; on ne peut retirer la dernière connexion d'un compte sans mot de passe. Un compte créé par SSO peut définir un mot de passe via « Mot de passe oublié ». Supprimer un tel compte demande de taper SUPPRIMER.
+
+**Limites** : application native (Capacitor) non incluse pour l'instant (boutons masqués) ; Apple à venir (jeton client signé + `form_post`, il faudra un cookie `SameSite=None`).
+
+**Retirer le module (ex. migration vers Neon Auth)** :
+1. supprimer `api/_lib/sso/`, `public/js/sso.js` et `test/sso.test.js` ;
+2. retirer toutes les lignes marquées `// SSO` (`grep -rn "// SSO" api public`) : 1 import + 1 appel dans `api/auth.js`, 5 lignes dans `public/js/app.js` ;
+3. retirer la réécriture `/sso/callback/:provider` de `vercel.json` et `/js/sso.js` de `public/sw.js` ;
+4. (facultatif) `DROP TABLE app_identities;`. Les comptes SSO restent des lignes `app_users` avec courriel : ils pourront se réidentifier par courriel chez le nouveau fournisseur.
+
+Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/providers.js`.

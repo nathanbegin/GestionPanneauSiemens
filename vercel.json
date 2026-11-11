@@ -32,5 +32,8 @@
    ]
   }
  ],
+ "rewrites": [
+  {"source": "/sso/callback/:provider", "destination": "/api/auth?action=sso-callback&provider=:provider"}
+ ],
  "cleanUrls": true
 }

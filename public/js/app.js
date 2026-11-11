@@ -1,5 +1,6 @@
 // Application Mon Panneau : routeur, authentification, sites, compte.
 import {brandingCard} from './branding.js';
+import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
@@ -82,6 +83,7 @@ function loginView(){
   field('Mot de passe',h('input',{name:'password',type:'password',autocomplete:'current-password',required:true})),
   h('a',{href:'#/mot-de-passe-oublie',class:'small',text:'Mot de passe oublié ?'})],'Se connecter',async f=>{
   const out=await api('/api/auth?action=login',{method:'POST',body:f});await afterAuth(out,'Bon retour, '+out.user.name.split(' ')[0]+' !');});
+ ssoButtons().then(b=>b&&form.before(b)); // SSO
  return authCard('Connexion','Retrouvez vos sites et vos panneaux.',form,['Pas encore de compte ? ',h('a',{href:'#/inscription',text:'Créer un compte gratuit'})]);
 }
 function signupView(){
@@ -94,6 +96,7 @@ function signupView(){
   h('div',{class:'radio-cards',role:'radiogroup','aria-label':'Type de compte'},radio('particulier','Particulier','Ma maison, mon chalet…',true),radio('pro','Électricien / entrepreneur','Rapports à mon nom, plusieurs clients')),
   h('label',{class:'check'},h('input',{type:'checkbox',name:'acceptTerms',value:'1'}),h('span',{},'J’accepte les ',h('a',{href:webUrl('/conditions'),target:'_blank',text:'conditions d’utilisation et la politique de confidentialité'}),'.'))],'Créer mon compte',async f=>{
   storeLang(f.lang);const out=await api('/api/auth?action=signup',{method:'POST',body:{...f,acceptTerms:!!f.acceptTerms}});await afterAuth(out,'Bienvenue, '+out.user.name.split(' ')[0]+' ! Ajoutez votre premier site.');});
+ ssoButtons().then(b=>b&&form.before(b)); // SSO
  return authCard('Créer un compte','Gratuit. Vos données restent privées.',form,['Déjà inscrit ? ',h('a',{href:'#/connexion',text:'Se connecter'})]);
 }
 function forgotView(){
@@ -233,12 +236,13 @@ function accountView(){
  const e4=h('p',{class:'error',role:'alert'});
  const del=h('form',{class:'card form-card',novalidate:true},h('fieldset',{class:'form-section'},h('legend',{text:'Supprimer le compte'}),
   h('p',{class:'small muted',text:'Supprime définitivement votre compte, vos sites, vos panneaux et tous les circuits. Exportez d’abord ce que vous voulez garder.'}),
-  field('Mot de passe pour confirmer',h('input',{name:'password',type:'password',autocomplete:'current-password'}))),e4,
+  field(state.user?.hasPassword===false?'Tapez SUPPRIMER pour confirmer':'Mot de passe pour confirmer',h('input',{name:'password',type:state.user?.hasPassword===false?'text':'password',autocomplete:'off'}))),e4,
   h('div',{class:'form-actions'},h('button',{type:'submit',class:'danger'},'Supprimer mon compte')));
  del.addEventListener('submit',async ev=>{ev.preventDefault();e4.textContent='';if(!await confirmDialog('Supprimer définitivement votre compte et toutes vos données ?',{title:'Dernière confirmation',confirm:'Supprimer mon compte',danger:true}))return;try{await api('/api/account',{method:'DELETE',body:formData(del)});setToken('');state.user=null;toast('Compte supprimé.');location.hash='#/inscription';}catch(x){e4.textContent=x.message;}});
 
+ const ssoSlot=h('div'); ssoCard().then(c=>c&&ssoSlot.replaceChildren(c)); // SSO
  return h('div',{class:'container'},h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:'Paramètres'}),h('h1',{text:'Mon compte'}))),
-  h('div',{class:'stack'},updateCard(),profile,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Mon Panneau v${APP_VERSION}`})));
+  h('div',{class:'stack'},updateCard(),profile,ssoSlot,brandingCard(),pwd,legacy,del,h('p',{class:'small muted',text:`Mon Panneau v${APP_VERSION}`})));
 }
 
 // ---------- Routeur ----------
@@ -289,6 +293,7 @@ async function boot(){
  try{const me=await api('/api/auth');state.user=me.user;state.features=me.features||{};followAccountLang(me.user?.profile);}
  catch(e){if(!state.user&&e.offline){view.replaceChildren(h('div',{class:'container'},h('div',{class:'card empty-state'},h('div',{class:'ico',text:'📡'}),h('h2',{text:'Hors ligne'}),h('p',{text:e.message}),h('button',{type:'button',class:'primary',onclick:()=>location.reload()},'Réessayer'))));return;}}
  lastPath=location.hash.split('/').slice(0,3).join('/');
+ handleSsoReturn(); // SSO
  route();
 }
 if('serviceWorker' in navigator&&!NATIVE)navigator.serviceWorker.register('sw.js').catch(()=>{});

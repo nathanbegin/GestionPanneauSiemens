@@ -47,7 +47,8 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
  }
  if(req.method==='PUT'&&action==='password'){
   await rateLimit(sql,'pwd:'+user.id,8,15);
-  if(!await verifyPassword(String(data.current||''),user.password_hash)){await recordAttempt(sql,'pwd:'+user.id);throw new HttpError(400,'Mot de passe actuel incorrect.');}
+  // Compte créé par connexion externe : aucun mot de passe actuel à vérifier.
+  if(user.password_hash&&!await verifyPassword(String(data.current||''),user.password_hash)){await recordAttempt(sql,'pwd:'+user.id);throw new HttpError(400,'Mot de passe actuel incorrect.');}
   checkPassword(data.password);
   const hash=await hashPassword(data.password);
   await sql`UPDATE app_users SET password_hash=${hash},updated_at=now() WHERE id=${user.id}`;
@@ -63,7 +64,9 @@ export default route(['GET','PUT','POST','DELETE'],async(req,res)=>{
   return res.status(200).json({user:publicUser(u)});
  }
  if(req.method==='DELETE'){
-  if(!await verifyPassword(String(data.password||''),user.password_hash))throw new HttpError(400,'Mot de passe incorrect. Le compte n’a pas été supprimé.');
+  // Sans mot de passe (connexion externe), on demande de taper SUPPRIMER.
+  const confirmed=user.password_hash?await verifyPassword(String(data.password||''),user.password_hash):String(data.password||'').trim().toUpperCase()==='SUPPRIMER';
+  if(!confirmed)throw new HttpError(400,'Mot de passe incorrect. Le compte n’a pas été supprimé.');
   await sql`DELETE FROM app_users WHERE id=${user.id}`;
   clearSessionCookie(req,res);
   return res.status(200).json({ok:true});
