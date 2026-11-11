@@ -125,6 +125,7 @@ export async function panelView({id,tab='panel',ctx}){
  const garnir=()=>aiImportDialog({site,siblings,target:panel,onApplied:p=>{panel=p;renderHead();renderBody();}});
  function renderHead(){
   const s=stats(panel.circuits),det=panel.details||{};
+  ctx.remember?.({id:panel.id,name:panel.name,tag:panel.tag,site:site.name,siteId:site.id,toConfirm:s.toConfirm});
   const fed=siblings.find(x=>x.id===det.fedFrom);
   const ro=data.access==='view'?h('p',{class:'notice info',text:`Panneau partagé en lecture seule par ${data.sharedBy} : vous pouvez le consulter et générer ses documents, mais pas le modifier.`}):null;
   const empty=data.access!=='view'&&!panel.circuits.some(c=>c.label||c.amps!=null||c.vacant);

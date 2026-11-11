@@ -28,15 +28,16 @@ function crumbs(items){
  items.forEach(([label,href],i)=>{if(i)nav.append(h('i',{'aria-hidden':'true',text:'›'}));nav.append(href&&i<items.length-1?h('a',{href,text:label}):h('span',{text:label,'aria-current':i===items.length-1?'page':null}));});
  const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Disjonio — accueil'},h('span',{class:'brand-icon','aria-hidden':'true',text:'ϟ'}),h('span',{text:'DISJONIO'}));
  const parts=[brand,nav];
+ const isPro=state.user?.profile?.accountType==='pro';
  if(state.user){
   const menu=h('div',{class:'menu',role:'menu'},
    h('div',{class:'who'},h('b',{text:state.user.name}),state.user.email),
    h('a',{href:'#/sites',role:'menuitem'},'🏠 Mes sites'),
    h('a',{href:'#/compte',role:'menuitem'},'👤 Mon compte'),
    h('a',{href:'#/compte',role:'menuitem',onclick:()=>setTimeout(()=>document.getElementById('miseajour')?.scrollIntoView({behavior:'smooth'}),150)},'🔄 Mise à jour',h('i',{class:'update-dot','aria-label':'Nouvelle version disponible'})),
-   h('a',{href:'#/comparer',role:'menuitem'},'⇄ Comparer des panneaux'),
+   !isPro&&h('a',{href:'#/comparer',role:'menuitem'},'⇄ Comparer des panneaux'),
    h('a',{href:'#/abonnement',role:'menuitem'},'⭐ Mon abonnement'),
-   h('a',{href:'#/equipe',role:'menuitem'},'👥 Mon équipe'),
+   !isPro&&h('a',{href:'#/equipe',role:'menuitem'},'👥 Mon équipe'),
    state.user.isAdmin&&h('a',{href:'#/admin',role:'menuitem'},'🛠 Administration'),
    h('a',{href:webUrl('/fonctionnement'),role:'menuitem',target:NATIVE?'_blank':null},'❓ Fonctionnement'),
    h('button',{type:'button',role:'menuitem',onclick:()=>feedbackDialog()},'💡 Suggérer une amélioration'),
@@ -49,10 +50,20 @@ function crumbs(items){
  // Langue : FR / EN (le bouton montre la langue vers laquelle on bascule).
  parts.push(h('button',{type:'button',class:'ghost lang-switch','data-i18n-skip':'',title:lang==='en'?'Français':'English','aria-label':lang==='en'?'Passer en français':'Switch to English',onclick:async()=>{const next=lang==='en'?'fr':'en';if(state.user){try{await api('/api/account',{method:'PUT',body:{name:state.user.name,profile:{...(state.user.profile||{}),lang:next}}});}catch{}}setLang(next);}},lang==='en'?'FR':'EN'));
  topbar.replaceChildren(...parts);
+ // Navigation de travail visible pour les professionnels : Sites · Comparer · Équipe.
+ {let wn=document.getElementById('worknav');if(!wn){wn=h('nav',{id:'worknav',class:'worknav','aria-label':'Navigation de travail'});topbar.parentElement.append(wn);}
+  const cur=location.hash.split('/')[1]||'';
+  const link=(href,label,on)=>h('a',{href,class:on?'on':'','aria-current':on?'page':null,text:label});
+  wn.hidden=!(state.user&&isPro);
+  wn.replaceChildren(...(wn.hidden?[]:[h('div',{class:'container'},link('#/sites','Sites',['sites','panneaux'].includes(cur)),link('#/comparer','Comparer',cur==='comparer'),link('#/equipe','Équipe',cur==='equipe'))]));}
  document.title=(items.at(-1)?.[0]||'Mon espace')+' · Disjonio';
 }
 document.addEventListener('click',()=>document.querySelectorAll('.menu.open').forEach(m=>{m.classList.remove('open');m.previousElementSibling?.setAttribute('aria-expanded','false');}));
-const ctx={crumbs,get features(){return state.features;},get user(){return state.user;}};
+// Derniers panneaux consultés (sur cet appareil) : alimente « Continuer » à l'accueil.
+const RECENT='mp_recent';
+const recents=()=>{try{return JSON.parse(localStorage.getItem(RECENT)||'[]').filter(r=>r&&r.uid===state.user?.id);}catch{return [];}};
+function remember(r){try{const all=[{...r,uid:state.user?.id,at:Date.now()},...recents().filter(x=>x.id!==r.id)].slice(0,6);localStorage.setItem(RECENT,JSON.stringify(all));}catch{}}
+const ctx={crumbs,remember,get features(){return state.features;},get user(){return state.user;}};
 
 async function logout(){
  try{await api('/api/auth?action=logout',{method:'POST',body:{}});}catch{}
@@ -135,6 +146,8 @@ async function sitesView(){
   h('button',{type:'button',class:'primary lg',onclick:create},'+ Ajouter mon premier site'),
   h('p',{class:'small muted mt'},'Forfait gratuit : 5 panneaux. ',h('a',{href:'#/abonnement',text:'Voir les forfaits'}),'.'),
   h('p',{class:'small muted mt'},'Vous utilisiez l’ancienne version avec une clé d’accès ? ',h('a',{href:'#/compte',text:'Importez vos panneaux'}),'.')));
+ const resume=recents().filter(r=>sites.some(x=>x.panels.some(p=>p.id===r.id))).slice(0,3);
+ const resumeBox=resume.length?h('section',{class:'resume','aria-label':'Reprendre le travail'},h('h2',{class:'resume-title',text:'Reprendre le travail'}),h('div',{class:'resume-cards'},...resume.map(r=>h('a',{class:'card resume-card',href:'#/panneaux/'+r.id},h('b',{text:(r.tag?r.tag+' · ':'')+r.name}),h('span',{class:'small muted',text:r.site}),h('span',{class:'resume-cta',text:r.toConfirm>0?`Continuer le relevé — ${r.toConfirm} circuit${r.toConfirm>1?'s':''} à confirmer`:'Rouvrir le panneau'}))))):null;
  const grid=h('div',{class:'cards'},...sites.map(s=>h('a',{class:'card site-card',href:'#/sites/'+s.id},
    h('div',{},h('h2',{text:s.name}),s.shared&&h('span',{class:'badge shared',text:`👥 Partagé par ${s.shared.by}`}),h('div',{class:'addr',text:siteAddress(s)||'Adresse à préciser'}),s.client&&h('div',{class:'addr',text:'Client : '+s.client})),
    h('div',{class:'chips'},s.panels.length?s.panels.map(p=>h('span',{class:'badge '+(p.progress===100?'ok':''),text:`${p.tag||p.name} · ${p.progress} %`})):h('span',{class:'badge warn',text:'Aucun panneau'})),
@@ -142,7 +155,7 @@ async function sitesView(){
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
  return h('div',{class:'container'},
   h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
-  grid);
+  resumeBox||"",grid);
 }
 
 function tree(panels){

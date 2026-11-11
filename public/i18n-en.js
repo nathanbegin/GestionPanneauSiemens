@@ -1656,4 +1656,11 @@ export default [
  ["Caractéristiques avancées (protection, format du disjoncteur, regroupement)", "Advanced characteristics (protection, breaker format, grouping)"],
  ["Tension et superficies", "Voltage and floor areas"],
  ["Ex. 200 (laisser vide si inconnu)", "E.g. 200 (leave empty if unknown)"],
+ ["Sites", "Sites"],
+ ["Comparer", "Compare"],
+ ["Navigation de travail", "Work navigation"],
+ ["Reprendre le travail", "Pick up where you left off"],
+ ["Rouvrir le panneau", "Reopen the panel"],
+ ["Continuer le relevé — {} circuit à confirmer", "Continue the survey — {} circuit to confirm"],
+ ["Continuer le relevé — {} circuits à confirmer", "Continue the survey — {} circuits to confirm"],
 ];

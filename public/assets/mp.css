@@ -778,3 +778,14 @@ button.link{background:none;border:0;padding:0;min-height:0;color:var(--green,#2
 details.form-adv{border:1px dashed var(--line);border-radius:12px;padding:6px 12px;margin:10px 0}
 details.form-adv>summary{cursor:pointer;padding:8px 0;font-weight:600;color:var(--ink)}
 details.form-adv[open]>summary{margin-bottom:8px}
+/* Navigation de travail (pros) et reprise du travail */
+.worknav{background:var(--card,#fff);border-bottom:1px solid var(--line)}
+.worknav .container{display:flex;gap:6px;height:46px;align-items:center;overflow-x:auto;scrollbar-width:none}
+.worknav a{text-decoration:none;color:var(--muted);padding:8px 14px;border-radius:99px;font-weight:600;white-space:nowrap;min-height:36px;display:inline-flex;align-items:center}
+.worknav a:hover{background:var(--soft);color:var(--ink)}
+.worknav a.on{background:var(--ink);color:#fff}
+.resume{margin:0 0 22px}
+.resume-title{font-size:15px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.resume-cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.resume-card{display:grid;gap:4px;text-decoration:none;color:inherit;padding:14px 16px}
+.resume-cta{color:var(--green,#226a51);font-weight:600;font-size:14px}
