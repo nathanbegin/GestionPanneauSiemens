@@ -2,7 +2,8 @@
 // Étapes : 1) photos / fichiers  2) lecture  3) identification à confirmer
 //          4) construction pas à pas du panneau  5) « Est-ce bien la configuration en place ? »  6) création.
 import {h,field,select,dialog,toast} from './dom.js';
-import {api} from './api.js';
+import {api,apiProgress} from './api.js';
+import {aiProgress} from './aiprogress.js';
 import {panelArt} from './panelart.js';
 import {blank,resize,mergeScanned,designation,sortCircuits,ampsList,panelKinds,voltages,slotPos,isLinkedPair,groupCandidates,groupCircuits,ungroupCircuit,suggestLinks} from '../model.js';
 import {FAMILIES} from '../catalog.js';
@@ -96,17 +97,24 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
 
  // ---------- 2. Lecture par l'IA ----------
  async function read(hint){
-  const msg=h('p',{class:'ai-wait-msg',text:'Lecture des photos…'});
-  put(h('div',{class:'ai-wait'},h('div',{class:'spinner','aria-hidden':'true'}),msg,h('p',{class:'small muted',text:'Cela prend généralement de 10 à 40 secondes.'})));
-  const steps=['Recherche de la marque et de l’étiquette du fabricant…','Comptage des positions…','Lecture des calibres sur les manettes…','Lecture du répertoire…'];
-  let i=0;const timer=setInterval(()=>{msg.textContent=steps[i++%steps.length];},4500);
+  const prog=aiProgress({steps:['Envoi des photos','Analyse par l’IA','Réception des résultats','Préparation du panneau'],weights:[15,60,10,15],analysisIndex:1,expectedMs:30000,
+   details:['Recherche de la marque et de l’étiquette du fabricant…','Comptage des positions…','Lecture des calibres sur les manettes…','Lecture du répertoire…','Association des circuits aux disjoncteurs…']});
+  put(h('div',{class:'ai-wait'},h('h3',{text:'Analyse du panneau en cours'}),prog.el,h('p',{class:'small muted',text:'Cela prend généralement de 10 à 40 secondes. Ne fermez pas cette fenêtre.'})));
+  prog.stage(0,0);
   try{
-   const out=await api('/api/panels?action=scan',{method:'POST',body:{files:files.map(({name,data})=>({name,data})),hint}});
+   const out=await apiProgress('/api/panels?action=scan',{method:'POST',body:{files:files.map(({name,data})=>({name,data})),hint},onUpload:fr=>prog.stage(fr>=1?1:0,fr>=1?0:fr)});
    status.used=out.used;usedModel=out.model||'';
-   if(out.notPanel)return photos('L’IA ne reconnaît pas de panneau électrique sur ces fichiers. '+(out.summary||''));
+   if(out.notPanel){prog.stop();return photos('L’IA ne reconnaît pas de panneau électrique sur ces fichiers. '+(out.summary||''));}
+   await showFound(prog,out.proposal);
    if(target)build(out.proposal);else identify(out.proposal);
-  }catch(e){photos(e.message);}
-  finally{clearInterval(timer);}
+  }catch(e){prog.stop();photos(e.message);}
+ }
+ // Résultats reçus : les circuits lus apparaissent un à un avant de passer à la confirmation.
+ async function showFound(prog,proposal){
+  prog.stage(2,0);
+  const cs=(proposal?.circuits||[]).filter(c=>c.label||c.amps);
+  await prog.results(cs.map(c=>`Position ${slotPos(c.slots[0])} · ${c.amps?c.amps+' A':'— A'}${c.label?' · '+c.label:''}`),{title:`${cs.length} circuit(s) lu(s) sur ${proposal?.positions||'?'} positions`,delay:100});
+  prog.stage(3,.5);await new Promise(r=>setTimeout(r,350));prog.finish();await new Promise(r=>setTimeout(r,450));
  }
 
  // ---------- 3. Identification ----------
@@ -277,17 +285,19 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
   refresh();
  }
  async function readMore(p,state,extra,note){
-  const msg=h('p',{class:'ai-wait-msg',text:'Lecture des photos de précision…'});
-  put(h('div',{class:'ai-wait'},h('div',{class:'spinner','aria-hidden':'true'}),msg,h('p',{class:'small muted',text:'L’IA complète la configuration déjà établie.'})));
+  const prog=aiProgress({steps:['Envoi des photos','Lecture des photos de précision','Réception des résultats','Mise à jour du panneau'],weights:[15,60,10,15],analysisIndex:1,expectedMs:25000,details:['Lecture des étiquettes et des calibres…','Comparaison avec la configuration déjà établie…']});
+  put(h('div',{class:'ai-wait'},h('h3',{text:'Analyse des photos supplémentaires'}),prog.el,h('p',{class:'small muted',text:'L’IA complète la configuration déjà établie.'})));
+  prog.stage(0,0);
   const current=state.circuits;
   // Configuration actuelle transmise à l'IA (les corrections de l'utilisateur sont marquées).
   const previous=current.filter(c=>c.label||c.amps||c.vacant).map(c=>({position:slotPos(c.slots[0]),half:c.slots.length===1||isLinkedPair(c)?c.slots[0].slice(-1):'',poles:isLinkedPair(c)?1:new Set(c.slots.map(slotPos)).size,spans_next:isLinkedPair(c),amps:c.amps??null,label:c.label||'',vacant:!!c.vacant,user_confirmed:state.edited.has(c.id)}));
   const det=p.meta.details;
   try{
-   const out=await api('/api/panels?action=scan',{method:'POST',body:{files:extra.map(({name,data})=>({name,data})),hint:{note,previous,brand:det.brand,series:det.model,mainAmps:det.mainAmps??undefined,positions:p.positions}}});
+   const out=await apiProgress('/api/panels?action=scan',{method:'POST',onUpload:fr=>prog.stage(fr>=1?1:0,fr>=1?0:fr),body:{files:extra.map(({name,data})=>({name,data})),hint:{note,previous,brand:det.brand,series:det.model,mainAmps:det.mainAmps??undefined,positions:p.positions}}});
    status.used=out.used;usedModel=out.model||usedModel;
-   if(out.notPanel)return clarify(p,state,'L’IA ne reconnaît pas d’éléments de panneau sur ces photos. '+(out.summary||''));
+   if(out.notPanel){prog.stop();return clarify(p,state,'L’IA ne reconnaît pas d’éléments de panneau sur ces photos. '+(out.summary||''));}
    const np=out.proposal;
+   await showFound(prog,np);
    let circuits=np.circuits,positions=np.positions;
    if(positions<p.positions){circuits=resize(circuits,p.positions);positions=p.positions;}
    // Les corrections de l'utilisateur sont réappliquées si le disjoncteur occupe les mêmes positions.
@@ -307,6 +317,6 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
    const np2={...p,positions,circuits,review:{...np.review},steps:np.steps,warnings:np.warnings};
    const note2=`${changed.size} circuit(s) ajouté(s) ou modifié(s) grâce aux photos de précision.`+(np.warnings.length?' À vérifier : '+np.warnings.slice(0,4).join(' · '):'');
    confirm(np2,{circuits,edited,changed,note:note2});
-  }catch(e){clarify(p,state,e.message);}
+  }catch(e){prog.stop();clarify(p,state,e.message);}
  }
 }

@@ -37,6 +37,29 @@ export async function api(path,{method='GET',body}={}){
  return data;
 }
 
+// Requête avec progression de l'envoi (photos volumineuses) : onUpload(fraction 0..1). Même comportement d'erreurs que api().
+export function apiProgress(path,{method='POST',body,onUpload}={}){
+ if(demo.active&&demo.handler)return demo.handler(path,{method,body});
+ return new Promise((resolve,reject)=>{
+  const x=new XMLHttpRequest();
+  x.open(method,API_BASE+path);
+  x.setRequestHeader('X-MP-Client',NATIVE?'native':'web');
+  if(body!==undefined)x.setRequestHeader('Content-Type','application/json');
+  if(token)x.setRequestHeader('Authorization','Bearer '+token);
+  x.withCredentials=!NATIVE;
+  if(onUpload&&x.upload)x.upload.onprogress=e=>{if(e.lengthComputable)onUpload(e.loaded/e.total);};
+  if(onUpload&&x.upload)x.upload.onload=()=>onUpload(1);
+  x.onerror=()=>reject(Object.assign(Error('Connexion impossible. Vérifiez votre accès Internet.'),{offline:true}));
+  x.onload=()=>{
+   let data={};try{data=JSON.parse(x.responseText);}catch{}
+   if(x.status>=200&&x.status<300){setOffline(false);return resolve(data);}
+   if(x.status===401&&data.auth)onAuthLost();
+   reject(Object.assign(Error(data.error||'Erreur '+x.status),{status:x.status,data}));
+  };
+  x.send(body===undefined?undefined:JSON.stringify(body));
+ });
+}
+
 // Ouvre un PDF généré côté serveur via un lien signé temporaire.
 export async function openDocument(params){
  if(demo.active){window.open('/assets/exemple-rapport.pdf','_blank');return;}

@@ -2,7 +2,8 @@
 // Un électroménager relié est une charge du circuit (circuit.loads) : il alimente le calcul de charge.
 // Un électroménager pas encore relié reste dans la fiche du panneau (details.appliances).
 import {h,dialog,toast,field,select} from './dom.js';
-import {api} from './api.js';
+import {api,apiProgress} from './api.js';
+import {aiProgress} from './aiprogress.js';
 import {prepare} from './aiimport.js';
 import {LOAD_LIBRARY,LOAD_CATEGORIES,VOLTAGES} from '../catalog.js';
 import {designation} from '../model.js';
@@ -72,29 +73,38 @@ export async function addDialog({panel,save,onChange,edit=null}){
  const lib=select('lib',[['','— Choisir dans la liste —'],...LOAD_LIBRARY.map(l=>[l.id,`${l.g} · ${l.name}`])],'');
  lib.addEventListener('change',()=>{const l=LOAD_LIBRARY.find(x=>x.id===lib.value);if(!l)return;f.name.value=l.name;f.w.value=l.w;f.v.value=String(l.v);f.cont.checked=!!l.cont;f.cat.value=l.cat;catTouched=true;source='liste';note.textContent='Valeur typique : vérifiez la plaque de votre appareil.';drawCircuit();});
  const photo=h('input',{type:'file',accept:'image/*',capture:'environment',class:'sr-only',id:'plateFile'});
+ const progBox=h('div',{class:'ai-prog-box'});
  photo.addEventListener('change',async()=>{
   const file=photo.files[0];if(!file)return;
-  note.textContent='Lecture de la plaque…';
+  note.textContent='';
+  const prog=aiProgress({steps:['Préparation de la photo','Envoi de la photo','Lecture de la plaque par l’IA','Remplissage des champs'],weights:[10,20,55,15],analysisIndex:2,expectedMs:12000,
+   details:['Recherche de la plaque signalétique…','Lecture du nom, de la marque et du modèle…','Lecture de la puissance et de la tension…']});
+  progBox.replaceChildren(h('b',{text:'Analyse de la plaque'}),prog.el);
   try{
+   prog.stage(0,0);
    const p=await prepare(file);
-   const out=await api('/api/panels?action=nameplate',{method:'POST',body:{files:[{name:p.name,data:p.data}]}});
+   prog.stage(1,0);
+   const out=await apiProgress('/api/panels?action=nameplate',{method:'POST',body:{files:[{name:p.name,data:p.data}]},onUpload:fr=>prog.stage(fr>=1?2:1,fr>=1?0:fr)});
    const r=out.plate;
-   if(!r.is_nameplate){note.textContent='Plaque non reconnue : prenez la photo plus près, bien éclairée, ou saisissez la puissance à la main.';return;}
+   if(!r.is_nameplate){prog.stop();progBox.replaceChildren();note.textContent='Plaque non reconnue : prenez la photo plus près, bien éclairée, ou saisissez la puissance à la main.';return;}
+   prog.stage(3,0);
+   await prog.results([r.name&&`Appareil : ${[r.name,r.brand].filter(Boolean).join(' · ')}`,r.model&&`Modèle : ${r.model}`,r.watts&&`Puissance : ${r.watts} W`,[120,208,240,347,600].includes(r.volts)&&`Tension : ${r.volts} V`].filter(Boolean),{delay:260});
    if(r.name)f.name.value=[r.name,r.brand].filter(Boolean).join(' · ').slice(0,80);
    if(r.model)f.model.value=String(r.model).slice(0,60);
    if(r.watts)f.w.value=r.watts;
    if([120,208,240,347,600].includes(r.volts))f.v.value=String(r.volts);
    source='plaque';autoCat();
+   prog.finish();setTimeout(()=>progBox.replaceChildren(),2500);
    note.textContent=`Lu par l’IA (confiance ${Math.round((r.confidence||0)*100)} %)${r.model?' · modèle '+r.model:''}${r.watts?'':' · puissance illisible : saisissez-la'}. ${r.notes||''} Vérifiez avant d’enregistrer.`;
    drawCircuit();
-  }catch(e){note.textContent=e.message;}
+  }catch(e){prog.stop();progBox.replaceChildren();note.textContent=e.message;}
   finally{photo.value='';}
  });
  const photoBlock=status.allowed&&status.configured
   ?h('div',{class:'page-actions'},h('label',{class:'btn primary',for:'plateFile'},'📷 Photographier la plaque signalétique'),photo,h('span',{class:'small muted',text:`Compte pour 1 analyse IA${status.monthly!=null?` (${status.used}/${status.monthly} ce mois-ci)`:''}.`}))
   :h('p',{class:'small muted',text:'La lecture de plaque par IA est incluse dans les forfaits payants. Vous pouvez saisir la puissance à la main ou choisir dans la liste.'});
  const d=dialog({title:edit?'Modifier l’électroménager':'Ajouter un électroménager',eyebrow:'Étape Vérification · '+(panel.tag||panel.name),form:true,wide:true,
-  body:[photoBlock,h('div',{class:'fields'},field('Ou choisir dans la liste',lib,{full:true}),field('Nom',f.name,{full:true}),field('Numéro de modèle',f.model,{full:true,hint:'Détecté par l’IA sur la plaque signalétique, modifiable.'}),field('Puissance (W)',f.w),field('Tension',f.v),field('Quantité',f.qty),field('Catégorie de charge',f.cat,{full:true,hint:'Détermine le calcul : « Cuisinière » applique la règle 8-300 au circuit (8 000 W + 40 %) et 6 000 W + 40 % à l’entrée.'}),h('label',{class:'check full'},f.cont,' Charge continue (3 heures ou plus) : disjoncteur ≥ 125 %')),note,circuitBox],
+  body:[photoBlock,progBox,h('div',{class:'fields'},field('Ou choisir dans la liste',lib,{full:true}),field('Nom',f.name,{full:true}),field('Numéro de modèle',f.model,{full:true,hint:'Détecté par l’IA sur la plaque signalétique, modifiable.'}),field('Puissance (W)',f.w),field('Tension',f.v),field('Quantité',f.qty),field('Catégorie de charge',f.cat,{full:true,hint:'Détermine le calcul : « Cuisinière » applique la règle 8-300 au circuit (8 000 W + 40 %) et 6 000 W + 40 % à l’entrée.'}),h('label',{class:'check full'},f.cont,' Charge continue (3 heures ou plus) : disjoncteur ≥ 125 %')),note,circuitBox],
   actions:[{label:'Annuler',kind:'ghost'},{label:'Enregistrer',kind:'primary',submit:true}]});
  drawCircuit();
  d.form.addEventListener('submit',async ev=>{

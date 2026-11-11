@@ -244,3 +244,7 @@ Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/
 
 - **Police** : Manrope (identité Disjonio, par défaut) ou Inter, hébergées dans `public/fonts/` (licence OFL, `@font-face` dans `mp.css`), ou la police du système. Réglage : **Administration → Site** (stocké dans `app_settings` clé `site`, renvoyé par `GET /api/auth` et appliqué par `public/js/sitefont.js` sur l'application et les pages publiques).
 - **Logo** : `public/branding/disjonio/` (kit d'identité). Le symbole est dans l'en-tête, les icônes PWA/mobiles (`node scripts/icons.mjs`) et le pied de page des PDF (`node scripts/brandmark-png.mjs` régénère `api/_data/brandmark.js`).
+
+## Progression des analyses par IA
+
+`public/js/aiprogress.js` : barre de progression, étapes cochées, temps écoulé et résultats qui apparaissent un à un (circuits lus, champs de la plaque). L'**envoi** des photos est mesuré pour de vrai (`apiProgress` dans `api.js`, XHR) ; l'**attente de l'IA** est estimée (sa durée réelle n'est pas connue d'avance, la barre plafonne à ~94 % jusqu'à la réponse). Utilisée pour la plaque signalétique d'un électroménager et l'ajout d'un panneau par photos (et photos de précision).
