@@ -43,6 +43,15 @@ async function ensureSchema(sql){
   positions integer NOT NULL DEFAULT 32, details jsonb NOT NULL DEFAULT '{}'::jsonb, circuits jsonb NOT NULL,
   revision integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
  await sql`CREATE INDEX IF NOT EXISTS app_panels_site ON app_panels(site_id)`;
+ // ---- Corbeille (30 jours) et historique des versions d'un panneau ----
+ await sql`CREATE TABLE IF NOT EXISTS app_trash(
+  id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, kind text NOT NULL, ref_id uuid NOT NULL, title text NOT NULL DEFAULT '',
+  data jsonb NOT NULL, deleted_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_trash_user ON app_trash(user_id)`;
+ await sql`CREATE TABLE IF NOT EXISTS app_panel_history(
+  id bigserial PRIMARY KEY, panel_id uuid NOT NULL REFERENCES app_panels(id) ON DELETE CASCADE, user_id uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  at timestamptz NOT NULL DEFAULT now(), revision integer NOT NULL DEFAULT 0, initial boolean NOT NULL DEFAULT false, snap jsonb NOT NULL)`;
+ await sql`CREATE INDEX IF NOT EXISTS app_panel_history_panel ON app_panel_history(panel_id,id)`;
  // ---- Abonnements (v2.1) ----
  await sql`CREATE TABLE IF NOT EXISTS app_plans(
   id text PRIMARY KEY, name text NOT NULL, audience text NOT NULL, description text NOT NULL DEFAULT '',

@@ -66,3 +66,17 @@ test('PDF de calcul : cadre du calcul et mention « Résultat historique »',asy
   }
  }
 });
+
+import {diffCircuits} from '../public/js/history.js';
+test('historique : différences entre deux versions',()=>{
+ const a=circuits(3),b=structuredClone(a);
+ b[1].label='Prises cuisine';b[1].status='Identifié';
+ b.push({...circuits(1)[0],id:'cx',slots:['9A']});
+ a.push({...circuits(1)[0],id:'old',slots:['11A']});
+ const d=diffCircuits(a,b);
+ const c1=d.find(x=>x.id==='c1');
+ assert.deepEqual(c1.changes.map(x=>[x.k,x.from,x.to]),[['label','—','Prises cuisine'],['status','À confirmer','Identifié']]);
+ assert.ok(d.find(x=>x.id==='cx'&&x.added));
+ assert.ok(d.find(x=>x.id==='old'&&x.removed));
+ assert.equal(d.find(x=>x.id==='c0'),undefined);
+});

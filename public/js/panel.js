@@ -5,6 +5,7 @@ import {qrMatrix,qrSvg,panelLink,qrAllowed} from '../qr.js';
 import {voltsOf} from '../voltage.js';
 import {calcFingerprint,CODE_EDITION,designation,sortCircuits,stats,fold,searchable,allTags,tagGroups,slotPos,slotOrder,panelTitle,siteAddress,states} from '../model.js';
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
+import {historyDialog} from './history.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
 import {GUIDE_STEPS,GUIDE_DISCLAIMER} from '../loadguide.js';
@@ -146,6 +147,7 @@ export async function panelView({id,tab='panel',ctx}){
    data.access!=='view'&&item('📷 Garnir par photos (IA)',garnir),
    qr&&item('▦ Code QR',qrDialog),
    item('📄 Aide-mémoire PDF',()=>doc({kind:'door'})),
+   data.access!=='view'&&item('🕘 Historique',()=>historyDialog({panel,persist,onDone:()=>{renderHead();renderBody();}})),
    item('🖨 Rapports et étiquettes',()=>go('docs')));
   const btn=h('button',{type:'button','aria-haspopup':'menu','aria-expanded':'false'},'⋯ Plus d’actions');
   btn.onclick=e=>{e.stopPropagation();const open=menu.classList.toggle('open');btn.setAttribute('aria-expanded',String(open));};
@@ -386,8 +388,8 @@ export async function panelView({id,tab='panel',ctx}){
   body.replaceChildren(form,h('p',{class:'small muted mt',text:`Créé le ${new Date(panel.createdAt).toLocaleDateString((globalThis.MP_LOCALE||'fr-CA'))} · modifié ${fmtRelative(panel.updatedAt)} · révision ${panel.revision}`}));
  }
  async function remove(){
-  if(!await confirmDialog(`Supprimer définitivement « ${panelTitle(panel)} » et ses ${panel.circuits.length} circuits ? Cette action est irréversible.`,{title:'Supprimer le panneau',confirm:'Supprimer',danger:true}))return;
-  try{await api('/api/panels?id='+panel.id,{method:'DELETE'});toast('Panneau supprimé.');location.hash='#/sites/'+site.id;}catch(e){toast(e.message);}
+  if(!await confirmDialog(`Supprimer « ${panelTitle(panel)} » et ses ${panel.circuits.length} circuits ? Il sera placé dans la corbeille pendant 30 jours : vous pourrez le restaurer.`,{title:'Supprimer le panneau',confirm:'Mettre à la corbeille',danger:true}))return;
+  try{await api('/api/panels?id='+panel.id,{method:'DELETE'});toast('Panneau placé dans la corbeille (30 jours).');location.hash='#/sites/'+site.id;}catch(e){toast(e.message);}
  }
 
  // Création d'un sous-panneau pré-relié à un circuit de ce panneau (sans quitter la page).

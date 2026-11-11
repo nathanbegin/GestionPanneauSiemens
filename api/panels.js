@@ -11,6 +11,8 @@ import {siteAccess,panelAccess,need} from './_lib/shares.js';
 import {scanPanel,scanNameplate,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
 import {scanToPanel} from '../public/aiscan.js';
 import {makeCalcRecord} from './_lib/calcrecord.js';
+import {trashPanel} from './_lib/trash.js';
+import {recordHistory,listHistory,getVersion} from './_lib/history.js';
 import {rateLimit,recordAttempt} from './_lib/auth.js';
 
 function checkPositions(v){
@@ -118,6 +120,11 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  const pa=need(await panelAccess(sql,user.id,id),req.method==='PUT');
  if(req.method==='DELETE'&&pa.role!=='owner')throw new HttpError(403,'Seul le propriétaire peut supprimer ce panneau.');
  const row=pa.panel;
+ if(req.method==='GET'&&req.query?.action==='history'){
+  // Historique : liste des versions, ou une version avec la précédente (?hid=).
+  if(req.query.hid){const v=await getVersion(sql,id,Number(req.query.hid));if(!v)throw new HttpError(404,'Version introuvable.');return res.status(200).json(v);}
+  return res.status(200).json({versions:await listHistory(sql,id)});
+ }
  if(req.method==='GET'){
   const [site]=await sql`SELECT * FROM app_sites WHERE id=${row.site_id}`;
   const all=await sql`SELECT id,name,tag,kind,details,circuits FROM app_panels WHERE site_id=${row.site_id} ORDER BY created_at`;
@@ -128,6 +135,7 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   return res.status(200).json({panel:panelOut(row),site:siteOut(site),siblings,children,access:pa.role,sharedBy:pa.by||null});
  }
  if(req.method==='DELETE'){
+  await trashPanel(sql,row.user_id,row); // corbeille : récupérable 30 jours
   await sql`DELETE FROM app_panels WHERE id=${id} AND user_id=${row.user_id}`;
   // Les panneaux qui étaient alimentés par celui-ci perdent ce lien.
   await sql`UPDATE app_panels SET details=jsonb_set(details,'{fedFrom}','""'::jsonb) WHERE site_id=${row.site_id} AND details->>'fedFrom'=${id}`;
@@ -168,5 +176,6 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  const [u]=await sql`UPDATE app_panels SET name=${name},tag=${tag},kind=${kind},location=${location},details=${JSON.stringify(details)}::jsonb,positions=${positions},circuits=${JSON.stringify(circuits)}::jsonb,revision=revision+1,updated_at=now() WHERE id=${id} AND revision=${data.revision} RETURNING *`;
  if(!u)throw new HttpError(409,'Ce panneau a été modifié ailleurs (autre appareil ou onglet). Rechargez la page pour voir la dernière version.',{conflict:true});
  await sql`UPDATE app_sites SET updated_at=now() WHERE id=${row.site_id}`;
+ try{await recordHistory(sql,{panel:u,userId:user.id,previous:row});}catch(e){console.error('history',e?.message);}
  return res.status(200).json({panel:panelOut(u)});
 });

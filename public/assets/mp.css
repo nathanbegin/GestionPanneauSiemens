@@ -844,3 +844,13 @@ body.is-offline .topbar{top:36px}
 /* Mode hors ligne */
 .offline-bar{position:sticky;top:0;z-index:60;background:#fff3cd;color:#6b4e00;border-bottom:1px solid #e6cf85;padding:8px 14px;font-size:14px;text-align:center}
 body.is-offline .topbar{top:36px}
+/* Corbeille et historique */
+.trash-list{display:grid;gap:10px}
+.trash-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;flex-wrap:wrap}
+.history-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;min-height:260px}
+.history-list{list-style:none;margin:0;padding:0;display:grid;gap:4px;align-content:start;max-height:60vh;overflow:auto}
+.history-list button{width:100%;display:grid;text-align:left;gap:2px;padding:8px 10px}
+.history-list button.on{background:var(--ink);color:#fff}.history-list button.on small{color:#cfe0d4}
+.diff-list{margin:8px 0;padding-left:18px;display:grid;gap:8px}
+.diff-list ul{margin:4px 0;padding-left:18px}
+@media (max-width:720px){.history-grid{grid-template-columns:1fr}.history-list{max-height:200px}}

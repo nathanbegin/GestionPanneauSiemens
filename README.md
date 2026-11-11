@@ -221,3 +221,8 @@ Pour **ajouter Apple ou un autre fournisseur** : une entrée dans `api/_lib/sso/
 - **Pas encore possible hors ligne** : modifier (l'enregistrement échoue avec « Réessayer »), générer des PDF, analyser des photos.
 - Les copies sont effacées à la déconnexion et si un autre compte se connecte sur l'appareil.
 - Rafraîchir une copie : bouton « 📥 Hors ligne ✓ » → Actualiser.
+
+## Corbeille et historique des versions
+
+- **Corbeille** : supprimer un site ou un panneau le déplace 30 jours dans `app_trash` (copie JSON, historique inclus) avant l'effacement définitif; « 🗑 Corbeille » (page Mes sites) restaure ou supprime pour de bon. La restauration respecte les limites du forfait. Les partages d'un site supprimé ne sont pas restaurés.
+- **Historique** : chaque enregistrement d'un panneau crée un instantané (`app_panel_history`), regroupé par rafales de 10 minutes pour une même personne; 60 versions gardées. « ⋯ Plus d'actions → 🕘 Historique » montre qui a changé quoi, remet l'ancienne valeur d'un circuit ou restaure tout le panneau (la restauration est elle-même une nouvelle version).

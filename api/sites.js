@@ -6,12 +6,21 @@ import {assertCanCreateSite} from './_lib/plans.js';
 import {cleanSite,designation,panelTitle} from '../public/model.js';
 import {siteOut,panelSummary} from './_lib/serialize.js';
 import {sharesFor,siteAccess,need} from './_lib/shares.js';
+import {trashSite,listTrash,restoreTrash,purgeTrash} from './_lib/trash.js';
 
 export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
  const sql=await getSql();
  const user=await requireUser(req,sql);
  const id=req.query?.id?String(req.query.id):'';
  if(id&&!isUuid(id))throw new HttpError(404,'Site introuvable.');
+ // Corbeille : liste, restauration, suppression définitive.
+ const action=String(req.query?.action||'');
+ if(action==='trash'&&req.method==='GET')return res.status(200).json({items:await listTrash(sql,user.id)});
+ if(action.startsWith('trash-')){
+  const tid=String(req.query?.tid||'');if(!isUuid(tid))throw new HttpError(404,'Élément introuvable.');
+  if(action==='trash-restore'&&req.method==='POST')return res.status(200).json({ok:true,...await restoreTrash(sql,user.id,tid)});
+  if(action==='trash-purge'&&req.method==='DELETE'){await purgeTrash(sql,user.id,tid);return res.status(200).json({ok:true});}
+ }
  // Recherche sur l'ensemble des sites de l'utilisateur : site, client, adresse, panneau, circuit.
  if(req.method==='GET'&&!id&&req.query?.search!==undefined){
   const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -77,6 +86,11 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   const [u]=await sql`UPDATE app_sites SET name=${site.name},client=${site.client},street=${site.street},city=${site.city},province=${site.province},postal_code=${site.postalCode},notes=${site.notes},bipolar_volts=${site.bipolarVolts},updated_at=now() WHERE id=${id} RETURNING *`;
   return res.status(200).json({site:siteOut(u)});
  }
+ // Mise en corbeille (30 jours) avant la suppression : le site et ses panneaux sont récupérables.
+ if(row.user_id===user.id){
+  const prows=await sql`SELECT * FROM app_panels WHERE site_id=${id}`;
+  await trashSite(sql,user.id,row,prows);
+ }
  await sql`DELETE FROM app_sites WHERE id=${id} AND user_id=${user.id}`;
- return res.status(200).json({ok:true});
+ return res.status(200).json({ok:true,trashed:true});
 });

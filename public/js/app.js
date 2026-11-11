@@ -1,6 +1,7 @@
 // Application Disjonio : routeur, authentification, sites, compte.
 import {brandingCard} from './branding.js';
 import {ssoButtons,ssoCard,handleSsoReturn} from './sso.js'; // SSO
+import {trashDialog} from './trash.js';
 import {net,bindUser,clearOffline,listDownloads,getDownload,downloadSite,removeDownload} from './offline.js';
 import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
@@ -149,6 +150,7 @@ async function sitesView(){
   h('div',{class:'ico',text:'🏠'}),h('h2',{text:`Bienvenue, ${first} !`}),h('p',{text:'Commencez par ajouter un site : l’adresse d’une maison, d’un chalet ou d’un client. Vous y ajouterez ensuite ses panneaux électriques.'}),
   h('div',{class:'onboard'},h('div',{},h('b',{text:'1. Un site'}),h('span',{text:'Une adresse (maison, chalet, client).'})),h('div',{},h('b',{text:'2. Ses panneaux'}),h('span',{text:'Principal, sous-panneau du garage…'})),h('div',{},h('b',{text:'3. Les circuits'}),h('span',{text:'Touchez chaque disjoncteur et décrivez-le.'}))),
   h('button',{type:'button',class:'primary lg',onclick:create},'+ Ajouter mon premier site'),
+  h('p',{class:'small muted mt'},h('button',{type:'button',class:'link',onclick:()=>trashDialog({onRestored:route})},'🗑 Corbeille'),' (sites et panneaux supprimés, récupérables 30 jours)'),
   h('p',{class:'small muted mt'},'Forfait gratuit : 5 panneaux. ',h('a',{href:'#/abonnement',text:'Voir les forfaits'}),'.'),
   h('p',{class:'small muted mt'},'Vous utilisiez l’ancienne version avec une clé d’accès ? ',h('a',{href:'#/compte',text:'Importez vos panneaux'}),'.')));
  const resume=recents().filter(r=>sites.some(x=>x.panels.some(p=>p.id===r.id))).slice(0,3);
@@ -169,7 +171,7 @@ async function sitesView(){
    h('div',{class:'small muted',text:'Modifié '+fmtRelative(s.updatedAt)}))),
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
  return h('div',{class:'container'},
-  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
+  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',onclick:()=>trashDialog({onRestored:route})},'🗑 Corbeille'),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
   gsearch,found,(()=>{gridWrap.append(resumeBox||'',grid);return gridWrap;})());
 }
 
@@ -211,7 +213,7 @@ async function siteView(id){
   const d=dialog({title:'Disponible hors ligne',eyebrow:site.name,body:[h('p',{class:'muted',text:`Copie enregistrée ${fmtRelative(dlRec.savedAt)} sur cet appareil. Les PDF, les photos et les modifications exigent une connexion.`})],actions:[{label:'Fermer',kind:'ghost'},{label:'Retirer de cet appareil',kind:'danger',onClick:async()=>{await removeDownload(site.id);toast('Copie hors ligne retirée.');route();}},{label:'Actualiser',kind:'primary',onClick:()=>{run();}}]});
  }},dlRec?'📥 Hors ligne ✓':'📥 Rendre disponible hors ligne');
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
- const remove=async()=>{if(!await confirmDialog(`Supprimer « ${site.name} », ses ${panels.length} panneau(x) et tous leurs circuits ? Cette action est irréversible.`,{title:'Supprimer le site',confirm:'Supprimer définitivement',danger:true}))return;await api('/api/sites?id='+site.id,{method:'DELETE'});toast('Site supprimé.');location.hash='#/sites';};
+ const remove=async()=>{if(!await confirmDialog(`Supprimer « ${site.name} », ses ${panels.length} panneau(x) et tous leurs circuits ? Il sera placé dans la corbeille pendant 30 jours : vous pourrez le restaurer.`,{title:'Supprimer le site',confirm:'Mettre à la corbeille',danger:true}))return;await api('/api/sites?id='+site.id,{method:'DELETE'});toast('Site placé dans la corbeille (30 jours).');location.hash='#/sites';};
  const report=async()=>{try{toast('Génération du rapport du site…');await openDocument({site:site.id,kind:'report'});}catch(e){toast(e.message);}};
  const panelCards=panels.map(p=>h('a',{class:'card panel-card',href:'#/panneaux/'+p.id},
   h('div',{class:'row'},h('span',{class:'badge tag',text:p.tag||'—'}),h('span',{text:p.kind})),
