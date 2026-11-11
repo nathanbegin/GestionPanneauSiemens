@@ -5,7 +5,7 @@ import {aiImportDialog} from './aiimport.js';
 import {guidedDialog} from './guided.js';
 import {feedbackDialog} from './feedback.js';
 import {teamView,joinInviteView,shareDialog} from './team.js';
-import {h,toast,confirmDialog,fmtRelative,field,dialog,select} from './dom.js';
+import {h,toast,confirmDialog,fmtRelative,field,dialog,select,hasUnsaved,discardUnsaved} from './dom.js';
 import {api,setToken,handleAuthLost,openDocument,NATIVE,webUrl} from './api.js';
 import {siteAddress,panelTitle,APP_VERSION} from '../model.js';
 import {siteDialog,panelDialog,siteFields,formData} from './forms.js';
@@ -170,11 +170,11 @@ async function siteView(id){
   if(!panels.length){toast('Relevez d’abord un panneau : la vérification se base sur ses circuits.');return releveChoices();}
   const sel=select('p',panels.map(p=>[p.id,panelTitle(p)]),panels[0].id);
   const d=dialog({title:'Vérifier la charge d’un panneau',eyebrow:site.name,body:[h('p',{class:'muted',text:'Inscrivez les gros électroménagers (avec la plaque signalétique en photo) et reliez-les au bon circuit. Le calcul de charge se base sur le relevé déjà fait.'}),field('Panneau',sel)],actions:[{label:'Annuler',kind:'ghost'},{label:'Ouvrir la vérification',kind:'primary',onClick:()=>{location.hash=`#/panneaux/${sel.value}/appliances`;}}]});};
- const addPanel=()=>{const d=dialog({title:'Que souhaitez-vous faire ?',eyebrow:'Nouveau projet de panneau · '+site.name,wide:true,body:[h('div',{class:'stage-choices'},
-   choice('✏️','1. Concevoir','Assistant : bâtiment, gros appareils, calcul de l’entrée, modèle et disposition des circuits.',()=>{d.close();designDialog({site,onCreated:p=>{location.hash='#/panneaux/'+p.id;},onManual:()=>createPanel({stage:'conception',state:'Planifié'},'Nouveau panneau à concevoir')});}),
-   choice('📋','2. Relever l’existant','Un panneau est en place : photos (IA), questions ou saisie, pour clarifier ou agrandir.',()=>{d.close();releveChoices();}),
-   choice('🔌','3. Vérifier la charge','Inscrire les gros électroménagers et les relier aux circuits.',()=>{d.close();verifyChoices();})),
-   h('p',{class:'small muted',text:'Ces trois étapes se suivent : vous pouvez passer de l’une à l’autre sur le même panneau, sans rien ressaisir.'})],actions:[{label:'Annuler',kind:'ghost'}]});};
+ // Une seule entrée « Ajouter un panneau » : panneau existant (relevé) ou projet de panneau (conception).
+ const addPanel=()=>{const d=dialog({title:'Ajouter un panneau',eyebrow:site.name,wide:true,body:[h('div',{class:'stage-choices'},
+   choice('📋','Panneau existant','Il est déjà installé : le relever par photo (IA), par questions ou par saisie.',()=>{d.close();releveChoices();}),
+   choice('✏️','Projet de panneau','Il n’existe pas encore : concevoir un nouveau panneau ou un agrandissement.',()=>{d.close();designDialog({site,onCreated:p=>{location.hash='#/panneaux/'+p.id;},onManual:()=>createPanel({stage:'conception',state:'Planifié'},'Nouveau panneau à concevoir')});})),
+   panels.length>0&&h('p',{class:'small'},h('button',{type:'button',class:'link',onclick:()=>{d.close();verifyChoices();}},'Vérifier la charge d’un panneau existant'),' (électroménagers et calcul).')],actions:[{label:'Annuler',kind:'ghost'}]});};
  const edit=()=>siteDialog(site,async f=>{await api('/api/sites?id='+site.id,{method:'PUT',body:f});toast('Site modifié.');route();});
  const remove=async()=>{if(!await confirmDialog(`Supprimer « ${site.name} », ses ${panels.length} panneau(x) et tous leurs circuits ? Cette action est irréversible.`,{title:'Supprimer le site',confirm:'Supprimer définitivement',danger:true}))return;await api('/api/sites?id='+site.id,{method:'DELETE'});toast('Site supprimé.');location.hash='#/sites';};
  const report=async()=>{try{toast('Génération du rapport du site…');await openDocument({site:site.id,kind:'report'});}catch(e){toast(e.message);}};
@@ -186,11 +186,11 @@ async function siteView(id){
  return h('div',{class:'container'},
   h('div',{class:'page-head'},
    h('div',{},h('div',{class:'eyebrow',text:'Site'}),h('h1',{text:site.name}),h('div',{class:'sub',text:siteAddress(site)||'Adresse à préciser'}),site.client&&h('div',{class:'sub',text:'Client : '+site.client})),
-   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',onclick:addGuided},'🧭 Mode guidé'),h('button',{type:'button',onclick:addByPhoto},'📷 Ajouter par photo (IA)'),h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
+   h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
     panels.length?(()=>{const g=h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'));return h('div',{},h('div',{class:'cards-toolbar'},viewToggle('mp_panels_view',g)),g);})()
-     :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'▦'}),h('h2',{text:'Aucun panneau pour l’instant'}),h('p',{text:'Ajoutez le panneau principal. Vous pourrez ensuite ajouter les sous-panneaux (garage, atelier, logement…) et indiquer lequel alimente l’autre.'}),h('div',{class:'page-actions center'},h('button',{type:'button',class:'primary lg',onclick:addPanel},'+ Ajouter le panneau principal'),h('button',{type:'button',class:'lg',onclick:addGuided},'🧭 Mode guidé (questions)'),h('button',{type:'button',class:'lg',onclick:addByPhoto},'📷 Par photo (IA)')))),
+     :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'▦'}),h('h2',{text:'Aucun panneau pour l’instant'}),h('p',{text:'Ajoutez le panneau principal. Vous pourrez ensuite ajouter les sous-panneaux (garage, atelier, logement…) et indiquer lequel alimente l’autre.'}),h('div',{class:'page-actions center'},h('button',{type:'button',class:'primary lg',onclick:addPanel},'+ Ajouter le panneau principal')))),
    h('aside',{class:'stack'},
     panels.length>0&&h('div',{class:'card side-card'},h('h3',{text:'Hiérarchie d’alimentation'}),tree(panels)),
     h('div',{class:'card side-card'},h('h3',{text:'Informations'}),h('dl',{class:'facts'},h('dt',{text:'Adresse'}),h('dd',{text:siteAddress(site)||'—'}),h('dt',{text:'Client'}),h('dd',{text:site.client||'—'}),h('dt',{text:'Panneaux'}),h('dd',{text:String(panels.length)}),h('dt',{text:'Modifié'}),h('dd',{text:fmtRelative(site.updatedAt)})),site.notes&&h('p',{class:'small muted mt',text:site.notes})),
@@ -282,7 +282,16 @@ async function route(){
  }
 }
 let lastPath='';
-window.addEventListener('hashchange',()=>{
+let settledHash=location.hash,guarding=false;
+window.addEventListener('hashchange',async()=>{
+ // Saisie non enregistrée : on revient en arrière et on demande confirmation avant de quitter la page.
+ if(guarding){guarding=false;return;}
+ if(hasUnsaved()){
+  const target=location.hash;guarding=true;location.hash=settledHash;
+  if(!await confirmDialog('Quitter cette page sans enregistrer vos modifications ?',{title:'Modifications non enregistrées',confirm:'Quitter sans enregistrer'}))return;
+  discardUnsaved();guarding=false;location.hash=target;return;
+ }
+ settledHash=location.hash;
  // Changer d'onglet d'un panneau ne recharge pas toute la vue.
  const path=location.hash.split('/').slice(0,3).join('/');
  if(path===lastPath&&location.hash.startsWith('#/panneaux/'))return;

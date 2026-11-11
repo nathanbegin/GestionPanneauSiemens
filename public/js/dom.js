@@ -26,12 +26,21 @@ export function toast(message,ms=4500){
 }
 
 // Boîte de dialogue modale. actions : [{label, kind:'primary'|'danger'|'ghost', left, onClick(close) -> false pour garder ouvert}]
-export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide=false,beforeClose}){
+// Saisies non enregistrées : chaque fenêtre à formulaire (ou fournissant dirty()) s'inscrit ici, pour protéger
+// la croix, Échap, la fermeture de l'onglet et la navigation (retour, changement de page).
+const unsaved=new Set();
+export const hasUnsaved=()=>[...unsaved].some(f=>f());
+export function discardUnsaved(){document.querySelectorAll('dialog[open]').forEach(d=>d.close());unsaved.clear();}
+let leaveHooked=false;
+export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide=false,beforeClose,dirty,side=false}){
  const foot=h('div',{class:'dlg-foot'});
  const right=h('div',{class:'right'});
  const close=()=>{if(el.open)el.close();};
  // Sorties « douces » (croix, Échap) : beforeClose peut les refuser (ex. saisie non enregistrée).
- const tryClose=async()=>{if(beforeClose&&await beforeClose()===false)return;close();};
+ let touched=false;
+ const isDirty=()=>dirty?!!dirty():touched;
+ const guard=beforeClose||(async()=>{if(isDirty()&&!await confirmDialog('Fermer sans enregistrer les modifications ?',{confirm:'Fermer sans enregistrer'}))return false;});
+ const tryClose=async()=>{if(await guard()===false)return;close();};
  for(const a of actions){
   const b=h('button',{type:a.submit?'submit':'button',class:a.kind||'',text:a.label});
   // Tout bouton sans « submit » ferme la boîte, après son action éventuelle (sauf si elle renvoie false).
@@ -44,9 +53,12 @@ export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide
  const el=h('dialog',{},inner);
  // wide : true (860 px) ou 'xl' (presque toute la largeur de l'écran, pour voir un panneau en grand).
  if(wide==='xl')el.classList.add('xl');else if(wide)el.style.width='min(860px, calc(100vw - 24px))';
- el.addEventListener('cancel',ev=>{if(beforeClose){ev.preventDefault();tryClose();}});
- el.addEventListener('close',()=>{el.remove();onClose?.();});
- document.body.append(el);el.showModal();
+ el.addEventListener('cancel',ev=>{ev.preventDefault();tryClose();});
+ if(form||dirty){unsaved.add(isDirty);if(form){inner.addEventListener('input',()=>{touched=true;});inner.addEventListener('change',()=>{touched=true;});}}
+ if(!leaveHooked){leaveHooked=true;window.addEventListener('beforeunload',ev=>{if(hasUnsaved()){ev.preventDefault();ev.returnValue='';}});}
+ el.addEventListener('close',()=>{unsaved.delete(isDirty);el.remove();onClose?.();});
+ document.body.append(el);
+ if(side){el.classList.add('side');el.show();}else el.showModal();
  return {el,close,form:form?inner:null};
 }
 export function confirmDialog(message,{title='Confirmer',confirm='Confirmer',danger=false}={}){

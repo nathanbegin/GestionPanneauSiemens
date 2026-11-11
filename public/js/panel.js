@@ -25,8 +25,6 @@ const statusClass=c=>c.vacant?'free vacant':c.status==='Identifié'?'identified'
 const shortText=c=>c.vacant?'Espace inutilisé':c.status==='Libre'?'Libre':c.label||'';
 const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',appliances:'🔌 Électroménagers',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
 // Onglets de chaque étape du projet (l'onglet ouvert reste toujours accessible).
-const STAGE_TABS={conception:['plan','panel','docs','info'],releve:['panel','list','docs','info'],verification:['appliances','plan','panel','list','docs','info']};
-const NEXT_STAGE={conception:['releve','Le panneau est installé : relever ses circuits'],releve:['verification','Vérifier la charge et les électroménagers'],verification:['releve','Retour au relevé des circuits']};
 
 export async function panelView({id,tab='panel',ctx}){
  const [data,ent]=await Promise.all([api('/api/panels?id='+encodeURIComponent(id)),api('/api/billing').catch(()=>null)]);
@@ -96,13 +94,20 @@ export async function panelView({id,tab='panel',ctx}){
    toast('Copie créée : concevez-y votre agrandissement.');location.hash='#/panneaux/'+out.panel.id;
   }catch(e){toast(e.message,8000);}
  }
+ // Avancement du projet (indicateur), distinct de la navigation entre les outils (onglets) : consulter un outil ne le modifie pas.
+ function stageDialog(){
+  const cur=stageOf();let pick=cur;
+  const radios=STAGE_IDS.map(k=>{const st=PANEL_STAGES[k];return h('label',{class:'stage-opt'},h('input',{type:'radio',name:'stage',value:k,checked:k===cur,onchange:()=>{pick=k;}}),h('span',{},h('b',{text:st.n+'. '+st.label}),h('small',{class:'muted',text:st.hint})));});
+  dialog({title:'Étape du projet',eyebrow:panelTitle(panel),body:[h('p',{class:'muted',text:'L’étape indique où en est le projet. Elle ne modifie ni vos circuits ni vos calculs, et tous les outils restent accessibles dans les onglets.'}),h('div',{class:'stage-opts'},radios)],actions:[{label:'Annuler',kind:'ghost'},{label:'Enregistrer',kind:'primary',onClick:async()=>{if(pick!==cur)await setStage(pick,{keepTab:true});}}]});
+ }
  function stepper(){
-  const cur=stageOf(),canEdit=data.access!=='view';
-  const [nextId,nextLabel]=NEXT_STAGE[cur];
-  return h('div',{class:'stage-bar'},
-   h('ol',{class:'stepper','aria-label':'Étapes du projet'},...STAGE_IDS.map(k=>{const s=PANEL_STAGES[k];return h('li',{class:k===cur?'on':''},h('button',{type:'button',disabled:!canEdit&&k!==cur,'aria-current':k===cur?'step':null,onclick:()=>k!==cur&&setStage(k)},h('span',{class:'n',text:s.n}),h('span',{},h('b',{text:s.label}),h('small',{text:s.short}))));})),
+  const cur=stageOf(),canEdit=data.access!=='view',ci=STAGE_IDS.indexOf(cur);
+  return h('div',{class:'stage-bar compact'},
+   h('div',{class:'stage-line'},h('span',{class:'stage-label',text:'Avancement du projet'}),
+    h('ol',{class:'stage-pills','aria-label':'Étapes du projet'},...STAGE_IDS.map((k,i)=>h('li',{class:k===cur?'on':i<ci?'done':'','aria-current':k===cur?'step':null,text:PANEL_STAGES[k].n+'. '+PANEL_STAGES[k].label}))),
+    canEdit&&h('button',{type:'button',class:'sm ghost',onclick:stageDialog},'Changer l’étape…')),
    h('div',{class:'stage-hint'},h('span',{class:'small muted',text:PANEL_STAGES[cur].hint}),
-    canEdit&&h('span',{class:'stage-actions'},cur==='releve'&&h('button',{type:'button',class:'sm',onclick:conceptionCopy},'✏️ Planifier un agrandissement (copie)'),h('button',{type:'button',class:'sm',onclick:()=>setStage(nextId)},nextLabel+' →'))));
+    canEdit&&cur==='releve'&&h('span',{class:'stage-actions'},h('button',{type:'button',class:'sm',onclick:conceptionCopy},'✏️ Planifier un agrandissement (copie)'))));
  }
  // Code QR : ouvre ce panneau dans l'application (connexion requise).
  function qrDialog(){
@@ -138,7 +143,8 @@ export async function panelView({id,tab='panel',ctx}){
     h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes'))));
  }
  function renderTabs(){
-  const keys=[...new Set([...STAGE_TABS[stageOf()],state.tab])];
+  // Tous les outils sont accessibles quelle que soit l'étape (l'étape n'est qu'un indicateur d'avancement).
+ const keys=['panel','list','plan','appliances','docs','info'];
   tabs.replaceChildren(...keys.map(k=>h('button',{type:'button',role:'tab','aria-selected':String(state.tab===k),onclick:()=>go(k)},tabNames[k])));
  }
  function go(t){state.tab=t;history.replaceState(null,'',`#/panneaux/${panel.id}/${t}`);renderTabs();renderBody();}
@@ -426,6 +432,5 @@ export async function panelView({id,tab='panel',ctx}){
 
  renderHead();renderTabs();renderBody();
  // Lien direct vers les électroménagers : le projet passe à l'étape Vérification.
- if(state.tab==='appliances'&&stageOf()!=='verification'&&data.access!=='view')setStage('verification',{keepTab:true});
  return root;
 }

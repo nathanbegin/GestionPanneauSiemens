@@ -761,3 +761,16 @@ body.app .container{max-width:min(1760px,96vw)}
 .sso-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0}
 .sso-row b{min-width:90px}.sso-row .small{flex:1}
 .todo{background:#fff3cd;color:#7a5a00;padding:0 4px;border-radius:3px}
+/* Avancement du projet (indicateur) et boutons-liens */
+button.link{background:none;border:0;padding:0;min-height:0;color:var(--green,#226a51);text-decoration:underline;font:inherit;cursor:pointer}
+.stage-bar.compact{padding:10px 14px}
+.stage-line{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.stage-label{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.stage-pills{display:flex;gap:6px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.stage-pills li{padding:4px 10px;border-radius:999px;background:var(--soft);font-size:13px;color:var(--muted)}
+.stage-pills li.done{color:var(--ink)}.stage-pills li.done::before{content:'✓ '}
+.stage-pills li.on{background:var(--ink);color:#fff;font-weight:600}
+.stage-bar.compact .stage-hint{margin-top:6px}
+.stage-opts{display:grid;gap:8px}
+.stage-opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.stage-opt small{display:block}
