@@ -200,9 +200,29 @@ async function sitesView(){
    h('div',{class:'chips'},s.panels.length?s.panels.map(p=>h('span',{class:'badge '+(p.progress===100?'ok':''),text:`${p.tag||p.name} · ${p.progress} %`})):h('span',{class:'badge warn',text:'Aucun panneau'})),
    h('div',{class:'small muted',text:'Modifié '+fmtRelative(s.updatedAt)}))),
    h('button',{type:'button',class:'add-card',onclick:create},'+ Ajouter un site'));
+ const bmS=sites.length>1&&!state.demo&&!net.offline?batchManage({grid,cardSel:'.site-card',items:sites,noun:'site',url:'/api/sites?id=',after:route}):null;
  return h('div',{class:'container'},
-  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),h('button',{type:'button',onclick:()=>trashDialog({onRestored:route})},'🗑 Corbeille'),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
-  inviteBox||'',gsearch,found,(()=>{gridWrap.append(resumeBox||'',grid);return gridWrap;})());
+  h('div',{class:'page-head'},h('div',{},h('div',{class:'eyebrow',text:`${lang==="en"?"Hello":"Bonjour"} ${first}`}),h('h1',{text:'Mes sites'}),h('div',{class:'sub',text:`${sites.length} site${sites.length>1?'s':''} · ${sites.reduce((n,s)=>n+s.panelCount,0)} panneau(x)`})),h('div',{class:'page-actions'},chip,viewToggle('mp_sites_view',grid),bmS?.btn||'',h('button',{type:'button',onclick:()=>trashDialog({onRestored:route})},'🗑 Corbeille'),h('button',{type:'button',class:'primary',onclick:create},'+ Nouveau site'))),
+  inviteBox||'',bmS?.bar||'',gsearch,found,(()=>{gridWrap.append(resumeBox||'',grid);return gridWrap;})());
+}
+
+
+// Sélection multiple pour supprimer plusieurs sites / panneaux d'un coup (corbeille 30 jours).
+function batchManage({grid,cardSel,items,noun,url,after}){
+ let on=false;const sel=new Set();
+ const cards=[...grid.querySelectorAll(cardSel)];cards.forEach((c,i)=>{c.dataset.id=items[i].id;});
+ const count=h('b',{text:'0'});
+ const delBtn=h('button',{type:'button',class:'danger',disabled:true,onclick:async()=>{
+  if(!sel.size)return;
+  if(!await confirmDialog(`Mettre ${sel.size} ${noun}${sel.size>1?'s':''} à la corbeille ? Ils resteront récupérables pendant 30 jours.`,{title:'Suppression multiple',confirm:'Mettre à la corbeille',danger:true}))return;
+  let ok=0,ko=0;for(const id of [...sel]){try{await api(url+encodeURIComponent(id),{method:'DELETE'});ok++;}catch{ko++;}}
+  toast(`${ok} ${noun}${ok>1?'s':''} placé${ok>1?'s':''} dans la corbeille.`+(ko?` ${ko} n’a/ont pas pu être supprimé(s).`:''),6000);after();}},'Supprimer la sélection');
+ const refresh=()=>{count.textContent=String(sel.size);delBtn.disabled=!sel.size;cards.forEach(c=>{const x=sel.has(c.dataset.id);c.classList.toggle('selected',x);c.setAttribute('aria-pressed',String(x));});};
+ const all=h('button',{type:'button',onclick:()=>{const eligible=items.filter(i=>!i.shared).map(i=>i.id);if(sel.size===eligible.length)sel.clear();else eligible.forEach(i=>sel.add(i));refresh();}},'Tout sélectionner');
+ const bar=h('div',{class:'batch-bar'},h('span',{},count,' sélectionné(s)'),all,delBtn);bar.hidden=true;
+ grid.addEventListener('click',e=>{if(!on)return;const c=e.target.closest(cardSel);if(!c)return;e.preventDefault();const it=items.find(i=>i.id===c.dataset.id);if(!it||it.shared)return;sel.has(it.id)?sel.delete(it.id):sel.add(it.id);refresh();},true);
+ const btn=h('button',{type:'button',onclick:()=>{on=!on;sel.clear();grid.classList.toggle('selecting',on);bar.hidden=!on;btn.textContent=on?'Terminer':'☑ Sélectionner';refresh();}},'☑ Sélectionner');
+ return {btn,bar};
 }
 
 function tree(panels){
@@ -280,7 +300,7 @@ async function siteView(id){
    h('div',{class:'page-actions'},site.shared?h('span',{class:'badge shared',text:`👥 Partagé par ${site.shared.by} · ${site.shared.role==='edit'?'modification':'lecture seule'}`}):h('button',{type:'button',onclick:()=>shareDialog({siteId:site.id,title:site.name})},'👥 Partager'),!site.shared||site.shared.role==='edit'?h('button',{type:'button',onclick:edit},'Modifier'):null,offlineBtn,!site.shared&&!net.offline&&!state.demo?h('button',{type:'button',onclick:handoff},'🤝 Remettre au client'):null,panels.length?h('button',{type:'button',onclick:report},'📄 Rapport PDF du site'):null,h('button',{type:'button',class:'primary',onclick:addPanel},'+ Ajouter un panneau'))),
   h('div',{class:'split'},
    h('section',{'aria-label':'Panneaux'},
-    panels.length?(()=>{const g=h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'));return h('div',{},h('div',{class:'cards-toolbar'},viewToggle('mp_panels_view',g)),g);})()
+    panels.length?(()=>{const g=h('div',{class:'cards'},...panelCards,h('button',{type:'button',class:'add-card',onclick:addPanel},'+ Ajouter un panneau'));const bm=panels.length>1&&!site.shared&&!state.demo&&!net.offline?batchManage({grid:g,cardSel:'.panel-card',items:panels,noun:'panneau',url:'/api/panels?id=',after:route}):null;return h('div',{},h('div',{class:'cards-toolbar'},bm?.btn||'',viewToggle('mp_panels_view',g)),bm?.bar||'',g);})()
      :h('div',{class:'card empty-state'},h('div',{class:'ico',text:'▦'}),h('h2',{text:'Aucun panneau pour l’instant'}),h('p',{text:'Ajoutez le panneau principal. Vous pourrez ensuite ajouter les sous-panneaux (garage, atelier, logement…) et indiquer lequel alimente l’autre.'}),h('div',{class:'page-actions center'},h('button',{type:'button',class:'primary lg',onclick:addPanel},'+ Ajouter le panneau principal')))),
    h('aside',{class:'stack'},
     panels.length>0&&h('div',{class:'card side-card'},h('h3',{text:'Hiérarchie d’alimentation'}),tree(panels)),

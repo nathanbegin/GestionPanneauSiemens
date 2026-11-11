@@ -320,7 +320,6 @@ export default [
  ["Modèle retiré.", "Model removed."],
  ["Retirer le modèle", "Remove the model"],
  ["Dernier disjoncteur de la liste.", "Last breaker in the list."],
- ["{} sélectionné(s)", "{} selected"],
  ["Tout sélectionner", "Select all"],
  ["Sans modèle seulement", "Without model only"],
  ["Aucun", "None"],
@@ -1853,4 +1852,7 @@ export default [
  ["Panneau restauré.", "Panel restored."],
  ["Restaurer « {} » ({} positions, {} circuit(s) décrit(s)) dans « {} » ? Un nouveau panneau sera créé avec ces données ; rien n’est remplacé.", "Restore “{}” ({} positions, {} described circuit(s)) in “{}”? A new panel will be created with this data; nothing is replaced."],
  ["Fichier trop volumineux.", "File too large."],
+ ["☑ Sélectionner", "☑ Select"],
+ ["Supprimer la sélection", "Delete selection"],
+ ["Suppression multiple", "Delete several"],
 ];

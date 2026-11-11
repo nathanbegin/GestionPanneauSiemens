@@ -1024,3 +1024,9 @@ dialog.side .f:focus-within .hint{display:block}
  .topbar .crumbs{flex:none;max-width:min(50vw,760px);justify-content:center}
 }
 @media (max-width:900px){.tb-left,.tb-right{display:contents}}
+
+/* Sélection multiple (sites / panneaux) */
+.batch-bar{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.6rem 0;padding:.6rem .8rem;border:1px solid var(--line,#d6dbe3);border-radius:10px;background:var(--panel,#f6f8fb)}
+.cards.selecting .card{cursor:pointer;outline:2px dashed transparent}
+.cards.selecting .card.selected{outline:2px solid #c0392b;background:rgba(192,57,43,.07)}
+.cards.selecting .add-card{display:none}
