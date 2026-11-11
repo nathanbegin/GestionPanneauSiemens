@@ -1636,4 +1636,6 @@ export default [
  ["Conditions", "Terms"],
  ["Confidentialité", "Privacy"],
  ["Conditions d’utilisation", "Terms of use"],
+ ["politique de confidentialité", "privacy policy"],
+ ["« Identifié » = vérifié sur place. Une description seule laisse le circuit « À confirmer ».", "“Identified” = checked on site. A description alone leaves the circuit “To confirm”."],
 ];

@@ -26,10 +26,12 @@ export function toast(message,ms=4500){
 }
 
 // Boîte de dialogue modale. actions : [{label, kind:'primary'|'danger'|'ghost', left, onClick(close) -> false pour garder ouvert}]
-export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide=false}){
+export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide=false,beforeClose}){
  const foot=h('div',{class:'dlg-foot'});
  const right=h('div',{class:'right'});
  const close=()=>{if(el.open)el.close();};
+ // Sorties « douces » (croix, Échap) : beforeClose peut les refuser (ex. saisie non enregistrée).
+ const tryClose=async()=>{if(beforeClose&&await beforeClose()===false)return;close();};
  for(const a of actions){
   const b=h('button',{type:a.submit?'submit':'button',class:a.kind||'',text:a.label});
   // Tout bouton sans « submit » ferme la boîte, après son action éventuelle (sauf si elle renvoie false).
@@ -37,11 +39,12 @@ export function dialog({title,eyebrow,body=[],actions=[],onClose,form=false,wide
   (a.left?foot:right).append(b);
  }
  foot.append(right);
- const content=[h('div',{class:'dlg-head'},h('div',{},eyebrow&&h('div',{class:'eyebrow',text:eyebrow}),h('h2',{text:title})),h('button',{type:'button','aria-label':'Fermer',text:'✕',onclick:close})),h('div',{class:'dlg-body'},body),foot];
+ const content=[h('div',{class:'dlg-head'},h('div',{},eyebrow&&h('div',{class:'eyebrow',text:eyebrow}),h('h2',{text:title})),h('button',{type:'button','aria-label':'Fermer',text:'✕',onclick:tryClose})),h('div',{class:'dlg-body'},body),foot];
  const inner=form?h('form',{novalidate:true},content):content;
  const el=h('dialog',{},inner);
  // wide : true (860 px) ou 'xl' (presque toute la largeur de l'écran, pour voir un panneau en grand).
  if(wide==='xl')el.classList.add('xl');else if(wide)el.style.width='min(860px, calc(100vw - 24px))';
+ el.addEventListener('cancel',ev=>{if(beforeClose){ev.preventDefault();tryClose();}});
  el.addEventListener('close',()=>{el.remove();onClose?.();});
  document.body.append(el);el.showModal();
  return {el,close,form:form?inner:null};

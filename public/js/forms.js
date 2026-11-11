@@ -186,7 +186,7 @@ export function circuitEditor({panel,id,order,onSave,planning=false,lib=null,fee
     feeds&&h('div',{class:'full feed-slot'}),
     field('Calibre',select('amps',[['','À confirmer'],...ampsList.map(a=>[a,a+' A'])],c.amps??'')),
     field('Protection',select('protection',protections,c.protection||'Standard'),{hint:'DDFT : différentiel (salle de bain, extérieur). Anti-arc : chambres, aires habitables.'}),
-    field('Statut',select('status',states,c.status)),
+    field('Statut',select('status',states,c.status),{hint:'« Identifié » = vérifié sur place. Une description seule laisse le circuit « À confirmer ».'}),
     field('Format du disjoncteur',select('format',Object.entries(breakerFormats),fmt),{hint:'Bipolaire = 240 V (cuisinière, sécheuse…).'}),
     h('div',{class:'full group-block'}),
     h('datalist',{id:'rooms'},[...new Set(panel.circuits.map(x=>x.room).filter(Boolean))].map(r=>h('option',{value:r}))),
@@ -231,8 +231,7 @@ export function circuitEditor({panel,id,order,onSave,planning=false,lib=null,fee
   const prot=f.get('protection');if(prot==='Standard')delete c.protection;else c.protection=prot;
   const tags=Object.fromEntries(tagGroups.map(k=>[k,[...new Set(String(f.get(k)||'').split(',').map(t=>t.trim()).filter(Boolean))]]));
   if(Object.values(tags).some(a=>a.length)||c.tags)c.tags=tags;
-  // Un circuit décrit passe automatiquement à « Identifié » s'il était « À confirmer » et que l'utilisateur n'a pas touché au statut.
-  if(c.label&&c.status==='À confirmer'&&!statusTouched)c.status='Identifié';
+  // Décrire un circuit ne le rend pas « Identifié » : seule une vérification sur place le confirme (le statut reste celui choisi).
   if(plan){
    const loads=plan.loads();if(loads.length)c.loads=loads;else delete c.loads;
    const wire={gauge:f.get('wireGauge')||'',type:f.get('wireType')||'',length:f.get('wireLength')===''||f.get('wireLength')==null?null:Number(f.get('wireLength'))};
@@ -255,7 +254,10 @@ export function circuitEditor({panel,id,order,onSave,planning=false,lib=null,fee
  };
  const prevBtn=h('button',{type:'button',class:'ghost',text:'‹ Précédent'});
  const nextBtn=h('button',{type:'button',text:'Enregistrer et suivant ›'});
- d=dialog({title:'Circuit',eyebrow:' ',form:true,wide:true,body:[body],actions:[{label:'Fermer',kind:'ghost',left:true,onClick:async()=>{if(dirty&&!await confirmDialog('Fermer sans enregistrer les modifications de cette fiche ?',{confirm:'Fermer sans enregistrer'}))return false;}},{label:'Enregistrer',kind:'primary',submit:true}]});
+ const guard=async()=>{if(dirty&&!await confirmDialog('Fermer sans enregistrer les modifications de cette fiche ?',{confirm:'Fermer sans enregistrer'}))return false;};
+ const leave=ev=>{if(dirty){ev.preventDefault();ev.returnValue='';}};
+ window.addEventListener('beforeunload',leave);
+ d=dialog({title:'Circuit',eyebrow:' ',form:true,wide:true,body:[body],beforeClose:guard,onClose:()=>window.removeEventListener('beforeunload',leave),actions:[{label:'Fermer',kind:'ghost',left:true,onClick:guard},{label:'Enregistrer',kind:'primary',submit:true}]});
  d.el.querySelector('.dlg-foot .right').prepend(prevBtn,nextBtn);
  prevBtn.onclick=async()=>{const ok=await save(0);if(ok!==false){const idx=order.indexOf(current)-1;if(order[idx]){current=order[idx];render();}}};
  nextBtn.onclick=()=>save(1);
