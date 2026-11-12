@@ -127,8 +127,9 @@ body.app{min-height:100vh;display:flex;flex-direction:column}
 .topbar{position:sticky;top:0;z-index:20;background:#fbfcf8f2;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding-top:var(--safe-top)}
 .topbar .container{display:flex;align-items:center;gap:14px;height:64px}
 .topbar .brand small{display:none}
-.crumbs{display:flex;align-items:center;gap:6px;min-width:0;flex:1;font-size:14px;overflow:hidden}
-.crumbs a,.crumbs span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none;color:var(--muted);padding:6px 8px;border-radius:7px}
+.crumbs{display:flex;align-items:center;gap:6px;min-width:0;flex:1;font-size:14px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.crumbs::-webkit-scrollbar{display:none}
+.crumbs a,.crumbs span{white-space:nowrap;flex:none;text-decoration:none;color:var(--muted);padding:6px 8px;border-radius:7px}
 .crumbs a:hover{background:var(--soft);color:var(--ink)}
 .crumbs span:last-child{color:var(--ink);font-weight:600}
 .crumbs i{color:#a9b3ab;font-style:normal}
@@ -793,7 +794,8 @@ details.form-adv[open]>summary{margin-bottom:8px}
 .worknav a{text-decoration:none;color:var(--muted);padding:8px 14px;border-radius:99px;font-weight:600;white-space:nowrap;min-height:38px;display:inline-flex;align-items:center}
 .worknav a:hover{background:var(--soft);color:var(--ink)}
 .worknav a.on{background:var(--ink);color:#fff}
-.topbar .crumbs{justify-content:center}
+.topbar .crumbs{justify-content:flex-start}
+.topbar .crumbs>:first-child{margin-left:auto}.topbar .crumbs>:last-child{margin-right:auto}
 @media (max-width:900px){.topbar .container{flex-wrap:wrap;height:auto;padding:8px 14px;gap:6px 10px}.topbar .brand{font-size:16px}.topbar .brand-icon{width:40px;height:40px}.worknav{order:10;flex-basis:100%;overflow-x:auto;scrollbar-width:none}.topbar .crumbs{justify-content:flex-start;min-width:0;flex:1}}
 .resume{margin:0 0 22px}
 .resume-title{font-size:15px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
@@ -985,7 +987,8 @@ dialog.side .f:focus-within .hint{display:block}
  .topbar .crumbs i{display:none}
  .topbar .crumbs a:last-of-type{display:inline-flex;align-items:center;min-height:44px;min-width:32px;font-size:0;padding:0 6px;flex:none}
  .topbar .crumbs a:last-of-type::before{content:'‹';font-size:30px;line-height:1;color:var(--ink)}
- .topbar .crumbs span{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .topbar .crumbs span{flex:1 0 auto;min-width:0;font-size:15px;white-space:nowrap}
+ .topbar .crumbs a:last-of-type{position:sticky;left:0;z-index:1;background:var(--card,#fbfcf8)}
 }
 /* Mobile : le profil, ses options et la langue passent dans un menu hamburger à gauche (plus de place pour le fil d'Ariane) */
 .burger{display:none}
@@ -1022,7 +1025,7 @@ dialog.side .f:focus-within .hint{display:block}
 .tb-right{justify-content:flex-end;gap:14px}
 @media (min-width:901px){
  .topbar .container,body.app .topbar .container{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center}
- .topbar .crumbs{flex:none;max-width:min(50vw,760px);justify-content:center}
+ .topbar .crumbs{flex:none;max-width:min(50vw,760px)}
 }
 @media (max-width:900px){.tb-left,.tb-right{display:contents}}
 
@@ -1079,3 +1082,7 @@ header.topbar{padding-top:env(safe-area-inset-top,0px)}
  body.app .topbar .container,.topbar .container{padding-bottom:12px;height:auto;min-height:0}
  #worknav.worknav{margin-bottom:2px}
 }
+
+/* Fil d'Ariane : défile horizontalement quand il dépasse ; un fondu à droite signale qu'il y a une suite */
+.crumbs.scrolls{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.crumbs.scrolls.at-end{-webkit-mask-image:none;mask-image:none}

@@ -44,6 +44,9 @@ async function switchLang(){
 function crumbs(items){
  const nav=h('nav',{class:'crumbs','aria-label':'Fil d’Ariane'});
  items.forEach(([label,href],i)=>{if(i)nav.append(h('i',{'aria-hidden':'true',text:'›'}));nav.append(href&&i<items.length-1?h('a',{href,text:label}):h('span',{text:label,'aria-current':i===items.length-1?'page':null}));});
+ // Fil d'Ariane défilant : fondu à droite tant qu'il reste du contenu caché.
+ const hint=()=>{const over=nav.scrollWidth>nav.clientWidth+1;nav.classList.toggle('scrolls',over);nav.classList.toggle('at-end',over&&nav.scrollLeft+nav.clientWidth>=nav.scrollWidth-2);};
+ nav.addEventListener('scroll',hint,{passive:true});setTimeout(hint,0);setTimeout(hint,400);
  const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Disjonio — accueil'},h('img',{class:'brand-logo',src:'/branding/disjonio/svg/outlined/disjonio-horizontal-no-tagline-on-light.svg',alt:'Disjonio',width:214,height:44}),h('img',{class:'brand-sym',src:'/branding/disjonio/svg/disjonio-symbol-simple-on-light.svg',alt:'',width:40,height:40}));
  const parts=[brand,nav];
  const isPro=state.user?.profile?.accountType==='pro';
