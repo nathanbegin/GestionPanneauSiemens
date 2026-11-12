@@ -82,3 +82,22 @@ export function clearModel(circuits,unit){
  for(const id of unit.ids){const c=next.find(x=>x.id===id);if(c)delete c.breakerRef;}
  return next;
 }
+
+// Changement de marque / de famille de panneau : pour chaque disjoncteur dont la référence n'est plus compatible,
+// propose l'équivalent (même format, mêmes calibres, même protection si possible) dans la nouvelle famille.
+// Retourne [{unit, from, fromLabel, to|null, sameProtection, designation}]. Les disjoncteurs sans référence ne sont pas touchés.
+export function convertBreakers(circuits,breakers,det={}){
+ const ok=det.accepts?.length?det.accepts:det.family?[det.family]:null;
+ const byCat=new Map(breakers.map(b=>[b.cat,b]));
+ const rows=[];
+ for(const u of breakerUnits(circuits)){
+  if(u.kind==='other'||!u.ref)continue;
+  const old=byCat.get(u.ref);
+  const compatible=old&&(!ok||ok.includes(old.family))&&!(old.neutre==='PoN'&&det.pon===false);
+  if(compatible)continue;
+  const {exact,other}=matchBreakers(u,breakers,det);
+  const to=exact[0]||other[0]||null;
+  rows.push({unit:u,from:u.ref,fromLabel:old?.label||'',to,sameProtection:!!exact[0],designation:u.designation});
+ }
+ return rows;
+}

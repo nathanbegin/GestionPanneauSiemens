@@ -1950,4 +1950,11 @@ export default [
  ["Refaire l’estimation", "Redo the estimate"],
  ["Recherche des prix en cours… (30 à 60 secondes)", "Looking up prices… (30 to 60 seconds)"],
  ["Voir", "View"],
+ ["Convertir les disjoncteurs", "Convert the breakers"],
+ ["Garder les références actuelles", "Keep the current references"],
+ ["Convertir", "Convert"],
+ ["aucun équivalent", "no equivalent"],
+ ["La référence d’origine sera retirée ; le format et le calibre sont conservés.", "The original reference will be removed; the format and rating are kept."],
+ [" — protection différente de l’original", " — different protection from the original"],
+ ["Vérifiez chaque équivalent dans le catalogue du fabricant avant de commander ; l’historique du panneau permet de revenir en arrière.", "Check each equivalent in the manufacturer’s catalogue before ordering; the panel history lets you go back."],
 ];

@@ -11,6 +11,7 @@ import {historyDialog} from './history.js';
 import {net} from './offline.js';
 import {optimizeDialog} from './optimize.js';
 import {estimateDialog} from './estimate.js';
+import {convertDialog} from './convert.js';
 import {moveBreaker} from '../optimize.js';
 import {buildChecklist} from './checklist.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
@@ -455,7 +456,14 @@ state.rzoom=pref('mp_panel_zoom')==='circuits'?'circuits':'full';state.rmult=[1,
    ev.preventDefault();e.textContent='';
    const p=panelPayload(form);
    if(p.positions<panel.positions&&!await confirmDialog(`Réduire le panneau à ${p.positions} positions ? Les positions retirées doivent être vides.`))return;
-   try{await persist(p);toast('Fiche du panneau enregistrée.');ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);renderHead();}
+   try{
+    const prevFam=panel.details?.family||'',prevAcc=JSON.stringify(panel.details?.accepts||[]);
+    await persist(p);toast('Fiche du panneau enregistrée.');ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);renderHead();
+    // Changement de marque / de famille : proposer de convertir les disjoncteurs.
+    if(lib&&(prevFam!==(panel.details?.family||'')||prevAcc!==JSON.stringify(panel.details?.accepts||[]))){
+     convertDialog({panel,lib,save:async circuits=>{await persist({circuits});},onDone:()=>{renderHead();renderBody();}});
+    }
+   }
    catch(x){e.textContent=x.message;}
   });
   body.replaceChildren(form,h('p',{class:'small muted mt',text:`Créé le ${new Date(panel.createdAt).toLocaleDateString((globalThis.MP_LOCALE||'fr-CA'))} · modifié ${fmtRelative(panel.updatedAt)} · révision ${panel.revision}`}));

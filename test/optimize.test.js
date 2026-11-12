@@ -111,3 +111,16 @@ test('déplacer : refuse un espace réservé et déplace un jumelé complet',()=
  assert.equal(o.filter(c=>c.slots.length===1&&c.label).length,2);
  assert.throws(()=>moveBreaker(r.circuits,t.id,10,12),/réservé|hors/);
 });
+import {convertBreakers} from '../public/units.js';
+test('changement de marque : équivalents dans la nouvelle famille, sinon aucun',()=>{
+ const breakers=[{cat:'QO120',family:'QO',kind:'single',amps:[20],protection:'Standard',neutre:'—'},{cat:'QO230',family:'QO',kind:'double',amps:[30],protection:'Standard',neutre:'—'},
+  {cat:'QP120',family:'SIE',kind:'single',amps:[20],protection:'Standard',neutre:'—'},{cat:'QPF120',family:'SIE',kind:'single',amps:[20],protection:'DDFT',neutre:'—'}];
+ const p=mk([[1,'Prises',20],[3,'Chauffe-eau',30,2],[2,'Salle de bain',20]]);
+ p.circuits=p.circuits.map(c=>c.label==='Prises'||c.label==='Chauffe-eau'?{...c,breakerRef:c.label==='Prises'?'QO120':'QO230'}:c.label==='Salle de bain'?{...c,breakerRef:'QO120',protection:'DDFT'}:c);
+ const rows=convertBreakers(p.circuits,breakers,{family:'SIE',accepts:['SIE']});
+ const by=Object.fromEntries(rows.map(r=>[r.unit.labels[0],r]));
+ assert.equal(by['Prises'].to.cat,'QP120');assert.equal(by['Prises'].sameProtection,true);
+ assert.equal(by['Chauffe-eau'].to,null);               // aucun bipolaire 30 A Siemens dans ce catalogue d'essai
+ assert.equal(by['Salle de bain'].to.cat,'QPF120');     // même protection DDFT
+ assert.equal(convertBreakers(p.circuits,breakers,{family:'QO',accepts:['QO']}).length,0); // déjà compatibles
+});
