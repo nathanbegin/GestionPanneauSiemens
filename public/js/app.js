@@ -92,6 +92,10 @@ const recents=()=>{try{return JSON.parse(localStorage.getItem(RECENT)||'[]').fil
 function remember(r){try{const all=[{...r,uid:state.user?.id,at:Date.now()},...recents().filter(x=>x.id!==r.id)].slice(0,6);localStorage.setItem(RECENT,JSON.stringify(all));}catch{}}
 const ctx={crumbs,remember,get features(){return state.features;},get user(){return state.user;}};
 
+// Écran de chargement : le logo respire (zoom avant / arrière) avec « Chargement… » dessous ; version compacte entre deux pages.
+function splash(full){
+ return h('div',{class:'loading splash'+(full?'':' compact'),role:'status','aria-live':'polite'},h('img',{class:'splash-logo',src:'/branding/disjonio/svg/disjonio-symbol-simple-on-light.svg',alt:'',width:full?120:56,height:full?120:56}),h('div',{class:'splash-text',text:'Chargement…'}));
+}
 async function logout(){
  if(await queueCount()&&!await confirmDialog('Des modifications faites hors ligne n’ont pas encore été synchronisées. Si vous vous déconnectez maintenant, elles seront perdues. Reconnectez-vous au réseau pour les synchroniser d’abord.',{title:'Modifications en attente',confirm:'Me déconnecter quand même',danger:true}))return;
  try{await api('/api/auth?action=logout',{method:'POST',body:{}});}catch{}
@@ -374,7 +378,7 @@ async function route(){
   location.replace('#/connexion');return;
  }
  if(state.user&&['connexion','inscription'].includes(name)){location.replace('#/sites');return;}
- view.replaceChildren(h('div',{class:'loading',text:'Chargement…'}));
+ view.replaceChildren(splash(!state.booted));state.booted=true;
  try{
   let node;
   if(name==='connexion')node=loginView();

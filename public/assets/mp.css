@@ -1060,3 +1060,12 @@ body.is-offline .needs-net{opacity:.45;pointer-events:none}
 .panel-real .rp-slot.dragging{cursor:grabbing;opacity:.85;filter:drop-shadow(0 4px 6px rgba(0,0,0,.45));pointer-events:none}
 .panel-real .rp-drop{fill:rgba(42,216,246,.22);stroke:#2ad8f6;stroke-width:1.5;stroke-dasharray:4 2;pointer-events:none}
 .panel-area.moving .real-wrap{outline:2px dashed #2ad8f6;outline-offset:3px;border-radius:6px}
+
+/* Écran de chargement animé */
+.splash{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-height:60vh;padding:0}
+.splash.compact{min-height:30vh}
+.splash-logo{width:120px;height:120px;animation:splash-zoom 1.8s ease-in-out infinite;will-change:transform,opacity}
+.splash.compact .splash-logo{width:56px;height:56px}
+.splash-text{font-size:15px;letter-spacing:.04em;color:var(--muted)}
+@keyframes splash-zoom{0%,100%{transform:scale(.88);opacity:.75}50%{transform:scale(1.1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.splash-logo{animation:none}}
