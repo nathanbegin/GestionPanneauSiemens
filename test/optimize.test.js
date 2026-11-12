@@ -59,3 +59,32 @@ test('retirer un disjoncteur libère ses espaces (bipolaire = deux cases vides)'
  for(const s of ['3A','3B','5A','5B'])assert.ok(out.some(c=>c.slots.includes(s)&&!c.label&&c.amps==null),s);
  assert.equal(out.find(c=>c.label==='A').amps,15);
 });
+import {buildCatalog} from '../public/optimize.js';
+test('catalogue : jumelés vérifiés par modèle ; quad ; panneau sans jumelés',()=>{
+ const lib={panels:[{cat:'MODEL-T',family:'QO',tandem:true,circuits:24,espaces:12},{cat:'MODEL-N',family:'QO',tandem:false,circuits:12,espaces:12}],
+  breakers:[{cat:'QO1515CP',family:'QO',kind:'tandem',amps:[15,15],protection:'Standard'},{cat:'QO1520CP',family:'QO',kind:'tandem',amps:[15,20],protection:'Standard'},
+   {cat:'QOQ',family:'QO',kind:'quad',amps:[15,30,15],protection:'Standard'},{cat:'AUTRE',family:'BR',kind:'tandem',amps:[20,20],protection:'Standard'}]};
+ const cat=buildCatalog(lib,{modelId:'MODEL-T'});
+ assert.deepEqual([...cat.tandem.keys()].sort(),['15/15','15/20']);assert.equal(cat.quad.get('15/15|30'),'QOQ');assert.equal(cat.maxCircuits,24);
+ assert.equal(buildCatalog(lib,{modelId:'MODEL-N'}).tandem.size,0);
+  const p=mk([[1,'P15',15],[2,'P20a',20],[3,'P20b',20],[4,'P15b',15]]);p.details={modelId:'MODEL-T'};
+ const r=optimizeLayout(p,{pair:true,catalog:cat});
+ assert.equal(r.tandems,1); // 15+15 existe ; 20+20 n’existe pas pour cette famille
+ assert.deepEqual([...new Set(r.circuits.filter(c=>c.breakerRef).map(c=>c.breakerRef))],['QO1515CP']);
+ const none=optimizeLayout(p,{pair:true,catalog:buildCatalog(lib,{modelId:'MODEL-N'})});
+ assert.equal(none.tandems,0);assert.match(none.notes[0],/Aucun disjoncteur jumelé/);
+});
+test('quad : 2 unipolaires + 1 bipolaire dans 2 espaces',()=>{
+ const lib={panels:[],breakers:[{cat:'QOQ',family:'QO',kind:'quad',amps:[15,30,15],protection:'Standard'}]};
+ const cat=buildCatalog(lib,{family:'QO'});
+ const p=mk([[1,'A',15],[2,'B',15],[3,'Chauffe-eau',30,2]]);
+ const r=optimizeLayout(p,{pair:true,catalog:cat});
+ assert.equal(r.quads,1);validate(r.circuits,{positions:12});
+ assert.equal(r.after.used,2);assert.equal(r.before.used,4);
+ assert.equal(r.circuits.filter(c=>c.breakerRef==='QOQ').length,3);
+});
+test('ordre libre : les bipolaires sont posés d’abord et alignés',()=>{
+ const p=mk([[1,'A',15],[2,'B',15],[3,'C',15],[5,'Dbl1',30,2],[6,'Dbl2',40,2]]);
+ const r=optimizeLayout(p,{sort:'space'});validate(r.circuits,{positions:12});
+ assert.ok(r.after.used<=r.before.used);
+});

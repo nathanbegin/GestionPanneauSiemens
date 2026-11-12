@@ -1914,4 +1914,13 @@ export default [
  ["Touchez les disjoncteurs à retirer, puis « Retirer le disjoncteur ».", "Tap the breakers to remove, then “Remove breaker”."],
  ["Modifier ou retirer plusieurs circuits d’un coup (espaces inutilisés, libres, calibre, pièce…).", "Edit or remove several circuits at once (unused spaces, free, rating, room…)."],
  ["Retirer des disjoncteurs", "Remove breakers"],
+ ["Optimiser l’espace (jumelés et quads)", "Optimize space (tandem and quad breakers)"],
+ ["Ordre libre (économiser l’espace)", "Free order (save space)"],
+ ["Circuits en demi-espace (jumelés/quad)", "Half-space circuits (tandem/quad)"],
+ ["Modèle de panneau non choisi (ou bibliothèque indisponible) : règle générale, compatibilité à vérifier.", "Panel model not chosen (or library unavailable): general rule, compatibility to be checked."],
+ ["Aucune combinaison de disjoncteurs jumelables dans ce panneau (calibres ou protections incompatibles).", "No combination of breakers can be paired in this panel (incompatible ratings or protections)."],
+ ["Certains panneaux limitent les positions où poser des jumelés ou des quads : confirmez avec la fiche du modèle.", "Some panels limit where tandem or quad breakers can be installed: confirm with the model’s data sheet."],
+ ["Compatibilité des jumelés non vérifiée (aucun modèle de panneau choisi ou bibliothèque non disponible) : vérifiez-la avec le fabricant.", "Tandem compatibility not verified (no panel model chosen or library unavailable): check with the manufacturer."],
+ ["Les disjoncteurs ne tiennent pas dans le panneau avec cette disposition. Essayez l’ordre libre (économie d’espace) ou moins d’espaces réservés.", "The breakers do not fit in the panel with this layout. Try the free order (save space) or fewer reserved spaces."],
+ ["Ordre libre : disposition la plus compacte.", "Free order: most compact layout."],
 ];
