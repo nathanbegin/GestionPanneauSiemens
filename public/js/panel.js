@@ -10,6 +10,7 @@ import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {historyDialog} from './history.js';
 import {net} from './offline.js';
 import {optimizeDialog} from './optimize.js';
+import {moveBreaker} from '../optimize.js';
 import {buildChecklist} from './checklist.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
@@ -317,10 +318,16 @@ export async function panelView({id,tab='panel',ctx}){
  function realCabinet(){
   const filtering=!!(state.q||state.status||state.tag);
   const labels=h('label',{class:'check small'},h('input',{type:'checkbox',checked:state.realLabels,onchange:e=>{state.realLabels=e.target.checked;setPref('mp_panel_real_labels',e.target.checked?'1':'0');renderBody();}}),'Désignations');
-  return h('section',{class:'panel-area real'+(state.realLabels?' wide':''),'aria-label':'Vue réaliste du panneau'},
-   h('div',{class:'panel-caption'},viewSwitch(),zoomControls(),labels),
-   h('div',{class:'real-wrap'},sized(panelReal({panel,crop:state.rzoom==='circuits',activeId:state.activeId,labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit}))),
-   h('p',{class:'panel-tip',text:state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche. DDFT : bouton TEST blanc et fil témoin ; anti-arc : bouton TEST bleu.'}));
+  const canMove=data.access!=='view'&&!net.offline;
+  const moveToggle=canMove?h('label',{class:'check small move-toggle',title:'Glissez un disjoncteur vers un espace libre (ou sur un autre de même format pour les échanger)'},h('input',{type:'checkbox',checked:!!state.move,onchange:e=>{state.move=e.target.checked;if(state.move)state.select=null;renderBody();}}),'↕ Déplacer'):null;
+  const onMove=state.move&&canMove&&!state.select?async(id,delta)=>{
+   try{const circuits=moveBreaker(panel.circuits,id,delta,panel.positions);await persist({circuits});toast('Disjoncteur déplacé.');renderHead();renderBody();}
+   catch(err){toast(err.message,7000);renderBody();}
+  }:null;
+  return h('section',{class:'panel-area real'+(state.realLabels?' wide':'')+(onMove?' moving':''),'aria-label':'Vue réaliste du panneau'},
+   h('div',{class:'panel-caption'},viewSwitch(),zoomControls(),labels,moveToggle),
+   h('div',{class:'real-wrap'},sized(panelReal({panel,crop:state.rzoom==='circuits',activeId:state.activeId,labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit,onMove}))),
+   h('p',{class:'panel-tip',text:onMove?'Mode déplacement : glissez un disjoncteur vers un espace libre, ou sur un disjoncteur de même format pour les échanger.':state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche. DDFT : bouton TEST blanc et fil témoin ; anti-arc : bouton TEST bleu.'}));
  }
  function cabinet(){
   if(state.tab==='panel'&&state.view==='reel')return realCabinet();

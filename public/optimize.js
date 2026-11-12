@@ -208,3 +208,42 @@ export function buildCatalog(lib,det={}){
  for(const [k,b] of tmp)(k[0]==='t'?tandem:quad).set(k.slice(1),b.cat);
  return {tandem,quad,maxCircuits:det.maxCircuits??model?.circuits??null,label:det.modelId?`le modèle ${det.modelId}`:`la famille ${accepts.join('/')}`};
 }
+
+// ---------- Déplacement d'un disjoncteur (glisser-déposer) ----------
+// delta : décalage de position (un rang = ±2 dans la même colonne ; ±1 pour passer d'une colonne à l'autre).
+// Le disjoncteur entier (jumelé, bipolaire, quad…) se déplace avec ses fiches. Destination libre : déplacement ;
+// destination occupée par un disjoncteur de même format : échange ; sinon refus avec explication.
+export function moveBreaker(circuits,id,delta,positions){
+ const units=breakerUnits(circuits);
+ const u=units.find(x=>x.ids.includes(id));
+ if(!u)throw Error('Ce disjoncteur n’a pas de fiche à déplacer (case vide).');
+ if(!Number.isInteger(delta)||delta===0)return circuits;
+ const byId=new Map(circuits.map(c=>[c.id,c]));
+ const mine=u.ids.map(i=>byId.get(i));
+ const shift=(cs,d)=>cs.map(c=>({...c,slots:c.slots.map(s=>(slotPos(s)+d)+letter(s))}));
+ const moved=shift(mine,delta);
+ const T=new Set(moved.flatMap(c=>c.slots));
+ for(const s of T){const n=slotPos(s);if(n<1||n>positions)throw Error('Ce disjoncteur ne tient pas à cet endroit (hors du panneau).');}
+ const mineIds=new Set(u.ids);
+ const others=circuits.filter(c=>!mineIds.has(c.id));
+ const hit=others.filter(c=>c.slots.some(s=>T.has(s)));
+ if(hit.some(isReserved))throw Error('Cet espace est réservé pour une expansion future : retirez d’abord la réservation.');
+ const occupied=hit.filter(c=>live(c)||c.amps!=null||c.breakerRef||(c.loads&&c.loads.length));
+ let out;
+ if(!occupied.length){
+  const hitIds=new Set(hit.map(c=>c.id));
+  out=[...others.filter(c=>!hitIds.has(c.id)),...moved];
+ }else{
+  const other=units.find(x=>x.ids.some(i=>occupied.some(c=>c.id===i)));
+  const theirs=other?other.ids.map(i=>byId.get(i)):[];
+  const back=shift(theirs,-delta);
+  const oldSlots=new Set(mine.flatMap(c=>c.slots));
+  const fitsBack=other&&other!==u&&occupied.every(c=>other.ids.includes(c.id))&&back.flatMap(c=>c.slots).length===oldSlots.size&&back.flatMap(c=>c.slots).every(s=>oldSlots.has(s))
+   &&theirs.flatMap(c=>c.slots).every(s=>T.has(s));
+  if(!fitsBack)throw Error('Cet emplacement est occupé par un autre disjoncteur. Déposez-le sur un espace libre, ou sur un disjoncteur de même format pour les échanger.');
+  const theirIds=new Set(theirs.map(c=>c.id));
+  const hitIds=new Set(hit.map(c=>c.id));
+  out=[...others.filter(c=>!theirIds.has(c.id)&&!hitIds.has(c.id)),...moved,...back];
+ }
+ return resize(out,positions);
+}

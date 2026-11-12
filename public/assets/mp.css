@@ -1054,3 +1054,9 @@ body.is-offline .needs-net{opacity:.45;pointer-events:none}
 .opt-table{width:100%;margin:8px 0}.opt-table .good{color:#226a51;font-weight:600}.opt-table .bad{color:inherit}
 .opt-reco{font-weight:600}.opt-explain{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--soft,#f6f8fb)}
 .opt-moves{max-height:180px;overflow:auto}
+
+/* Glisser-déposer des disjoncteurs (vue réaliste) */
+.panel-real.movable .rp-slot:not(.dim){cursor:grab;touch-action:none}
+.panel-real .rp-slot.dragging{cursor:grabbing;opacity:.85;filter:drop-shadow(0 4px 6px rgba(0,0,0,.45));pointer-events:none}
+.panel-real .rp-drop{fill:rgba(42,216,246,.22);stroke:#2ad8f6;stroke-width:1.5;stroke-dasharray:4 2;pointer-events:none}
+.panel-area.moving .real-wrap{outline:2px dashed #2ad8f6;outline-offset:3px;border-radius:6px}

@@ -88,3 +88,26 @@ test('ordre libre : les bipolaires sont posés d’abord et alignés',()=>{
  const r=optimizeLayout(p,{sort:'space'});validate(r.circuits,{positions:12});
  assert.ok(r.after.used<=r.before.used);
 });
+import {moveBreaker} from '../public/optimize.js';
+test('déplacer : vers un espace libre, échange, bipolaire et refus',()=>{
+ const p=mk([[1,'A',15],[2,'B',20],[3,'Dbl',30,2],[4,'C',15]]);
+ const id=l=>p.circuits.find(c=>c.label===l).id;
+ // A (pos 1) → pos 7 (libre) : delta +6
+ let o=moveBreaker(p.circuits,id('A'),6,12);validate(o,{positions:12});
+ assert.equal(o.find(c=>c.label==='A').slots[0],'7A');assert.ok(o.some(c=>c.slots.includes('1A')&&!c.label));
+ // échange A (1) ↔ B (2) : delta +1
+ o=moveBreaker(p.circuits,id('A'),1,12);
+ assert.equal(o.find(c=>c.label==='A').slots[0],'2A');assert.equal(o.find(c=>c.label==='B').slots[0],'1A');
+ // bipolaire (3,5) → (7,9)
+ o=moveBreaker(p.circuits,id('Dbl'),4,12);validate(o,{positions:12});assert.equal(o.find(c=>c.label==='Dbl').slots.join(),'7A,7B,9A,9B');
+ // refus : bipolaire sur un unipolaire (format différent)
+ assert.throws(()=>moveBreaker(p.circuits,id('Dbl'),-2,12),/occupé/);
+ assert.throws(()=>moveBreaker(p.circuits,id('A'),99,12),/hors du panneau/);
+});
+test('déplacer : refuse un espace réservé et déplace un jumelé complet',()=>{
+ const r=optimizeLayout(mk([[1,'A',15],[2,'B',15],[3,'C',20]]),{pair:true,reserve:2});
+ const t=r.circuits.find(c=>c.slots.length===1&&c.label);
+ const o=moveBreaker(r.circuits,t.id,6,12);validate(o,{positions:12});
+ assert.equal(o.filter(c=>c.slots.length===1&&c.label).length,2);
+ assert.throws(()=>moveBreaker(r.circuits,t.id,10,12),/réservé|hors/);
+});

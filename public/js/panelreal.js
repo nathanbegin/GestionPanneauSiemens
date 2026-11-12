@@ -31,7 +31,7 @@ const BW=38; // largeur du bloc d'identification (calibre, référence, bouton T
  * opts : {panel, labels:boolean (désignations de part et d'autre), match?(c)→bool (filtre), selected?:Set<id>,
  *         highlight?:Set<position> (positions de départ proposées), onCircuit(id), onPosition(position)}
  */
-export function panelReal({panel,labels=false,match=null,selected=null,highlight=null,crop=false,activeId=null,onCircuit,onPosition}){
+export function panelReal({panel,labels=false,match=null,selected=null,highlight=null,crop=false,activeId=null,onCircuit,onPosition,onMove=null}){
  const det=panel.details||{};
  const fam=familyOf(det.family);
  const brand=(fam.brand||det.brand||'').trim();
@@ -129,7 +129,7 @@ export function panelReal({panel,labels=false,match=null,selected=null,highlight
   const poles=new Set(c.slots.map(slotPos)).size;
   const dim=match&&!match(c);
   const desc=`${designation(c)} · ${c.vacant?(c.reserved?'Réservé (expansion)':'Espace inutilisé'):c.label||'À identifier'}${c.amps?' · '+c.amps+' A':''}${c.protection&&c.protection!=='Standard'?' · '+c.protection:''}${c.breakerRef?' · '+c.breakerRef:''}`;
-  const g=s('g',{class:'rp-slot'+(dim?' dim':'')+(selected?.has(c.id)?' sel':'')+(activeId===c.id?' act':''),'data-id':c.id,transform:`translate(${x} ${y})`,role:'button',tabindex:0,'aria-label':desc},s('title',{},desc));
+  const g=s('g',{class:'rp-slot'+(dim?' dim':'')+(selected?.has(c.id)?' sel':'')+(activeId===c.id?' act':''),'data-id':c.id,transform:`translate(${x} ${y})`,'data-x':x,'data-y':y,role:'button',tabindex:0,'aria-label':desc},s('title',{},desc));
   const bx=right?W-BW-2:2;            // bloc d'identification, côté extérieur
   const hx=right?6:BW+6,hw=W-BW-14;    // logement de la manette, côté barre centrale
   if(isEmptySlot(c)){
@@ -186,7 +186,42 @@ export function panelReal({panel,labels=false,match=null,selected=null,highlight
  if(highlight)for(const n of highlight){const r=Math.floor((n-1)/2);targets.append(s('rect',{class:'rp-target','data-pos':n,x:(n%2?XL:XR)+1,y:Y0+r*P+1,width:W-2,height:P-2,rx:3}));}
  svg.append(slots,tagList,targets,
   s('text',{x:300,y:trimBottom+16,'font-size':11,fill:'#64747f','text-anchor':'middle','font-weight':700,'letter-spacing':1},[brand.toUpperCase()||'PANNEAU',isMain?`${det.mainAmps} A`:'SOUS-PANNEAU'].join(' · ')));
+ // Glisser-déposer (mode « Déplacer ») : onMove(id, delta) ; delta = ±2 par rang, ±1 pour changer de colonne.
+ let justDragged=false;
+ if(onMove){
+  svg.classList.add('movable');
+  const toSvg=e=>{const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse());};
+  const colOf=x=>Math.abs(x-(XR+W/2))<Math.abs(x-(XL+W/2))?1:0;
+  const deltaAt=(d,p)=>2*Math.round((p.y-d.start.y)/P)+(colOf(p.x)-d.col);
+  const drop=s('g',{class:'rp-drops'});svg.append(drop);
+  let drag=null;
+  svg.addEventListener('pointerdown',e=>{
+   const g=e.target.closest?.('.rp-slot');if(!g||(e.button||0)>0)return;
+   const c=panel.circuits.find(x=>x.id===g.getAttribute('data-id'));if(!c||isEmptySlot(c))return;
+   drag={g,c,start:toSvg(e),col:slotPos(c.slots[0])%2===0?1:0,x:Number(g.getAttribute('data-x')),y:Number(g.getAttribute('data-y')),moved:false};
+   try{g.setPointerCapture(e.pointerId);}catch{}
+  });
+  svg.addEventListener('pointermove',e=>{
+   if(!drag)return;const p=toSvg(e),dx=p.x-drag.start.x,dy=p.y-drag.start.y;
+   if(!drag.moved&&Math.hypot(dx,dy)<3)return;
+   drag.moved=true;e.preventDefault();drag.g.classList.add('dragging');
+   drag.g.setAttribute('transform',`translate(${drag.x+dx} ${drag.y+dy})`);
+   const d=deltaAt(drag,p);drop.replaceChildren();
+   const n=new Set(drag.c.slots.map(slotPos));
+   for(const pos of n){const t=pos+d;if(t<1||t>panel.positions)continue;const r=Math.floor((t-1)/2);drop.append(s('rect',{class:'rp-drop',x:(t%2?XL:XR)+1,y:Y0+r*P+1,width:W-2,height:P-2,rx:3}));}
+  });
+  const end=e=>{
+   if(!drag)return;const d0=drag;drag=null;drop.replaceChildren();
+   d0.g.classList.remove('dragging');d0.g.setAttribute('transform',`translate(${d0.x} ${d0.y})`);
+   if(!d0.moved)return;
+   justDragged=true;setTimeout(()=>{justDragged=false;},0);
+   const d=deltaAt(d0,toSvg(e));if(d)onMove(d0.c.id,d);
+  };
+  svg.addEventListener('pointerup',end);
+  svg.addEventListener('pointercancel',()=>{if(!drag)return;const d0=drag;drag=null;drop.replaceChildren();d0.g.classList.remove('dragging');d0.g.setAttribute('transform',`translate(${d0.x} ${d0.y})`);});
+ }
  svg.addEventListener('click',e=>{
+  if(justDragged)return;
   const t=e.target.closest('[data-pos]');if(t&&onPosition)return onPosition(Number(t.getAttribute('data-pos')));
   const g=e.target.closest('[data-id]');if(g&&onCircuit)onCircuit(g.getAttribute('data-id'));
  });

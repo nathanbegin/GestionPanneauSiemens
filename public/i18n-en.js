@@ -1923,4 +1923,12 @@ export default [
  ["Compatibilité des jumelés non vérifiée (aucun modèle de panneau choisi ou bibliothèque non disponible) : vérifiez-la avec le fabricant.", "Tandem compatibility not verified (no panel model chosen or library unavailable): check with the manufacturer."],
  ["Les disjoncteurs ne tiennent pas dans le panneau avec cette disposition. Essayez l’ordre libre (économie d’espace) ou moins d’espaces réservés.", "The breakers do not fit in the panel with this layout. Try the free order (save space) or fewer reserved spaces."],
  ["Ordre libre : disposition la plus compacte.", "Free order: most compact layout."],
+ ["↕ Déplacer", "↕ Move"],
+ ["Glissez un disjoncteur vers un espace libre (ou sur un autre de même format pour les échanger)", "Drag a breaker to a free space (or onto another of the same size to swap them)"],
+ ["Disjoncteur déplacé.", "Breaker moved."],
+ ["Mode déplacement : glissez un disjoncteur vers un espace libre, ou sur un disjoncteur de même format pour les échanger.", "Move mode: drag a breaker to a free space, or onto a breaker of the same size to swap them."],
+ ["Ce disjoncteur n’a pas de fiche à déplacer (case vide).", "This breaker has no record to move (empty slot)."],
+ ["Ce disjoncteur ne tient pas à cet endroit (hors du panneau).", "This breaker does not fit there (outside the panel)."],
+ ["Cet espace est réservé pour une expansion future : retirez d’abord la réservation.", "This space is reserved for future expansion: remove the reservation first."],
+ ["Cet emplacement est occupé par un autre disjoncteur. Déposez-le sur un espace libre, ou sur un disjoncteur de même format pour les échanger.", "This location is occupied by another breaker. Drop it on a free space, or on a breaker of the same size to swap them."],
 ];
