@@ -37,13 +37,27 @@ export default route(['GET','POST'],async(req,res)=>{
   }
   if(action==='users'){
    const search='%'+text(q.q,100).toLowerCase()+'%',plan=text(q.plan,60),status=text(q.status,20),page=Math.max(0,int(q.page||0,{max:10000}));
-   const rows=await sql`SELECT u.id,u.email,u.name,u.created_at,u.profile->>'accountType' AS account_type,s.plan_id,s.status,s.interval,s.current_period_end,s.source,s.cancel_at_period_end,
+   const rows=await sql`SELECT u.id,u.email,u.name,u.created_at,u.suspended_at,u.profile->>'accountType' AS account_type,s.plan_id,s.status,s.interval,s.current_period_end,s.source,s.cancel_at_period_end,
     (SELECT count(*)::int FROM app_panels p WHERE p.user_id=u.id) AS panels,(SELECT count(*)::int FROM app_sites x WHERE x.user_id=u.id) AS sites
     FROM app_users u LEFT JOIN app_subscriptions s ON s.user_id=u.id
     WHERE (lower(u.email) LIKE ${search} OR lower(u.name) LIKE ${search})
      AND (${plan}='' OR coalesce(s.plan_id,'gratuit')=${plan}) AND (${status}='' OR coalesce(s.status,'gratuit')=${status})
     ORDER BY u.created_at DESC LIMIT 50 OFFSET ${page*50}`;
    return res.status(200).json({users:rows});
+  }
+  if(action==='users-export'){
+   const search='%'+text(q.q,100).toLowerCase()+'%',plan=text(q.plan,60),status=text(q.status,20);
+   const rows=await sql`SELECT u.email,u.name,u.created_at,u.suspended_at,u.profile->>'accountType' AS account_type,u.profile->>'lang' AS lang,coalesce(s.plan_id,'gratuit') AS plan,coalesce(s.status,'gratuit') AS status,s.interval,s.current_period_end,s.source,s.cancel_at_period_end,
+    (SELECT count(*)::int FROM app_panels p WHERE p.user_id=u.id) AS panels,(SELECT count(*)::int FROM app_sites x WHERE x.user_id=u.id) AS sites
+    FROM app_users u LEFT JOIN app_subscriptions s ON s.user_id=u.id
+    WHERE (lower(u.email) LIKE ${search} OR lower(u.name) LIKE ${search})
+     AND (${plan}='' OR coalesce(s.plan_id,'gratuit')=${plan}) AND (${status}='' OR coalesce(s.status,'gratuit')=${status})
+    ORDER BY u.created_at DESC LIMIT 20000`;
+   const cell=v=>{let t=v instanceof Date?v.toISOString():String(v??'');if(/^[=+\-@\t\r]/.test(t))t="'"+t;return /[",;\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+   const head=['Courriel','Nom','Inscrit le','Suspendu le','Type de compte','Langue','Forfait','Statut','Périodicité','Fin de période','Source','Annulation à la fin','Panneaux','Sites'];
+   const lines=[head,...rows.map(r=>[r.email,r.name,r.created_at,r.suspended_at,r.account_type,r.lang,r.plan,r.status,r.interval,r.current_period_end,r.source,r.cancel_at_period_end?'oui':'',r.panels,r.sites])].map(l=>l.map(cell).join(','));
+   await audit(sql,admin,'users.export','-',{rows:rows.length});
+   return res.status(200).json({csv:'\ufeff'+lines.join('\r\n')+'\r\n',rows:rows.length});
   }
   if(action==='user'){
    const u=await loadUser(sql,String(q.id));
@@ -53,7 +67,7 @@ export default route(['GET','POST'],async(req,res)=>{
    let charges=[];
    if(u.stripe_customer&&stripeConfigured()){try{charges=(await stripe('GET','/charges',{customer:u.stripe_customer,limit:20})).data.map(c=>({id:c.id,amount:c.amount,refunded:c.amount_refunded,currency:c.currency,created:c.created*1000,description:c.description,status:c.status,receipt:c.receipt_url}));}catch(x){charges=[{error:x.message}];}}
    const log=await sql`SELECT admin_email,action,details,at FROM app_admin_audit WHERE target=${u.id} ORDER BY at DESC LIMIT 30`;
-   return res.status(200).json({user:{id:u.id,email:u.email,name:u.name,profile:u.profile,createdAt:u.created_at,stripeCustomer:u.stripe_customer},entitlement:e,credits,sites,charges,log});
+   return res.status(200).json({user:{id:u.id,email:u.email,name:u.name,profile:u.profile,createdAt:u.created_at,stripeCustomer:u.stripe_customer,suspendedAt:u.suspended_at,suspendedReason:u.suspended_reason||'',isAdmin:adminEmails().includes(u.email)},entitlement:e,credits,sites,charges,log});
   }
   if(action==='plans'){
    const plans=await sql`SELECT * FROM app_plans ORDER BY sort,id`;const packs=await sql`SELECT * FROM app_packs ORDER BY price`;
@@ -174,6 +188,17 @@ export default route(['GET','POST'],async(req,res)=>{
   if(!stripeLive||!sub.cancel_at_period_end)throw new HttpError(400,'Aucune annulation programmée.');
   await upsertSubscription(sql,await stripe('POST','/subscriptions/'+sub.stripe_subscription,{cancel_at_period_end:false}));
   await audit(sql,admin,'subscription.resume',u.id);return res.status(200).json({ok:true});
+ }
+ if(action==='suspend'){
+  if(adminEmails().includes(u.email))throw new HttpError(400,'Un compte administrateur ne peut pas être suspendu.');
+  const reason=text(d.reason,300);
+  await sql`UPDATE app_users SET suspended_at=now(),suspended_reason=${reason},updated_at=now() WHERE id=${u.id}`;
+  await sql`DELETE FROM app_sessions WHERE user_id=${u.id}`;
+  await audit(sql,admin,'user.suspend',u.id,{reason});return res.status(200).json({ok:true});
+ }
+ if(action==='unsuspend'){
+  await sql`UPDATE app_users SET suspended_at=NULL,suspended_reason=NULL,updated_at=now() WHERE id=${u.id}`;
+  await audit(sql,admin,'user.unsuspend',u.id);return res.status(200).json({ok:true});
  }
  if(action==='override'){
   const limit=int(d.limit,{nullable:true,max:100000});

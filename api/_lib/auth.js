@@ -31,6 +31,8 @@ export function checkEmail(email){
 }
 export const newId=()=>randomUUID();
 export async function createSession(sql,userId,client='web'){
+ const [su]=await sql`SELECT suspended_at FROM app_users WHERE id=${userId}`;
+ if(su?.suspended_at)throw new HttpError(403,'Ce compte est suspendu. Écrivez-nous pour en savoir plus.',{suspended:true});
  const token=randomBytes(32).toString('base64url');
  await sql`INSERT INTO app_sessions(id,user_id,expires_at,client) VALUES(${sha(token)},${userId},now()+make_interval(days=>${SESSION_DAYS}),${client})`;
  return token;
@@ -60,7 +62,7 @@ export async function currentUser(req,sql){
  if(!token)return null;
  // Protection CSRF : une écriture authentifiée par témoin doit porter l'en-tête applicatif.
  if(via==='cookie'&&req.method!=='GET'&&!req.headers['x-mp-client'])throw new HttpError(403,'Requête refusée.');
- const [u]=await sql`SELECT u.* FROM app_sessions s JOIN app_users u ON u.id=s.user_id WHERE s.id=${sha(token)} AND s.expires_at>now()`;
+ const [u]=await sql`SELECT u.* FROM app_sessions s JOIN app_users u ON u.id=s.user_id WHERE s.id=${sha(token)} AND s.expires_at>now() AND u.suspended_at IS NULL`;
  return u||null;
 }
 export async function requireUser(req,sql){

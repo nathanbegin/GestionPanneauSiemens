@@ -3,7 +3,7 @@ import {neon} from '@neondatabase/serverless';
 let cached,schemaReady;
 // Version du schéma : les migrations ne s'exécutent qu'une fois par version (au lieu de ~35 requêtes à chaque démarrage à froid).
 // Augmenter ce nombre quand on ajoute une table, une colonne ou un index à runMigrations.
-export const SCHEMA_VERSION=2;
+export const SCHEMA_VERSION=3;
 const isLocal=url=>/@(localhost|127\.0\.0\.1)(:\d+)?\//.test(url);
 async function localSql(url){
  const {default:pg}=await import('pg');
@@ -31,6 +31,8 @@ export async function runMigrations(sql){
  await sql`CREATE TABLE IF NOT EXISTS app_users(
   id uuid PRIMARY KEY, email text NOT NULL UNIQUE, password_hash text NOT NULL, name text NOT NULL DEFAULT '',
   profile jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`;
+ await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS suspended_at timestamptz`;
+ await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS suspended_reason text`;
  await sql`CREATE TABLE IF NOT EXISTS app_sessions(
   id text PRIMARY KEY, user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, client text NOT NULL DEFAULT 'web')`;

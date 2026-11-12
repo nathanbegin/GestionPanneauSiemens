@@ -1,6 +1,6 @@
 {
   "name": "gestion-panneau-siemens",
-  "version": "2.49.2",
+  "version": "2.50.0",
   "private": true,
   "type": "module",
   "engines": {

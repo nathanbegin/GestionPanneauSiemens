@@ -36,12 +36,14 @@ async function overview(){
 async function users(){
  const box=h('div');
  const form=h('form',{class:'inline-form'},field('Recherche',h('input',{name:'q',placeholder:'Courriel ou nom'})),field('Forfait',h('input',{name:'plan',placeholder:'ex. gratuit'})),
-  field('Statut',select('status',[['','Tous'],['gratuit','Gratuit'],['active','Actif'],['trialing','Essai'],['past_due','En retard'],['comp','Offert'],['canceled','Annulé']])),h('button',{type:'submit',class:'primary'},'Filtrer'));
+  field('Statut',select('status',[['','Tous'],['gratuit','Gratuit'],['active','Actif'],['trialing','Essai'],['past_due','En retard'],['comp','Offert'],['canceled','Annulé']])),h('button',{type:'submit',class:'primary'},'Filtrer'),h('button',{type:'button',onclick:async()=>{try{
+   const p=new URLSearchParams(new FormData(form));const {csv,rows}=await api('/api/admin?action=users-export&'+p);
+   const a=h('a',{href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),download:'abonnes-disjonio-'+new Date().toISOString().slice(0,10)+'.csv'});document.body.append(a);a.click();a.remove();toast(rows+' abonné(s) exporté(s).');}catch(x){toast(x.message,7000);}}},'⬇ Exporter en CSV'));
  const load=async()=>{
   const p=new URLSearchParams(new FormData(form));
   const {users}=await api('/api/admin?action=users&'+p);
   box.replaceChildren(h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Nom','Courriel','Forfait','Statut','Panneaux','Sites','Inscrit'].map(t=>h('th',{text:t})))),
-   h('tbody',{},users.map(u=>h('tr',{class:'click',onclick:()=>{location.hash='#/admin/abonne/'+u.id;}},h('td',{text:u.name}),h('td',{text:u.email}),h('td',{text:u.plan_id||'gratuit'}),h('td',{text:(STATUS[u.status]||'Gratuit')+(u.cancel_at_period_end?' (fin programmée)':'')}),h('td',{text:u.panels}),h('td',{text:u.sites}),h('td',{text:fmtDate(u.created_at)})))))),users.length===50?h('p',{class:'small muted',text:'50 premiers résultats : précisez la recherche.'}):'');
+   h('tbody',{},users.map(u=>h('tr',{class:'click',onclick:()=>{location.hash='#/admin/abonne/'+u.id;}},h('td',{text:u.name}),h('td',{text:u.email}),h('td',{text:u.plan_id||'gratuit'}),h('td',{text:(u.suspended_at?'⛔ Suspendu · ':'')+(STATUS[u.status]||'Gratuit')+(u.cancel_at_period_end?' (fin programmée)':'')}),h('td',{text:u.panels}),h('td',{text:u.sites}),h('td',{text:fmtDate(u.created_at)})))))),users.length===50?h('p',{class:'small muted',text:'50 premiers résultats : précisez la recherche.'}):'');
  };
  form.addEventListener('submit',e=>{e.preventDefault();load().catch(x=>toast(x.message));});
  await load();
@@ -65,6 +67,11 @@ async function userDetail(id){
    :formCard('Attribuer un forfait (offert)',[field('Forfait',select('planId',planOpts,s?.planId||'proprietaire')),field('Jusqu’au',h('input',{name:'until',type:'date'}),{hint:'Vide = sans fin'}),field('Note',h('input',{name:'note',maxlength:300,placeholder:'Raison'}))],'Attribuer',v=>act('set-plan',v,'Forfait attribué.'),'Sans paiement : partenaire, compensation, test…'),
   formCard('Limite personnalisée',[field('Panneaux',h('input',{name:'limit',type:'number',min:0,value:s?.limitOverride??'',placeholder:'Vide = limite du forfait'}))],'Enregistrer',v=>act('override',{limit:v.limit===''?null:Number(v.limit)},'Limite enregistrée.')),
   formCard('Offrir des panneaux',[field('Nombre',h('input',{name:'panels',type:'number',min:1,value:5})),field('Validité (jours)',h('input',{name:'days',type:'number',min:1,value:365})),field('Note',h('input',{name:'note'}))],'Offrir',v=>act('credits',{panels:Number(v.panels),days:Number(v.days),note:v.note},'Crédits ajoutés.')),
+  h('div',{class:'card'},h('h3',{text:'Suspension du compte'}),
+   u.suspendedAt?h('p',{class:'notice warn',text:`Suspendu le ${fmtDate(u.suspendedAt)}${u.suspendedReason?' — '+u.suspendedReason:''}. La personne ne peut plus se connecter ; ses données sont conservées.`}):h('p',{class:'small muted',text:'Une personne suspendue est déconnectée et ne peut plus se connecter. Ses données et son abonnement sont conservés (l’abonnement Stripe n’est pas annulé : faites-le séparément si nécessaire).'}),
+   u.isAdmin?h('p',{class:'small muted',text:'Compte administrateur : suspension impossible.'}):u.suspendedAt
+    ?h('button',{type:'button',onclick:()=>act('unsuspend',{},'Compte réactivé.')},'Réactiver le compte')
+    :h('button',{type:'button',class:'danger',onclick:async()=>{const f=h('input',{name:'reason',maxlength:300,placeholder:'Motif (interne)'});const d=dialog({title:'Suspendre ce compte',eyebrow:u.email,body:[h('p',{class:'muted',text:'La personne sera déconnectée immédiatement et ne pourra plus se connecter.'}),field('Motif',f)],actions:[{label:'Annuler',kind:'ghost'},{label:'Suspendre',kind:'danger',onClick:()=>{act('suspend',{reason:f.value},'Compte suspendu.');}}]});}},'Suspendre le compte')),
   h('div',{class:'card'},h('h3',{text:'Annulation'}),h('div',{class:'page-actions'},
    stripeSub&&!s.cancelAtPeriodEnd&&h('button',{type:'button',onclick:async()=>{if(await confirmDialog('Annuler à la fin de la période en cours ?'))act('cancel',{immediate:false},'Annulation programmée.');}},'À la fin de la période'),
    stripeSub&&s.cancelAtPeriodEnd&&h('button',{type:'button',onclick:()=>act('resume',{},'Abonnement réactivé.')},'Réactiver'),
