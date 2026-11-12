@@ -57,7 +57,7 @@ export async function panelView({id,tab='panel',ctx}){
  if(gotoCircuit&&panel.circuits.some(c=>c.id===gotoCircuit)){state.tab='panel';state.view='reel';}else gotoCircuit=null;
  try{const gq=sessionStorage.getItem('mp_goto_q');if(gq){state.q=gq;state.tab='list';sessionStorage.removeItem('mp_goto_q');}}catch{}
  // Désignations à côté du panneau réaliste : désactivées par défaut (la liste des circuits les montre déjà).
- state.realLabels=pref('mp_panel_real_labels')==='1';state.rzoom=pref('mp_panel_zoom')==='circuits'?'circuits':'full';state.rmult=[1,1.25,1.5,2,3].includes(Number(pref('mp_panel_mult')))?Number(pref('mp_panel_mult')):1;
+state.rzoom=pref('mp_panel_zoom')==='circuits'?'circuits':'full';state.rmult=[1,1.25,1.5,2,3].includes(Number(pref('mp_panel_mult')))?Number(pref('mp_panel_mult')):1;
  ctx.crumbs([['Mes sites','#/sites'],[site.name,'#/sites/'+site.id],[panelTitle(panel)]]);
 
  const root=h('div',{class:'container'});
@@ -315,18 +315,22 @@ export async function panelView({id,tab='panel',ctx}){
     h('button',{type:'button','aria-label':'Réinitialiser le zoom',title:'Réinitialiser',onclick:()=>{state.rmult=1;setPref('mp_panel_mult','1');renderBody();}},'×'+String(state.rmult).replace('.',',')),
     h('button',{type:'button','aria-label':'Augmenter le zoom',disabled:state.rmult===MULTS.at(-1),onclick:()=>setM(1)},'+')));
  }
- function realCabinet(){
-  const filtering=!!(state.q||state.status||state.tag);
-  const labels=h('label',{class:'check small'},h('input',{type:'checkbox',checked:state.realLabels,onchange:e=>{state.realLabels=e.target.checked;setPref('mp_panel_real_labels',e.target.checked?'1':'0');renderBody();}}),'Désignations');
+ // Mode « Déplacer » (glisser-déposer) commun aux onglets Panneau et Planification : interrupteur + gestionnaire.
+ function moveControl(){
   const canMove=data.access!=='view'&&!net.offline;
   const moveToggle=canMove?h('label',{class:'check small move-toggle',title:'Glissez un disjoncteur vers un espace libre (ou sur un autre de même format pour les échanger)'},h('input',{type:'checkbox',checked:!!state.move,onchange:e=>{state.move=e.target.checked;if(state.move)state.select=null;renderBody();}}),'↕ Déplacer'):null;
   const onMove=state.move&&canMove&&!state.select?async(id,delta)=>{
    try{const circuits=moveBreaker(panel.circuits,id,delta,panel.positions);await persist({circuits});toast('Disjoncteur déplacé.');renderHead();renderBody();}
    catch(err){toast(err.message,7000);renderBody();}
   }:null;
-  return h('section',{class:'panel-area real'+(state.realLabels?' wide':'')+(onMove?' moving':''),'aria-label':'Vue réaliste du panneau'},
-   h('div',{class:'panel-caption'},viewSwitch(),zoomControls(),labels,moveToggle),
-   h('div',{class:'real-wrap'},sized(panelReal({panel,crop:state.rzoom==='circuits',activeId:state.activeId,labels:state.realLabels,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit,onMove}))),
+  return {moveToggle,onMove};
+ }
+ function realCabinet(){
+  const filtering=!!(state.q||state.status||state.tag);
+  const {moveToggle,onMove}=moveControl();
+  return h('section',{class:'panel-area real'+(onMove?' moving':''),'aria-label':'Vue réaliste du panneau'},
+   h('div',{class:'panel-caption'},viewSwitch(),zoomControls(),moveToggle),
+   h('div',{class:'real-wrap'},sized(panelReal({panel,crop:state.rzoom==='circuits',activeId:state.activeId,labels:false,match:filtering?filtered():null,selected:state.select,onCircuit:openCircuit,onMove}))),
    h('p',{class:'panel-tip',text:onMove?'Mode déplacement : glissez un disjoncteur vers un espace libre, ou sur un disjoncteur de même format pour les échanger.':state.select?'Touchez les disjoncteurs à inclure dans la sélection.':'Touchez un disjoncteur pour ouvrir sa fiche. DDFT : bouton TEST blanc et fil témoin ; anti-arc : bouton TEST bleu.'}));
  }
  function cabinet(){
@@ -368,7 +372,7 @@ export async function panelView({id,tab='panel',ctx}){
   if(state.tab==='panel'){
    const listBox=h('div',{class:'circuit-list'});
    // Vue réaliste avec désignations : le panneau occupe toute la largeur, la liste passe dessous.
-   const cabBox=h('div',{class:'sticky-col'+(state.view==='reel'&&state.realLabels?' span-all':'')});
+   const cabBox=h('div',{class:'sticky-col'});
    const refresh=()=>{cabBox.replaceChildren(cabinet());circuitList(listBox);};
    body.replaceChildren(h('div',{class:'workspace'},cabBox,h('section',{'aria-label':'Liste des circuits'},bulkBar(),filters(refresh),listBox,legend())));
    refresh();markActive(false);
@@ -486,7 +490,8 @@ export async function panelView({id,tab='panel',ctx}){
     try{const circuits=placeBreaker(panel.circuits,pos,{...state.place,cat:state.place.cat},panel.positions);await persist({circuits});toast(`${state.place.cat} placé en position ${pos}.`);renderHead();renderBody();}
     catch(e){toast(e.message,7000);}
    }};
-  const art=h('div',{class:'plan-art'},h('div',{class:'panel-caption'},viewSwitch(),state.view==='reel'&&zoomControls()),state.view==='reel'?h('div',{class:'real-wrap'},sized(panelReal({...artOpts,labels:false,crop:state.rzoom==='circuits'}))):panelArt(artOpts));
+  const mv=state.view==='reel'?moveControl():{};
+  const art=h('div',{class:'plan-art'+(mv.onMove?' moving':'')},h('div',{class:'panel-caption'},viewSwitch(),state.view==='reel'&&zoomControls(),mv.moveToggle),state.view==='reel'?h('div',{class:'real-wrap'},sized(panelReal({...artOpts,labels:false,crop:state.rzoom==='circuits',onMove:state.place?null:mv.onMove}))):panelArt(artOpts));
   const banner=state.place&&h('div',{class:'place-banner'},h('span',{},'Placement : ',h('b',{text:state.place.cat}),` · ${state.place.label} — ${targets.size?'touchez une position en surbrillance.':'aucun espace libre suffisant.'}`),h('button',{type:'button',class:'sm',onclick:()=>{state.place=null;renderBody();}},'Terminer'));
   const cabBox=h('div',{class:'stack sticky-col'},banner,art);
   const palette=lib?breakerPalette({lib,det:panel.details||{},selected:state.place?.cat,onSelect:(b,issues)=>{
