@@ -1004,7 +1004,8 @@ dialog.side .f:focus-within .hint{display:block}
 /* Mobile connecté : le logo passe dans le menu (la barre garde hamburger + fil d'Ariane) */
 .menu .menu-brand{display:none}
 @media (max-width:720px){
- #topbar.has-menu .brand{display:none}
+ #topbar.has-menu .brand{display:flex;order:1;margin-left:auto;align-items:center}
+ #topbar.has-menu .brand-sym{display:block;width:36px;height:36px}
  .menu .menu-brand{display:flex;align-items:center;padding:12px 14px 6px;border-bottom:1px solid var(--line);margin-bottom:4px}
  .menu .menu-brand img{height:34px;width:auto}
 }
@@ -1072,3 +1073,9 @@ body.is-offline .needs-net{opacity:.45;pointer-events:none}
 
 /* Plein écran (application installée / native) : l'en-tête respecte l'encoche et la zone de caméra */
 header.topbar{padding-top:env(safe-area-inset-top,0px)}
+
+/* Mobile : espace sous la navigation Sites · Comparer · Équipe (les pastilles ne touchent plus le filet de l'en-tête) */
+@media (max-width:900px){
+ body.app .topbar .container,.topbar .container{padding-bottom:12px;height:auto;min-height:0}
+ #worknav.worknav{margin-bottom:2px}
+}
