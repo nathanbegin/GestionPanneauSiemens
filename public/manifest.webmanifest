@@ -6,6 +6,7 @@
  "start_url": "/app#/sites",
  "scope": "/",
  "display": "standalone",
+ "display_override": ["fullscreen", "standalone"],
  "background_color": "#F3F4EF",
  "theme_color": "#1A4032",
  "icons": [

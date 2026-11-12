@@ -1069,3 +1069,6 @@ body.is-offline .needs-net{opacity:.45;pointer-events:none}
 .splash-text{font-size:15px;letter-spacing:.04em;color:var(--muted)}
 @keyframes splash-zoom{0%,100%{transform:scale(.88);opacity:.75}50%{transform:scale(1.1);opacity:1}}
 @media (prefers-reduced-motion:reduce){.splash-logo{animation:none}}
+
+/* Plein écran (application installée / native) : l'en-tête respecte l'encoche et la zone de caméra */
+header.topbar{padding-top:env(safe-area-inset-top,0px)}
