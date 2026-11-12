@@ -8,7 +8,7 @@ import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
 import {siteAccess,panelAccess,need} from './_lib/shares.js';
-import {scanPanel,scanNameplate,explainLayout,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
+import {scanPanel,scanNameplate,explainLayout,estimateCosts,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
 import {scanToPanel} from '../public/aiscan.js';
 import {makeCalcRecord} from './_lib/calcrecord.js';
 import {trashPanel} from './_lib/trash.js';
@@ -53,8 +53,8 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   return res.status(200).json(library());
  }
  // Ajout de panneau assisté par IA : statut (GET) et analyse de photos / fichiers (POST).
- if(req.query?.action==='scan'||req.query?.action==='nameplate'||req.query?.action==='explain-layout'){
-  const isPlate=req.query.action==='nameplate',isExplain=req.query.action==='explain-layout';
+ if(req.query?.action==='scan'||req.query?.action==='nameplate'||req.query?.action==='explain-layout'||req.query?.action==='estimate-costs'){
+  const isPlate=req.query.action==='nameplate',isExplain=req.query.action==='explain-layout',isEstimate=req.query.action==='estimate-costs';
   const isAdmin=adminEmails().includes(user.email);
   const e=await entitlement(sql,user.id);
   const allow=aiAllowance(e,isAdmin);
@@ -68,6 +68,14 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   await rateLimit(sql,'ai:'+user.id,6,5);
   await recordAttempt(sql,'ai:'+user.id);
   const data=body(req);
+  if(isEstimate){
+   // Estimation des coûts (prix en ligne chez les détaillants) : compte dans le quota d'analyses IA.
+   let est;
+   try{est=await estimateCosts({input:data,lang:data.lang==='en'?'en':'fr',settings});}
+   catch(x){if(x.status!==400)await sql`INSERT INTO app_ai_scans(user_id,model,ok) VALUES(${user.id},${aiModel(settings)},false)`;throw x;}
+   await sql`INSERT INTO app_ai_scans(user_id,model,input_tokens,output_tokens) VALUES(${user.id},${est.model},${est.usage.input},${est.usage.output})`;
+   return res.status(200).json({estimate:est.scan,live:est.live,model:est.model,used:used+1,monthly:allow.monthly});
+  }
   if(isExplain){
    // Explication comparative de deux scénarios de disposition : compte dans le quota d'analyses IA.
    const d=data.compare&&typeof data.compare==='object'?data.compare:{};

@@ -10,6 +10,7 @@ import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {historyDialog} from './history.js';
 import {net} from './offline.js';
 import {optimizeDialog} from './optimize.js';
+import {estimateDialog} from './estimate.js';
 import {moveBreaker} from '../optimize.js';
 import {buildChecklist} from './checklist.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
@@ -554,7 +555,7 @@ state.rzoom=pref('mp_panel_zoom')==='circuits'?'circuits':'full';state.rmult=[1,
    h('div',{class:'table-wrap'},h('table',{class:'data'},h('thead',{},h('tr',{},['Pos.','Circuit','Charges','kW','A','Disj.','%','Fil'].map(t=>h('th',{text:t})))),
     h('tbody',{},loadRows.length?loadRows.map(({c,r})=>h('tr',{class:'click',onclick:()=>openCircuit(c.id)},h('td',{text:designation(c)}),h('td',{text:c.label||'—'}),h('td',{class:'small',text:(c.loads||[]).map(l=>(l.qty>1?l.qty+' × ':'')+l.name).join(', ')||'—'}),h('td',{text:r.watts?(r.watts/1000).toLocaleString((globalThis.MP_LOCALE||'fr-CA'),{maximumFractionDigits:2}):'—'}),h('td',{text:r.watts?Number(r.demandAmps).toLocaleString((globalThis.MP_LOCALE||'fr-CA'),{maximumFractionDigits:1}):'—'}),h('td',{text:c.amps?c.amps+' A':'—'}),h('td',{class:r.percent>100?'st-unknown':'',text:r.percent!=null?r.percent+' %':'—'}),h('td',{class:'small',text:c.wire?.gauge||(r.suggestedWire?'≈ '+r.suggestedWire:'—')}))):h('tr',{},h('td',{colspan:8,class:'muted',text:'Touchez un disjoncteur et ajoutez ses charges dans la section « Planification » de la fiche.'}))))));
   const mat=materials(panel);
-  const matCard=h('div',{class:'card side-card'},h('h3',{text:'Liste de matériel'}),h('p',{class:'small muted',text:'Famille : '+mat.family+' · numéros de catalogue de la bibliothèque (vérifiez la disponibilité auprès du distributeur).'}),
+  const matCard=h('div',{class:'card side-card'},h('h3',{text:'Liste de matériel'}),!net.offline&&mat.items.length?h('button',{type:'button',class:'needs-net',onclick:()=>estimateDialog({panel})},'💲 Estimer les coûts (IA)'):'',h('p',{class:'small muted',text:'Famille : '+mat.family+' · numéros de catalogue de la bibliothèque (vérifiez la disponibilité auprès du distributeur).'}),
    mat.items.length?h('table',{class:'data'},h('thead',{},h('tr',{},['Qté','Disjoncteur','Référence'].map(t=>h('th',{text:t})))),h('tbody',{},mat.items.map(i=>h('tr',{},h('td',{text:i.qty}),h('td',{text:`${i.tandem?'Jumelé 2 × ':i.poles===3?'Tripolaire ':i.poles===2?'Bipolaire ':'Unipolaire '}${i.amps} A${i.protection!=='Standard'?' · '+i.protection:''}`}),h('td',{text:i.ref||'—'}))))):h('p',{class:'small muted',text:'Aucun disjoncteur avec calibre.'}));
   const ev=h('details',{class:'card side-card'},h('summary',{},h('b',{text:'Guide des bornes de recharge (niveaux 1, 2 et 3)'})),
    h('div',{class:'table-wrap mt'},h('table',{class:'data ev-guide'},h('thead',{},h('tr',{},['Niveau','Alimentation','Puissance','Disjoncteur','Recharge','Usage'].map(t=>h('th',{text:t})))),h('tbody',{},EV_GUIDE.map(g=>h('tr',{},[g.level,g.supply,g.power,g.breaker,g.range,g.use].map(t=>h('td',{text:t}))))))),

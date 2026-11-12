@@ -1086,3 +1086,15 @@ header.topbar{padding-top:env(safe-area-inset-top,0px)}
 /* Fil d'Ariane : défile horizontalement quand il dépasse ; un fondu à droite signale qu'il y a une suite */
 .crumbs.scrolls{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
 .crumbs.scrolls.at-end{-webkit-mask-image:none;mask-image:none}
+
+/* Estimation des coûts */
+.est-total{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--soft,#f6f8fb);margin-bottom:10px}
+.est-total b{font-size:26px;color:var(--ink)}
+.est-table td,.est-table th{vertical-align:top}.est-wait{text-align:center;padding:30px 0}
+
+/* Écrans moyens (901–1399 px) : pas assez de place pour centrer le fil d'Ariane sans chevaucher la navigation → disposition souple */
+@media (min-width:901px) and (max-width:1399px){
+ .topbar .container,body.app .topbar .container{display:flex;gap:14px}
+ .tb-left{flex:none}.tb-right{flex:none}
+ .topbar .crumbs{flex:1;min-width:0;max-width:none}
+}

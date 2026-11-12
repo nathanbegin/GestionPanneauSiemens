@@ -165,7 +165,7 @@ export async function scanPanel({files,hint={},settings={},lite=false},{fetchImp
 }
 
 // Appel du modèle avec repli automatique sur les modèles suivants (modèle inexistant ou non autorisé).
-async function runModel({content,schema,schemaName,settings={},fetchImpl=fetch,timeoutMs=55000}){
+async function runModel({content,schema,schemaName,settings={},fetchImpl=fetch,timeoutMs=55000,tools=null}){
  const order=modelOrder(settings);
  const denied=[];
  const started=Date.now();
@@ -174,7 +174,7 @@ async function runModel({content,schema,schemaName,settings={},fetchImpl=fetch,t
   try{
    res=await fetchImpl('https://api.openai.com/v1/responses',{method:'POST',
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+process.env.OPENAI_API_KEY},
-    body:JSON.stringify({model,input:[{role:'user',content}],store:false,
+    body:JSON.stringify({model,input:[{role:'user',content}],store:false,...(tools?{tools}:{}),
      text:{format:{type:'json_schema',name:schemaName,strict:true,schema}}}),
     signal:AbortSignal.timeout(Math.max(5000,timeoutMs-(Date.now()-started)))});
   }catch(e){throw new HttpError(504,e?.name==='TimeoutError'?'L’analyse a pris trop de temps. Réessayez avec moins de photos ou des photos plus nettes.':'Service d’IA injoignable. Réessayez dans un instant.');}
@@ -282,4 +282,44 @@ Ne recommande jamais de contourner le Code. Voici les données (JSON) : ${JSON.s
 export async function explainLayout({data,lang='fr',settings={}},{fetchImpl=fetch,timeoutMs=45000}={}){
  if(!aiConfigured())throw new HttpError(503,'L’IA n’est pas configurée sur ce serveur (OPENAI_API_KEY manquante).');
  return runModel({content:[{type:'input_text',text:explainPrompt(data,lang)}],schema:EXPLAIN_SCHEMA,schemaName:'explication_disposition',settings,fetchImpl,timeoutMs});
+}
+
+
+// ---------- Estimation des coûts d'un panneau (sur demande) : prix en dollars canadiens chez les détaillants ----------
+export const STORES=['Home Depot Canada','Rona','Canac','Patrick Morin','Lumen','Guillevin','Westburne','Deschênes'];
+const nstr={type:['string','null']};
+export const ESTIMATE_SCHEMA={type:'object',additionalProperties:false,required:['items','stores_checked','warnings'],
+ properties:{
+  items:{type:'array',items:{type:'object',additionalProperties:false,required:['description','qty','unit_low','unit_high','store','url','note','confidence'],
+   properties:{description:{type:'string'},qty:{type:'number'},unit_low:{type:'number'},unit_high:{type:'number'},store:nstr,url:nstr,note:nstr,confidence:{type:'string',enum:['high','medium','low']}}}},
+  stores_checked:{type:'array',items:{type:'string'}},
+  warnings:{type:'array',items:{type:'string'}}}};
+export function cleanEstimateInput(input={}){
+ const items=(Array.isArray(input.items)?input.items:[]).slice(0,60).map(i=>({description:String(i?.description||'').slice(0,200),qty:Math.max(1,Math.min(999,Number(i?.qty)||1))})).filter(i=>i.description);
+ if(!items.length)throw new HttpError(400,'Aucun article à estimer : ajoutez des disjoncteurs au panneau.');
+ const c=input.context&&typeof input.context==='object'?input.context:{};
+ return {items,context:{family:String(c.family||'').slice(0,80),model:String(c.model||'').slice(0,200),mainAmps:Number(c.mainAmps)||null,positions:Number(c.positions)||null,province:String(c.province||'QC').slice(0,20)}};
+}
+export function estimatePrompt({items,context},lang='fr',live=true){
+ return `Tu estimes le coût du matériel d'un panneau électrique résidentiel au Québec (dollars canadiens, AVANT taxes).
+${live?`Utilise la recherche web pour trouver les prix actuels chez : ${STORES.join(', ')}. Les disjoncteurs de marque (Siemens, Square D, Eaton, Murray, GE…) se trouvent souvent chez Home Depot, Rona, Canac, Patrick Morin ; les références spécialisées (jumelés, DDFT, anti-arc, quad) surtout chez les grossistes (Lumen, Guillevin, Westburne, Deschênes).`:'La recherche web est indisponible : donne des fourchettes de prix réalistes selon tes connaissances et mets confidence « low ».'}
+Pour CHAQUE article de la liste, retourne : une fourchette de prix unitaire (unit_low, unit_high), le magasin le plus pertinent, l'adresse (url) de la page produit seulement si tu l'as réellement trouvée (sinon null — n'invente JAMAIS d'adresse), une courte note, et un niveau de confiance (high = prix vu en ligne, medium = produit équivalent, low = estimation).
+Conserve la même description et la même quantité que la liste. Ajoute dans warnings les points d'attention (prix variables, article vendu seulement en grossiste, compatibilité à vérifier, taxes non incluses). Réponds en ${lang==='en'?'anglais':'français'}.
+Contexte du panneau : ${JSON.stringify(context)}.
+Articles : ${JSON.stringify(items)}.`;
+}
+export async function estimateCosts({input,lang='fr',settings={}},{fetchImpl=fetch,timeoutMs=55000}={}){
+ if(!aiConfigured())throw new HttpError(503,'L’IA n’est pas configurée sur ce serveur (OPENAI_API_KEY manquante).');
+ const clean=cleanEstimateInput(input);
+ const started=Date.now();
+ try{
+  const r=await runModel({content:[{type:'input_text',text:estimatePrompt(clean,lang,true)}],schema:ESTIMATE_SCHEMA,schemaName:'estimation_couts',settings,fetchImpl,timeoutMs:Math.max(15000,timeoutMs-8000),tools:[{type:'web_search'}]});
+  return {...r,live:true,input:clean};
+ }catch(e){
+  // Recherche web non disponible pour ce modèle / ce projet : estimation générale, clairement signalée.
+  if(e.status===429||e.status===401||e.status===504||e.status===503)throw e;
+  const left=timeoutMs-(Date.now()-started);if(left<8000)throw e;
+  const r=await runModel({content:[{type:'input_text',text:estimatePrompt(clean,lang,false)}],schema:ESTIMATE_SCHEMA,schemaName:'estimation_couts',settings,fetchImpl,timeoutMs:left});
+  return {...r,live:false,input:clean};
+ }
 }
