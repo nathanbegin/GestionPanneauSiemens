@@ -47,6 +47,27 @@ function crumbs(items){
  // Fil d'Ariane défilant : fondu à droite tant qu'il reste du contenu caché.
  const hint=()=>{const over=nav.scrollWidth>nav.clientWidth+1;nav.classList.toggle('scrolls',over);nav.classList.toggle('at-end',over&&nav.scrollLeft+nav.clientWidth>=nav.scrollWidth-2);};
  nav.addEventListener('scroll',hint,{passive:true});setTimeout(hint,0);setTimeout(hint,400);
+ // Va-et-vient automatique pour lire le titre en entier ; pause au toucher / survol, et si l'utilisateur réduit les animations.
+ if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+  let pauseUntil=0,dir=1,last=0,hold=0;
+  const hold_=ms=>{pauseUntil=performance.now()+ms;};
+  for(const ev of ['pointerdown','wheel','touchstart'])nav.addEventListener(ev,()=>hold_(5000),{passive:true});
+  nav.addEventListener('pointerenter',()=>hold_(1500));
+  const tick=t=>{
+   if(!nav.isConnected)return;
+   const max=nav.scrollWidth-nav.clientWidth;
+   if(max>1&&t>pauseUntil&&document.visibilityState==='visible'){
+    const dt=Math.min(64,t-(last||t));
+    if(hold>0)hold-=dt;
+    else{
+     nav.scrollLeft=Math.max(0,Math.min(max,nav.scrollLeft+dir*dt*0.035));
+     if(nav.scrollLeft>=max-0.5||nav.scrollLeft<=0.5){if(nav.scrollLeft>=max-0.5)dir=-1;else dir=1;hold=1400;}
+    }
+   }
+   last=t;requestAnimationFrame(tick);
+  };
+  setTimeout(()=>requestAnimationFrame(tick),1200);
+ }
  const brand=h('a',{class:'brand',href:state.user||NATIVE?'#/sites':'/','aria-label':'Disjonio — accueil'},h('img',{class:'brand-logo',src:'/branding/disjonio/svg/outlined/disjonio-horizontal-no-tagline-on-light.svg',alt:'Disjonio',width:214,height:44}),h('img',{class:'brand-sym',src:'/branding/disjonio/svg/disjonio-symbol-simple-on-light.svg',alt:'',width:40,height:40}));
  const parts=[brand,nav];
  const isPro=state.user?.profile?.accountType==='pro';
