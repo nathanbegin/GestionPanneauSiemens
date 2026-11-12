@@ -50,3 +50,12 @@ test('bipolaire conservé sur deux positions de la même colonne',()=>{
  const r=optimizeLayout(p,{sort:'asc'});validate(r.circuits,{positions:12});
  const w=r.circuits.find(c=>c.label==='Chauffe-eau');assert.equal(w.slots.length,4);
 });
+import {bulkApply} from '../public/model.js';
+test('retirer un disjoncteur libère ses espaces (bipolaire = deux cases vides)',()=>{
+ const p=mk([[1,'A',15],[3,'Chauffe-eau',30,2]]);
+ const w=p.circuits.find(c=>c.label==='Chauffe-eau');
+ const out=bulkApply(p.circuits,[w.id],{type:'remove'});validate(out,{positions:12});
+ assert.equal(out.some(c=>c.label==='Chauffe-eau'),false);
+ for(const s of ['3A','3B','5A','5B'])assert.ok(out.some(c=>c.slots.includes(s)&&!c.label&&c.amps==null),s);
+ assert.equal(out.find(c=>c.label==='A').amps,15);
+});

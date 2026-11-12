@@ -1908,4 +1908,10 @@ export default [
  ["Aucun jumelage possible.", "No pairing possible."],
  ["Aucun déplacement nécessaire.", "No move needed."],
  ["Les disjoncteurs ne tiennent pas dans le panneau avec cette disposition. Essayez sans tri, ou avec moins d’espaces réservés.", "The breakers do not fit in the panel with this layout. Try without sorting, or with fewer reserved spaces."],
+ ["🗑 Retirer des disjoncteurs", "🗑 Remove breakers"],
+ ["🗑 Retirer le disjoncteur", "🗑 Remove breaker"],
+ ["Retirer le disjoncteur", "Remove breaker"],
+ ["Touchez les disjoncteurs à retirer, puis « Retirer le disjoncteur ».", "Tap the breakers to remove, then “Remove breaker”."],
+ ["Modifier ou retirer plusieurs circuits d’un coup (espaces inutilisés, libres, calibre, pièce…).", "Edit or remove several circuits at once (unused spaces, free, rating, room…)."],
+ ["Retirer des disjoncteurs", "Remove breakers"],
 ];

@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,STAGE_IDS,stageFromState} from './catalog.js';
-export const APP_VERSION='2.51.0';
+export const APP_VERSION='2.51.1';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -93,6 +93,16 @@ export const formatOf=c=>{
 export const BULK_FIELDS=['status','amps','protection','room','usage'];
 export function bulkApply(circuits,ids,action={}){
  const sel=new Set(ids);
+ // remove : retire le disjoncteur — ses espaces redeviennent libres (une case vide par position) et peuvent recevoir un autre disjoncteur.
+ if(action.type==='remove'){
+  const out=[],ids=new Set(circuits.map(c=>c.id));
+  for(const c of circuits){
+   if(!sel.has(c.id)){out.push(c);continue;}
+   if(c.slots.length%2||c.slots[0].endsWith('B')){out.push(emptyCircuit(c.id,c.slots));continue;}
+   for(let i=0;i<c.slots.length;i+=2){const id=i===0?c.id:freeId(ids,c.id+'-'+slotPos(c.slots[i]));ids.add(id);out.push(emptyCircuit(id,c.slots.slice(i,i+2)));}
+  }
+  return mergeHalves(sortCircuits(out));
+ }
  return circuits.map(c=>{
   if(!sel.has(c.id))return c;
   const base=emptyCircuit(c.id,c.slots);

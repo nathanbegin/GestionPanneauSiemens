@@ -378,7 +378,7 @@ export async function panelView({id,tab='panel',ctx}){
 
  // ---------- Actions groupées ----------
  function bulkBar(){
-  if(!state.select)return h('div',{class:'bulk-toggle'},h('button',{type:'button',onclick:()=>{state.select=new Set();renderBody();}},'☑ Sélection multiple'),h('span',{class:'small muted',text:'Modifier plusieurs circuits d’un coup (espaces inutilisés, libres, calibre, pièce…).'}));
+  if(!state.select)return h('div',{class:'bulk-toggle'},h('button',{type:'button',onclick:()=>{state.select=new Set();renderBody();}},'☑ Sélection multiple'),data.access!=='view'?h('button',{type:'button',class:'danger',onclick:()=>{state.select=new Set();renderBody();toast('Touchez les disjoncteurs à retirer, puis « Retirer le disjoncteur ».',6000);}},'🗑 Retirer des disjoncteurs'):null,h('span',{class:'small muted',text:'Modifier ou retirer plusieurs circuits d’un coup (espaces inutilisés, libres, calibre, pièce…).'}));
   const sel=state.select,n=sel.size;
   const pick=(label,fn)=>h('button',{type:'button',class:'ghost small-btn',onclick:()=>{fn();renderBody();}},label);
   const visible=()=>sortCircuits(panel.circuits).filter(filtered());
@@ -390,6 +390,7 @@ export async function panelView({id,tab='panel',ctx}){
     h('div',{class:'bulk-pick'},pick('Tout (filtrés)',()=>visible().forEach(c=>sel.add(c.id))),pick('Positions vides',()=>panel.circuits.filter(isEmptySlot).forEach(c=>sel.add(c.id))),pick('À confirmer',()=>panel.circuits.filter(c=>c.status==='À confirmer'&&!c.vacant).forEach(c=>sel.add(c.id))),pick('Aucun',()=>sel.clear()),
      h('button',{type:'button',onclick:()=>{state.select=null;renderBody();}},'Terminer'))),
    h('div',{class:'bulk-actions'},
+    h('button',{type:'button',class:'danger',disabled:!n,onclick:()=>apply({type:'remove'},'Retirer le disjoncteur',true)},'🗑 Retirer le disjoncteur'),
     h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'vacant'},'Espace inutilisé (aucun disjoncteur)',true)},'▭ Espace inutilisé'),
     h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'reserve'},'Réservé pour une expansion future',true)},'⏳ Réservé (expansion)'),
     h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'free'},'Disjoncteur libre',true)},'○ Disjoncteur libre'),
@@ -403,7 +404,8 @@ export async function panelView({id,tab='panel',ctx}){
  async function apply(action,label,destructive){
   const ids=[...state.select];if(!ids.length)return;
   const touched=panel.circuits.filter(c=>state.select.has(c.id)&&(c.label||c.loads?.length||c.notes));
-  if(destructive&&touched.length&&!await confirmDialog(`${label} pour ${ids.length} circuit(s) ? ${touched.length} fiche(s) contiennent déjà une description ou des charges, qui seront effacées.`,{title:'Action groupée',confirm:'Appliquer',danger:action.type==='clear'}))return;
+  if(action.type==='remove'){if(!await confirmDialog(`Retirer ${ids.length} disjoncteur${ids.length>1?'s':''} ? Les fiches (désignation, charges, notes) seront effacées et les espaces redeviendront libres. L’historique du panneau permet de revenir en arrière.`,{title:'Retirer des disjoncteurs',confirm:'Retirer',danger:true}))return;}
+  else  if(destructive&&touched.length&&!await confirmDialog(`${label} pour ${ids.length} circuit(s) ? ${touched.length} fiche(s) contiennent déjà une description ou des charges, qui seront effacées.`,{title:'Action groupée',confirm:action.type==='remove'?'Retirer':'Appliquer',danger:action.type==='clear'||action.type==='remove'}))return;
   try{const circuits=bulkApply(panel.circuits,ids,action);await persist({circuits});toast(`${label} — ${ids.length} circuit(s) mis à jour.`);state.select=new Set();renderHead();renderBody();}
   catch(e){toast(e.message);}
  }
