@@ -128,7 +128,7 @@ export function panelReal({panel,labels=false,match=null,selected=null,highlight
   const half=c.slots.length===1;
   const poles=new Set(c.slots.map(slotPos)).size;
   const dim=match&&!match(c);
-  const desc=`${designation(c)} · ${c.vacant?'Espace inutilisé':c.label||'À identifier'}${c.amps?' · '+c.amps+' A':''}${c.protection&&c.protection!=='Standard'?' · '+c.protection:''}${c.breakerRef?' · '+c.breakerRef:''}`;
+  const desc=`${designation(c)} · ${c.vacant?(c.reserved?'Réservé (expansion)':'Espace inutilisé'):c.label||'À identifier'}${c.amps?' · '+c.amps+' A':''}${c.protection&&c.protection!=='Standard'?' · '+c.protection:''}${c.breakerRef?' · '+c.breakerRef:''}`;
   const g=s('g',{class:'rp-slot'+(dim?' dim':'')+(selected?.has(c.id)?' sel':'')+(activeId===c.id?' act':''),'data-id':c.id,transform:`translate(${x} ${y})`,role:'button',tabindex:0,'aria-label':desc},s('title',{},desc));
   const bx=right?W-BW-2:2;            // bloc d'identification, côté extérieur
   const hx=right?6:BW+6,hw=W-BW-14;    // logement de la manette, côté barre centrale
@@ -177,7 +177,7 @@ export function panelReal({panel,labels=false,match=null,selected=null,highlight
   slots.append(g);
   // Désignation à côté du panneau (option).
   if(labels&&(c.label||c.vacant)){
-   const txt=c.vacant?'Espace inutilisé':c.label;
+   const txt=c.vacant?(c.reserved?'Réservé (expansion)':'Espace inutilisé'):c.label;
    tagList.append(s('text',{x:right?520:80,y:y+hgt/2+4,'text-anchor':right?'start':'end','font-size':half?9:11,'font-weight':c.vacant?400:650,'font-style':c.vacant?'italic':'normal',fill:dim?'#9aa6ae':'#1d3038',class:'rp-label','data-id':c.id},fit(txt,half?30:26)));
   }
  }

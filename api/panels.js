@@ -8,7 +8,7 @@ import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
 import {siteAccess,panelAccess,need} from './_lib/shares.js';
-import {scanPanel,scanNameplate,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
+import {scanPanel,scanNameplate,explainLayout,aiAllowance,aiConfigured,aiModel,loadAiSettings,LITE_MAX_FILES} from './_lib/ai.js';
 import {scanToPanel} from '../public/aiscan.js';
 import {makeCalcRecord} from './_lib/calcrecord.js';
 import {trashPanel} from './_lib/trash.js';
@@ -53,8 +53,8 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   return res.status(200).json(library());
  }
  // Ajout de panneau assisté par IA : statut (GET) et analyse de photos / fichiers (POST).
- if(req.query?.action==='scan'||req.query?.action==='nameplate'){
-  const isPlate=req.query.action==='nameplate';
+ if(req.query?.action==='scan'||req.query?.action==='nameplate'||req.query?.action==='explain-layout'){
+  const isPlate=req.query.action==='nameplate',isExplain=req.query.action==='explain-layout';
   const isAdmin=adminEmails().includes(user.email);
   const e=await entitlement(sql,user.id);
   const allow=aiAllowance(e,isAdmin);
@@ -63,11 +63,21 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   const status={configured:aiConfigured(),allowed:allow.allowed,monthly:allow.monthly,lite:allow.lite,maxFiles:allow.lite?LITE_MAX_FILES:null,used,model:aiModel(settings)};
   if(req.method==='GET')return res.status(200).json(status);
   if(req.method!=='POST')throw new HttpError(405,'Méthode non permise.');
-  if(!allow.allowed)throw new HttpError(402,'L’ajout de panneau par photo (IA) est inclus dans les forfaits payants.',{quota:true});
+  if(!allow.allowed)throw new HttpError(402,'Les fonctions d’IA (photos, plaques, explications) sont incluses dans les forfaits payants.',{quota:true});
   if(allow.monthly!=null&&used>=allow.monthly)throw new HttpError(402,`Vous avez utilisé vos ${allow.monthly} analyses par IA ce mois-ci.`,{quota:true});
   await rateLimit(sql,'ai:'+user.id,6,5);
   await recordAttempt(sql,'ai:'+user.id);
   const data=body(req);
+  if(isExplain){
+   // Explication comparative de deux scénarios de disposition : compte dans le quota d'analyses IA.
+   const d=data.compare&&typeof data.compare==='object'?data.compare:{};
+   const small=JSON.stringify(d);if(small.length>20000)throw new HttpError(400,'Données de comparaison trop volumineuses.');
+   let ex;
+   try{ex=await explainLayout({data:d,lang:data.lang==='en'?'en':'fr',settings});}
+   catch(x){await sql`INSERT INTO app_ai_scans(user_id,model,ok) VALUES(${user.id},${aiModel(settings)},false)`;throw x;}
+   await sql`INSERT INTO app_ai_scans(user_id,model,input_tokens,output_tokens) VALUES(${user.id},${ex.model},${ex.usage.input},${ex.usage.output})`;
+   return res.status(200).json({explanation:ex.scan,model:ex.model,used:used+1,monthly:allow.monthly});
+  }
   if(isPlate){
    // Plaque signalétique d'un appareil : puissance requise. Compte dans le quota d'analyses.
    let plate;

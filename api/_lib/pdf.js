@@ -300,7 +300,7 @@ function directory(d,panel,{rowH=18,compact=false}={}){
    d.text(designation(c),x+8,by,{size:fs,f:d.bold,color:d.C.green,max:posW-4});
    const amps=c.vacant?'':c.amps?c.amps+' A':'— A';
    d.text(amps,x+colW-7-d.width(amps,fs,d.bold),by,{size:fs,f:d.bold});
-   const label=c.vacant?'ESPACE INUTILISÉ':c.status==='Libre'?'LIBRE':c.label||'À identifier';
+   const label=c.vacant?(c.reserved?'RÉSERVÉ — EXPANSION':'ESPACE INUTILISÉ'):c.status==='Libre'?'LIBRE':c.label||'À identifier';
    d.text(label,x+8+posW,by,{size:fs,color:c.label||c.status==='Libre'?d.C.ink:d.C.muted,max:colW-posW-ampsW-22});
   }
   d.y=top-(end-row)*rowH-10;
@@ -325,14 +325,14 @@ function detailTable(d,panel){
   const extra=[c.exceptions&&'Exceptions : '+c.exceptions,c.notes&&'Notes : '+c.notes,...tagGroups.map(k=>(c.tags?.[k]||[]).length?({locations:'Emplacements',functions:'Fonctions',devices:'Appareils'}[k]+' : '+c.tags[k].join(', ')):'').filter(Boolean),formatOf(c)!=='single'?'Format : '+breakerFormats[formatOf(c)]:''].filter(Boolean);
   const extraLines=extra.flatMap(e=>d.wrap(e,7,d.W-2*M-cols[0][1]-10)).slice(0,8);
   // Désignation complète sur deux lignes au besoin (les autres colonnes restent sur la première ligne).
-  const desig=d.wrap(c.vacant?'Espace inutilisé':c.status==='Libre'?'Libre':c.label||'À identifier',7.8,cols[1][1]-6,d.bold);
+  const desig=d.wrap(c.vacant?(c.reserved?'Réservé (expansion)':'Espace inutilisé'):c.status==='Libre'?'Libre':c.label||'À identifier',7.8,cols[1][1]-6,d.bold);
   const desigLines=desig.length>2?[desig[0],d.fit(desig.slice(1).join(' '),7.8,cols[1][1]-6,d.bold)]:desig;
   const dh=(desigLines.length-1)*9.5;
   const h=15+dh+extraLines.length*9;
   if(d.ensure(h+2,head))zebra=false;
   if(zebra)d.rect(M,d.y-h,d.W-2*M,h,{color:d.C.soft});
   zebra=!zebra;
-  const vals=[designation(c),c.vacant?'Espace inutilisé':c.status==='Libre'?'Libre':c.label||'À identifier',c.room,c.usage,c.amps?c.amps+' A':'—',c.protection||'—',c.status];
+  const vals=[designation(c),c.vacant?(c.reserved?'Réservé (expansion)':'Espace inutilisé'):c.status==='Libre'?'Libre':c.label||'À identifier',c.room,c.usage,c.amps?c.amps+' A':'—',c.protection||'—',c.status];
   let x=M+5;
   vals.forEach((v,i)=>{if(i===1)desigLines.forEach((l,j)=>d.text(l,x,d.y-10-j*9.5,{size:7.8,f:d.bold}));else d.text(v||'—',x,d.y-10,{size:7.8,f:i<2?d.bold:d.font,color:i===6?statusColor(c):d.C.ink,max:cols[i][1]-6});x+=cols[i][1];});
   // Notes alignées sur le début de la désignation.
@@ -492,7 +492,7 @@ export async function buildLabels({site,panel,fedFromLabel,skipFree=false,brand=
   let posSize=16;while(posSize>7&&d.width(pos,posSize,d.bold)>46)posSize--;
   d.text(pos,x+10,y+H/2-posSize/3,{size:posSize,f:d.bold,color:d.C.green});
   const tx=x+62,tw=W-72;
-  const label=c.vacant?'ESPACE INUTILISÉ':c.status==='Libre'?'LIBRE':c.label||'________________';
+  const label=c.vacant?(c.reserved?'RÉSERVÉ — EXPANSION':'ESPACE INUTILISÉ'):c.status==='Libre'?'LIBRE':c.label||'________________';
   const lines=d.wrap(label,9,tw,d.bold).slice(0,2);
   lines.forEach((l,j)=>d.text(l,tx,y+H-22-j*11,{size:9,f:d.bold}));
   const meta=[c.amps&&c.amps+' A',c.room,c.protection&&c.protection!=='Standard'?c.protection:''].filter(Boolean).join(' · ');

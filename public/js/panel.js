@@ -9,6 +9,7 @@ import {calcFingerprint,CODE_EDITION,designation,sortCircuits,stats,fold,searcha
 import {circuitEditor,panelFields,panelPayload} from './forms.js';
 import {historyDialog} from './history.js';
 import {net} from './offline.js';
+import {optimizeDialog} from './optimize.js';
 import {buildChecklist} from './checklist.js';
 import {panelReport,suggestions,materials,circuitLoad,legOf} from '../loadcalc.js';
 import {EV_GUIDE,LOADS_SOURCES,familyOf} from '../catalog.js';
@@ -27,7 +28,7 @@ import {appliancesView} from './appliances.js';
 import {PANEL_STAGES,STAGE_IDS,stageFromState} from '../catalog.js';
 
 const statusClass=c=>c.vacant?'free vacant':c.status==='Identifié'?'identified':c.status==='Libre'?'free':'unknown';
-const shortText=c=>c.vacant?'Espace inutilisé':c.status==='Libre'?'Libre':c.label||'';
+const shortText=c=>c.vacant?(c.reserved?'Réservé (expansion)':'Espace inutilisé'):c.status==='Libre'?'Libre':c.label||'';
 const tabNames={panel:'▦ Panneau',list:'☷ Nomenclature',plan:'⚡ Planification et charges',appliances:'🔌 Électroménagers',docs:'📄 Documents et étiquettes',info:'⚙ Fiche du panneau'};
 // Onglets de chaque étape du projet (l'onglet ouvert reste toujours accessible).
 
@@ -168,11 +169,12 @@ export async function panelView({id,tab='panel',ctx}){
   return h('button',{type:'button',class:'primary',onclick:()=>go('docs')},'Rapports et étiquettes');
  }
  function moreMenu(){
-  const NET=/Garnir|Code QR|Historique|Rapports|Aide-mémoire|Planifier|Partager/;
+  const NET=/Garnir|Code QR|Historique|Rapports|Aide-mémoire|Planifier|Partager|Optimiser/;
   const item=(label,fn)=>h('button',{type:'button',role:'menuitem',class:NET.test(label)?'needs-net':'',onclick:fn},label);
   const menu=h('div',{class:'menu',role:'menu'},
    data.access&&data.access!=='owner'?h('div',{class:'who',text:`👥 Partagé par ${data.sharedBy} · ${data.access==='edit'?'modification':'lecture seule'}`}):item('👥 Partager',()=>shareDialog({panelId:panel.id,title:panelTitle(panel)})),
    data.access!=='view'&&item('📷 Garnir par photos (IA)',garnir),
+   data.access!=='view'&&stageOf()==='conception'&&item('✨ Optimiser la disposition…',()=>optimizeDialog({panel,site,metaWith})),
    qr&&item('▦ Code QR',qrDialog),
    data.access!=='view'&&stageOf()==='releve'&&item('✏️ Planifier un agrandissement (copie)',conceptionCopy),
    item('📄 Aide-mémoire PDF',()=>doc({kind:'door'})),
@@ -269,7 +271,7 @@ export async function panelView({id,tab='panel',ctx}){
   const list=sortCircuits(panel.circuits).filter(filtered());
   const rooms=[...new Set(panel.circuits.map(c=>c.room).filter(Boolean))];
   const rowOf=c=>{
-   if(c.vacant)return h('div',{class:'erow vacant'},h('span',{class:'pos',text:designation(c)}),h('span',{class:'muted',text:'Espace inutilisé'}));
+   if(c.vacant)return h('div',{class:'erow vacant'},h('span',{class:'pos',text:designation(c)}),h('span',{class:'muted',text:c.reserved?'Réservé (expansion)':'Espace inutilisé'}));
    const label=h('input',{value:c.label||'','aria-label':'Désignation du circuit '+designation(c),maxlength:100,placeholder:'À identifier…',onchange:e=>saveField(c.id,{label:e.target.value.trim()})});
    const room=h('input',{value:c.room||'','aria-label':'Pièce du circuit '+designation(c),maxlength:80,list:'erRooms',placeholder:'Pièce',onchange:e=>saveField(c.id,{room:e.target.value.trim()})});
    const st=h('select',{'aria-label':'Statut du circuit '+designation(c),class:'st-'+statusClass(c),onchange:e=>saveField(c.id,{status:e.target.value})},...states.map(x=>new Option(x,x)));st.value=c.status;
@@ -389,6 +391,7 @@ export async function panelView({id,tab='panel',ctx}){
      h('button',{type:'button',onclick:()=>{state.select=null;renderBody();}},'Terminer'))),
    h('div',{class:'bulk-actions'},
     h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'vacant'},'Espace inutilisé (aucun disjoncteur)',true)},'▭ Espace inutilisé'),
+    h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'reserve'},'Réservé pour une expansion future',true)},'⏳ Réservé (expansion)'),
     h('button',{type:'button',disabled:!n,onclick:()=>apply({type:'free'},'Disjoncteur libre',true)},'○ Disjoncteur libre'),
     chooser('Statut',states,'status'),
     chooser('Calibre',[['none','— Aucun'],...ampsList.map(a=>[a,a+' A'])],'amps',v=>v==='none'?null:Number(v)),

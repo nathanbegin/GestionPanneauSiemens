@@ -2,7 +2,7 @@
 // Un panneau comporte N positions numérotées (impaires à gauche, paires à droite).
 // Chaque position a deux demi-emplacements A et B (disjoncteurs jumelés / tandem).
 import {LOAD_CATEGORIES,VOLTAGES,WIRE_TABLE,WIRE_TYPES,FAMILY_IDS,PANEL_STATES,SERVICE_CONDUCTORS,SERVICE_MATERIALS,SERVICE_ROUTES,STAGE_IDS,stageFromState} from './catalog.js';
-export const APP_VERSION='2.50.0';
+export const APP_VERSION='2.51.0';
 export const usages=['Éclairage','Prises','Électroménager','Chauffage','Extérieur','Autre','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau'];
 export const usageOrder=['Éclairage','Prises','Électroménager','Chauffage','Chauffe-eau','Climatisation','Borne de recharge','Sous-panneau','Extérieur','Autre'];
 export const states=['À confirmer','Identifié','Libre','Non visible'];
@@ -55,6 +55,7 @@ export function validate(data,{positions=LEGACY_POSITIONS}={}){
   }
   if(c.wire!==undefined){const w=c.wire;if(!w||typeof w!=='object'||(w.gauge&&!WIRE_TABLE.some(x=>x.gauge===w.gauge))||(w.type&&!WIRE_TYPES.includes(w.type))||(w.length!=null&&(typeof w.length!=='number'||w.length<0||w.length>1000)))throw Error('Conducteur invalide.');}
   if(c.vacant!==undefined&&typeof c.vacant!=='boolean')throw Error('Champ invalide : vacant');
+  if(c.reserved!==undefined&&typeof c.reserved!=='boolean')throw Error('Champ invalide : reserved');
   if(c.breakerRef!==undefined&&(typeof c.breakerRef!=='string'||c.breakerRef.length>40))throw Error('Référence de disjoncteur invalide.');
   for(const k of ['originalLabel','originalNotes','surveyDate'])if(c[k]!==undefined&&(typeof c[k]!=='string'||c[k].length>3000))throw Error('Historique invalide.');
   if(!usages.includes(c.usage)||!states.includes(c.status)||!(c.amps===null||ampsList.includes(c.amps)))throw Error('Caractéristiques invalides.');
@@ -96,6 +97,7 @@ export function bulkApply(circuits,ids,action={}){
   if(!sel.has(c.id))return c;
   const base=emptyCircuit(c.id,c.slots);
   if(action.type==='vacant')return {...base,status:'Libre',vacant:true,notes:c.notes||''};
+  if(action.type==='reserve')return {...base,status:'Libre',vacant:true,reserved:true,notes:c.notes||'Espace réservé pour une expansion future.'};
   if(action.type==='clear')return base;
   if(action.type==='free'){const {vacant,loads,...rest}=c;return {...rest,label:'',usage:'Autre',status:'Libre'};}
   if(action.type==='set'){
@@ -109,7 +111,7 @@ export function bulkApply(circuits,ids,action={}){
     if(k==='room'&&(typeof v!=='string'||v.length>80))throw Error('Pièce invalide.');
     out[k]=v;
    }
-   if(out.vacant&&(out.amps||out.status!=='Libre'))delete out.vacant;
+   if(out.vacant&&(out.amps||out.status!=='Libre')){delete out.vacant;delete out.reserved;}
    return out;
   }
   throw Error('Action groupée inconnue.');

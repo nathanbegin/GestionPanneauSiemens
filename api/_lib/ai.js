@@ -268,3 +268,18 @@ export function estimateScanCost({model=DEFAULT_MODEL,photos=3,precision=false,o
  const output=outputTokens??2500+Math.max(0,photos-3)*500;
  return {input,output,usd:(input*m.input+output*m.output)/1e6};
 }
+
+// ---------- Explication comparative de deux scénarios de disposition (texte seulement, sans photo) ----------
+export const EXPLAIN_SCHEMA={type:'object',additionalProperties:false,required:['summary','advantages','cautions'],
+ properties:{summary:{type:'string'},advantages:{type:'array',items:{type:'string'}},cautions:{type:'array',items:{type:'string'}}}};
+export function explainPrompt(data,lang='fr'){
+ return `Tu es un assistant pour électriciens au Québec. On compare deux dispositions d'un panneau électrique résidentiel :
+le scénario de base et un scénario optimisé calculé automatiquement (jumelage de disjoncteurs, tri par ampérage, espaces réservés à l'expansion).
+Explique en ${lang==='en'?'anglais':'français'} clair et concis, sans inventer de données : (1) un résumé de 2 à 3 phrases, (2) les avantages concrets du scénario optimisé, (3) les points d'attention
+(compatibilité des disjoncteurs jumelés avec le modèle de panneau, nombre maximal de circuits, équilibrage L1/L2, repérage à refaire sur le terrain, vérification par un maître électricien).
+Ne recommande jamais de contourner le Code. Voici les données (JSON) : ${JSON.stringify(data)}`;
+}
+export async function explainLayout({data,lang='fr',settings={}},{fetchImpl=fetch,timeoutMs=45000}={}){
+ if(!aiConfigured())throw new HttpError(503,'L’IA n’est pas configurée sur ce serveur (OPENAI_API_KEY manquante).');
+ return runModel({content:[{type:'input_text',text:explainPrompt(data,lang)}],schema:EXPLAIN_SCHEMA,schemaName:'explication_disposition',settings,fetchImpl,timeoutMs});
+}
