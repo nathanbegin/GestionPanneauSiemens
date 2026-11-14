@@ -1098,3 +1098,27 @@ header.topbar{padding-top:env(safe-area-inset-top,0px)}
  .tb-left{flex:none}.tb-right{flex:none}
  .topbar .crumbs{flex:1;min-width:0;max-width:none}
 }
+
+/* Lecture IA — écran de confirmation sur téléphone : une seule colonne, lignes du tableau en fiches lisibles */
+@media (max-width:720px){
+ dialog.xl .ai-build,.ai-build{grid-template-columns:minmax(0,1fr)}
+ dialog.xl .ai-art svg,.ai-art svg{height:auto;min-height:0;max-height:46vh}
+ .ai-table-wrap,dialog.xl .ai-table-wrap{max-height:none;overflow:visible}
+ .ai-table{font-size:15px;display:block}
+ .ai-table thead{display:none}
+ .ai-table tbody{display:grid;gap:10px}
+ .ai-table tr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:'pos amps conf' 'label label label';gap:8px 10px;align-items:center;padding:10px 12px;border:1px solid #dfe5dc;border-radius:12px;background:#fff}
+ .ai-table tr.mid{border-left:4px solid #d0a04a}.ai-table tr.low{border-left:4px solid #c0503f}
+ .ai-table tr.mid td:first-child,.ai-table tr.low td:first-child{border-left:0}
+ .ai-table td{display:block;border:0;padding:0}
+ .ai-table td:nth-child(1){grid-area:pos;font-weight:800;font-size:17px;min-width:42px}
+ .ai-table td:nth-child(2){grid-area:amps}
+ .ai-table td:nth-child(3){grid-area:label}
+ .ai-table td:nth-child(4){grid-area:conf;font-size:13px;color:var(--muted)}
+ .ai-table select,.ai-table input{min-height:44px;font-size:16px;width:100%}
+ .ai-table td:nth-child(2) select{min-width:0}
+ .ai-grp summary{min-height:40px;display:flex;align-items:center}
+ .ai-stage .form-actions,dialog .ai-stage .form-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:14px}
+ .ai-stage .form-actions>button,.ai-stage .form-actions>a{width:100%;margin:0;justify-content:center;text-align:center;min-height:48px}
+ .ai-stage .form-actions>button.primary{order:-1}
+}
