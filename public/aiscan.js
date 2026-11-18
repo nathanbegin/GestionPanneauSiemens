@@ -43,7 +43,10 @@ export function scanToPanel(scan={}){
    if(review[id]&&!(b.half&&cur.slots.length===2)||slotPos(cur.slots[0])!==n)throw Error(`position déjà occupée par le circuit ${cur.label||cur.id}`);
    if(b.half){circuits=reshape(circuits,id,'tandem',positions);id=idAt(`${n}${b.half}`);}
    else if(b.poles>1)circuits=reshape(circuits,id,b.poles===2?'double':'triple',positions);
-   const conf=typeof b.confidence==='number'?Math.max(0,Math.min(1,b.confidence)):0.5;
+   let conf=typeof b.confidence==='number'?Math.max(0,Math.min(1,b.confidence)):0.5;
+   // Multipolaire dont les manettes ne sont pas reliées : sans doute des unipolaires séparés.
+   if(b.poles>1&&b.handle_tie==='separate'){warnings.push(`Position ${n} : ${b.poles===2?'bipolaire':'tripolaire'} déclaré, mais les manettes ne semblent pas reliées : vérifiez s’il s’agit de ${b.poles} unipolaires distincts.`);conf=Math.min(conf,0.55);}
+   else if(b.poles>1&&b.handle_tie==='unknown')conf=Math.min(conf,0.7);
    const label=b.label_source==='none'?'':str(b.label,100);
    const amps=snapAmps(b.amps);
    if(b.amps!=null&&amps==null)warnings.push(`Position ${n} : calibre lu (${b.amps} A) non standard, à vérifier.`);
@@ -67,6 +70,12 @@ export function scanToPanel(scan={}){
   }catch(e){
    warnings.push(`Position ${n}${b.half||''} : disjoncteur ignoré (${e.message.replace(/\.$/,'')}).`);
   }
+ }
+ // Charges de 240 V lues comme unipolaires : probablement un bipolaire mal vu.
+ const B240=/cuisini|poêle|poele|sécheuse|secheuse|chauffe-eau|chauffage|plinthe|thermopompe|climatis|borne|recharge|spa\b|piscine|range|dryer|water heater|heater|\bEV\b|induction/i;
+ for(const c of circuits){
+  if(c.slots.length===2&&slotPos(c.slots[0])===slotPos(c.slots[1])&&c.label&&B240.test(c.label)&&(c.amps||0)>=25&&review[c.id])
+   warnings.push(`Position ${slotPos(c.slots[0])} : « ${c.label} » (${c.amps} A) est lu comme unipolaire, mais ce type de charge est normalement sur un bipolaire (positions ${slotPos(c.slots[0])} et ${slotPos(c.slots[0])+2}). À vérifier sur le panneau.`);
  }
  for(const n of (scan.empty_positions||[]).filter(Number.isInteger)){
   const c=circuits.find(x=>x.slots.length===2&&slotPos(x.slots[0])===n&&!x.label&&x.amps==null);

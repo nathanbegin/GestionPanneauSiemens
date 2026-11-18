@@ -1957,4 +1957,9 @@ export default [
  ["La référence d’origine sera retirée ; le format et le calibre sont conservés.", "The original reference will be removed; the format and rating are kept."],
  [" — protection différente de l’original", " — different protection from the original"],
  ["Vérifiez chaque équivalent dans le catalogue du fabricant avant de commander ; l’historique du panneau permet de revenir en arrière.", "Check each equivalent in the manufacturer’s catalogue before ordering; the panel history lets you go back."],
+ ["Modèle du panneau", "Panel model"],
+ ["✓ Modèle reconnu d’après le numéro de catalogue lu sur la plaque.", "✓ Model recognised from the catalogue number read on the nameplate."],
+ ["✓ Modèle retrouvé dans le texte de la plaque : vérifiez-le.", "✓ Model found in the nameplate text: please check it."],
+ ["Modèles possibles d’après la marque, le calibre et le nombre d’espaces : choisissez le bon, ou aucun.", "Possible models based on the brand, rating and number of spaces: choose the right one, or none."],
+ ["— Aucun modèle du catalogue —", "— No catalogue model —"],
 ];

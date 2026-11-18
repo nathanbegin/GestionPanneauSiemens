@@ -82,3 +82,31 @@ export function panelSnapshot(p){
  return {modelId:p.cat,family:p.family,accepts:p.accepts||[],maxCircuits:p.circuits??null,tandem:p.tandem,pon:p.pon,
   modelInfo:`${fam?.marque||''} ${fam?.gamme||''} · ${p.type} · barres ${p.bus??'—'} A${p.main?` · principal ${p.main} A`:''} · ${p.espaces}/${p.circuits??'—'} · ${p.enveloppe||''}`.replace(/\s+/g,' ').trim().slice(0,160)};
 }
+
+// ---------- Reconnaissance du modèle de panneau lu sur photo ----------
+const normCat=v=>String(v??'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const brief=p=>({cat:p.cat,family:p.family,type:p.type,espaces:p.espaces,circuits:p.circuits,main:p.main,bus:p.bus});
+/**
+ * scan : lecture de l'IA (catalog_number, nameplate_text, family, main_amps, bus_amps, positions).
+ * Retourne {status:'exact'|'text'|'candidates'|'none', modelId?, candidates:[…]}
+ *  - exact : le numéro de catalogue lu est exactement un modèle de la bibliothèque ;
+ *  - text  : une référence connue figure dans le texte de la plaque ;
+ *  - candidates : plusieurs modèles possibles (même famille, même calibre / nombre d'espaces) à faire choisir.
+ */
+export function matchPanelModel(scan={},panels=library().panels){
+ const pool=panels.filter(p=>p.designable);
+ const cat=normCat(scan.catalog_number);
+ if(cat.length>=4){const ex=pool.find(p=>normCat(p.cat)===cat);if(ex)return {status:'exact',modelId:ex.cat,candidates:[brief(ex)]};}
+ const blob=normCat([scan.catalog_number,scan.nameplate_text].join(' '));
+ if(blob){
+  const hits=pool.filter(p=>normCat(p.cat).length>=6&&blob.includes(normCat(p.cat))).sort((a,b)=>normCat(b.cat).length-normCat(a.cat).length);
+  if(hits.length)return {status:'text',modelId:hits[0].cat,candidates:hits.slice(0,4).map(brief)};
+ }
+ const fam=scan.family||'',main=Number.isInteger(scan.main_amps)?scan.main_amps:null,bus=Number.isInteger(scan.bus_amps)?scan.bus_amps:null,spaces=Number.isInteger(scan.positions)?scan.positions:null;
+ if(fam&&(main||bus||spaces)){
+  const score=p=>(p.family===fam?4:0)+(main&&p.main===main?2:0)+(bus&&p.bus===bus?1:0)+(spaces&&p.espaces===spaces?3:0);
+  const cands=pool.filter(p=>p.family===fam&&(!main||p.main===main||p.bus===main)&&(!spaces||p.espaces===spaces)).sort((a,b)=>score(b)-score(a)||a.espaces-b.espaces).slice(0,6);
+  if(cands.length)return {status:'candidates',candidates:cands.map(brief)};
+ }
+ return {status:'none',candidates:[]};
+}

@@ -3,7 +3,7 @@ import {getSql} from './_lib/db.js';
 import {route,body,HttpError,isUuid,check} from './_lib/http.js';
 import {requireUser,newId} from './_lib/auth.js';
 import {consumePanelQuota,entitlement} from './_lib/plans.js';
-import {library,findPanel,panelSnapshot} from './_lib/library.js';
+import {library,findPanel,panelSnapshot,matchPanelModel} from './_lib/library.js';
 import {adminEmails} from './_lib/auth.js';
 import {siteOut,panelOut} from './_lib/serialize.js';
 import {blank,validate,normalize,resize,highestPosition,cleanPanelMeta,MIN_POSITIONS,MAX_POSITIONS} from '../public/model.js';
@@ -100,6 +100,19 @@ export default route(['GET','POST','PUT','DELETE'],async(req,res)=>{
   await sql`INSERT INTO app_ai_scans(user_id,model,input_tokens,output_tokens) VALUES(${user.id},${out.model},${out.usage.input},${out.usage.output})`;
   if(!out.scan.is_panel)return res.status(200).json({notPanel:true,summary:out.scan.summary||'',warnings:out.scan.warnings||[],used:used+1,monthly:allow.monthly});
   const proposal=check(()=>scanToPanel(out.scan));
+  // Modèle de panneau : rapproché de la bibliothèque (forfaits Électricien) à partir du numéro de catalogue lu.
+  try{
+   if(await hasLibrary(sql,user)){
+    const m=matchPanelModel(out.scan);
+    proposal.modelMatch=m;
+    if((m.status==='exact'||m.status==='text')&&m.modelId){
+     const mp=findPanel(m.modelId);
+     proposal.meta.details.modelId=m.modelId;
+     if(mp?.family)proposal.meta.details.family=mp.family;
+     if(mp?.main&&!proposal.meta.details.mainAmps)proposal.meta.details.mainAmps=mp.main;
+    }
+   }
+  }catch(e){console.error('modelMatch',e?.message);}
   return res.status(200).json({scan:out.scan,proposal,model:out.model,used:used+1,monthly:allow.monthly});
  }
  const id=req.query?.id?String(req.query.id):'';

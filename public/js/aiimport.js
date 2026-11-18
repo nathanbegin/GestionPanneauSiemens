@@ -131,11 +131,16 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
    voltage:select('voltage',voltages,det.voltage),
    family:select('family',[['','— Autre / non précisée —'],...Object.entries(FAMILIES).filter(([k])=>k!=='generic').map(([k,x])=>[k,x.name])],det.family),
   };
+  // Modèle reconnu dans la bibliothèque (numéro de catalogue lu sur la plaque) ou candidats à choisir.
+  const mm=p.modelMatch;
+  const modelSel=mm&&mm.candidates?.length?select('modelId',[['','— Aucun modèle du catalogue —'],...mm.candidates.map(c=>[c.cat,`${c.cat} · ${c.type||''} · ${c.espaces} espaces${c.main?' · '+c.main+' A':''}`])],det.modelId||''):null;
+  const modelNote=mm?(mm.status==='exact'?'✓ Modèle reconnu d’après le numéro de catalogue lu sur la plaque.':mm.status==='text'?'✓ Modèle retrouvé dans le texte de la plaque : vérifiez-le.':mm.status==='candidates'?'Modèles possibles d’après la marque, le calibre et le nombre d’espaces : choisissez le bon, ou aucun.':null):null;
   const conf=p.confidence;
   put(
    h('div',{class:'ai-step-head'},h('span',{class:'ai-step',text:'Étape 1 de 2'}),h('h3',{text:'Est-ce bien ce panneau ?'}),h('span',{class:'ai-conf '+confClass(conf),text:'Confiance '+pct(conf)}),usedModel&&h('span',{class:'small muted',text:'Lu par '+usedModel})),
    det.notes&&h('p',{class:'small muted',text:det.notes}),
    p.warnings.length?h('div',{class:'notice'},h('b',{text:'À vérifier : '}),h('ul',{},p.warnings.slice(0,8).map(w=>h('li',{text:w})))):null,
+   modelSel?h('div',{class:'notice '+(mm.status==='candidates'?'':'info')},h('b',{text:'Modèle du panneau'}),modelNote?h('p',{class:'small',text:modelNote}):null,modelSel):null,
    h('div',{class:'fields'},field('Nom du panneau',f.name),field('Étiquette',f.tag),field('Type',f.kind),field('Emplacement',f.location),
     field('Marque',f.brand),field('Gamme / modèle',f.model),field('Principal (A)',f.mainAmps),field('Nombre de positions',f.positions,{hint:'Ajustez si l’IA n’a pas vu tout le panneau.'}),field('Tension',f.voltage),field('Famille de produits',f.family,{hint:'Détermine le dessin des disjoncteurs.'})),
    h('div',{class:'form-actions'},h('button',{type:'button',class:'ghost',onclick:()=>photos()},'← Autres photos'),
@@ -145,7 +150,7 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
      let circuits=p.circuits;
      try{if(positions!==p.positions)circuits=resize(circuits,positions);}catch(e){return toast(e.message);}
      build({...p,positions,circuits,meta:{name:f.name.value.trim(),tag:f.tag.value.trim(),kind:f.kind.value,location:f.location.value.trim(),
-      details:{...det,brand:f.brand.value.trim(),model:f.model.value.trim(),mainAmps:f.mainAmps.value===''?null:Number(f.mainAmps.value),voltage:f.voltage.value,family:f.family.value}}});
+      details:{...det,...(modelSel?{modelId:modelSel.value||undefined}:{}),brand:f.brand.value.trim(),model:f.model.value.trim(),mainAmps:f.mainAmps.value===''?null:Number(f.mainAmps.value),voltage:f.voltage.value,family:f.family.value}}});
     }},'Oui — construire le panneau →')));
  }
 
@@ -205,7 +210,7 @@ export async function aiImportDialog({site,siblings=[],onCreated,target=null,onA
      const merged=mergeScanned(target.circuits,circuits,target.positions,{replace:replaceExisting});
      // Complète la fiche du panneau (marque, gamme, principal…) seulement là où elle est vide.
      const det=target.details||{},rd=p.meta.details||{},fill={};
-     for(const k of ['brand','model','mainAmps','family'])if((det[k]==null||det[k]==='')&&rd[k])fill[k]=rd[k];
+     for(const k of ['brand','model','mainAmps','family','modelId'])if((det[k]==null||det[k]==='')&&rd[k])fill[k]=rd[k];
      const body={revision:target.revision,circuits:merged.circuits};
      if(Object.keys(fill).length)body.meta={name:target.name,tag:target.tag,kind:target.kind,location:target.location,details:{...det,...fill}};
      const out=await api('/api/panels?id='+target.id,{method:'PUT',body});

@@ -53,12 +53,13 @@ export const MAX_FILES=6,MAX_BYTES=3*1024*1024; // ≈ 4 Mo une fois encodé en 
 const nullable=t=>({type:[t,'null']});
 export const SCAN_SCHEMA={
  type:'object',additionalProperties:false,
- required:['is_panel','brand','series','catalog_number','family','main_amps','bus_amps','positions','voltage','panel_kind','breakers','empty_positions','confidence','warnings','summary'],
+ required:['is_panel','brand','series','catalog_number','nameplate_text','family','main_amps','bus_amps','positions','voltage','panel_kind','breakers','empty_positions','confidence','warnings','summary'],
  properties:{
   is_panel:{type:'boolean',description:'Vrai si les documents montrent un panneau électrique ou son répertoire.'},
   brand:{type:'string',description:'Marque lue (Siemens, Square D, Eaton, Cutler-Hammer, Schneider Electric, Federal Pioneer, Stab-Lok, Westinghouse, Commander, GE, Leviton, Generac…). Vide si illisible.'},
   series:{type:'string',description:'Gamme ou série (ex. EQ, QO, Homeline, BR, CH). Vide si inconnue.'},
   catalog_number:{type:'string',description:'Numéro de catalogue lu sur l’étiquette du fabricant. Vide si illisible.'},
+  nameplate_text:{type:'string',description:'Transcription brute du texte de l’étiquette ou de la plaque du fabricant (type, « Cat. No. », CAT, numéros de modèle, calibres, nombre de circuits, « Max 40 circuits »…), tel que lu, sur 400 caractères au plus. Vide si illisible.'},
   family:{type:'string',enum:[...FAMILY_IDS,''],description:'Famille de produits correspondante dans la liste fournie, ou vide.'},
   main_amps:{...nullable('integer'),description:'Calibre du disjoncteur principal (A), null si absent ou illisible.'},
   bus_amps:{...nullable('integer'),description:'Calibre des barres omnibus (A) lu sur l’étiquette, null sinon.'},
@@ -66,10 +67,11 @@ export const SCAN_SCHEMA={
   voltage:{type:'string',enum:[...voltages,''],description:'Tension du panneau.'},
   panel_kind:{type:'string',enum:['Principal','Sous-panneau','Inconnu']},
   breakers:{type:'array',items:{type:'object',additionalProperties:false,
-   required:['position','poles','half','spans_next','amps','label','label_source','protection','confidence'],
+   required:['position','poles','handle_tie','half','spans_next','amps','label','label_source','protection','confidence'],
    properties:{
     position:{type:'integer',description:'Première position occupée (numérotation : impairs à gauche 1,3,5… de haut en bas ; pairs à droite 2,4,6…).'},
-    poles:{type:'integer',enum:[1,2,3],description:'1 unipolaire, 2 bipolaire (positions n et n+2), 3 tripolaire.'},
+    poles:{type:'integer',enum:[1,2,3],description:'Nombre de pôles du disjoncteur installé : 1 unipolaire, 2 bipolaire (positions n et n+2 de la même colonne), 3 tripolaire (n, n+2 et n+4).'},
+    handle_tie:{type:'string',enum:['common','separate','unknown'],description:'Pour un disjoncteur de 2 ou 3 pôles : « common » si les manettes des positions adjacentes sont reliées (barre, poignée commune ou une seule grosse manette) ; « separate » si elles bougent indépendamment (alors ce sont des unipolaires distincts) ; « unknown » si l’on ne peut pas le voir. « unknown » pour un unipolaire.'},
     half:{type:'string',enum:['','A','B'],description:'Disjoncteur jumelé (tandem) : A = moitié du haut, B = moitié du bas. Vide sinon.'},
     spans_next:{type:'boolean',description:'true si ce disjoncteur occupe aussi le demi-emplacement suivant de la même colonne (ex. un 25 A sur 5B puis 7A) : donne alors half du premier. false sinon.'},
     amps:{...nullable('integer'),description:'Calibre lu sur la manette, null si illisible.'},
@@ -110,6 +112,8 @@ export function scanPrompt(hint={}){
   'Objectif : reconstituer la configuration du panneau (marque, gamme, disjoncteur principal, nombre de positions, et chaque disjoncteur avec sa position, son nombre de pôles, son calibre et sa désignation).',
   'Numérotation canadienne habituelle : positions impaires dans la colonne de gauche (1, 3, 5… de haut en bas), paires à droite (2, 4, 6…). Un bipolaire occupe n et n+2 dans la même colonne ; donne sa première position. Un jumelé (tandem) loge deux demi-disjoncteurs dans une position : déclare-les séparément avec half A (haut) et B (bas). Vérifie chaque disjoncteur : un seul disjoncteur peut occuper deux demi-emplacements consécutifs à cheval sur deux positions, par exemple 5B et 7A (chauffage 25 A). Dans ce cas, déclare-le UNE seule fois avec half du premier demi-emplacement (B) et spans_next à true, sans déclarer le second séparément.',
   'Si les numéros sont imprimés sur le panneau ou le répertoire, ils ont priorité sur ta déduction.',
+  'MODÈLE DU PANNEAU : cherche l’étiquette du fabricant (à l’intérieur de la porte, sur le côté ou près des barres) et recopie fidèlement le numéro de catalogue (« Cat. No. », « Type », « Model ») dans catalog_number, et tout le texte utile de l’étiquette dans nameplate_text. Le numéro de catalogue sert à retrouver le modèle exact dans un catalogue : ne le complète pas, ne le corrige pas, laisse vide s’il est illisible.',
+  'TYPE DE DISJONCTEUR (pôles) : regarde les manettes. UNIPOLAIRE (1) : une manette, une position, 120 V. BIPOLAIRE (2) : deux manettes adjacentes de la MÊME colonne (positions n et n+2) reliées par une barre ou une poignée commune, un seul calibre moulé, 240 V (cuisinière 40-50 A, chauffe-eau 30 A, sécheuse 30 A, chauffage, thermopompe, borne de recharge, spa). TRIPOLAIRE (3) : trois manettes reliées (n, n+2, n+4), surtout dans les panneaux triphasés (208/120 V, 600 V) ou les gros appareils. Deux manettes voisines de calibres différents ou non reliées sont deux unipolaires. Les inscriptions « 2P », « 3P », « 2 POLE », « 3 POLE » sont des preuves. Renseigne handle_tie pour chaque disjoncteur de 2 ou 3 pôles et baisse la confiance si tu hésites.',
   'Le calibre est le nombre moulé sur la manette (15, 20, 30, 40…). Repère DDFT (bouton TEST, « GFCI »/« DDFT ») et anti-arc (« AFCI », « CAFCI », témoin).',
   'Les désignations viennent du répertoire collé sur la porte ou d’étiquettes : recopie-les telles quelles (français ou anglais), sans les traduire ni les inventer.',
   'Un fichier récapitulatif (PDF, CSV, texte, tableau) peut remplacer les photos : utilise ses colonnes (position, calibre, désignation).',

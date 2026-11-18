@@ -1122,3 +1122,4 @@ header.topbar{padding-top:env(safe-area-inset-top,0px)}
  .ai-stage .form-actions>button,.ai-stage .form-actions>a{width:100%;margin:0;justify-content:center;text-align:center;min-height:48px}
  .ai-stage .form-actions>button.primary{order:-1}
 }
+.ai-stage .notice{margin-bottom:12px}

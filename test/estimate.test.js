@@ -28,3 +28,33 @@ test('429 et clé invalide ne déclenchent pas de repli',async()=>{
 test('schéma strict : tous les champs requis',()=>{
  const it=ESTIMATE_SCHEMA.properties.items.items;assert.deepEqual([...it.required].sort(),Object.keys(it.properties).sort());
 });
+
+import {matchPanelModel,library} from '../api/_lib/library.js';
+import {scanToPanel} from '../public/aiscan.js';
+import {SCAN_SCHEMA,scanPrompt} from '../api/_lib/ai.js';
+test('modèle de panneau : numéro exact, texte de plaque, candidats, rien',()=>{
+ const lib=library();const any=lib.panels.find(p=>p.designable&&p.cat.length>=8);
+ let m=matchPanelModel({catalog_number:any.cat.toLowerCase().replace(/(.{3})/g,'$1 ')});
+ assert.equal(m.status,'exact');assert.equal(m.modelId,any.cat);
+ m=matchPanelModel({catalog_number:'',nameplate_text:'LOADCENTER TYPE 1 CAT. NO. '+any.cat+' 120/240V'});
+ assert.equal(m.status,'text');assert.equal(m.modelId,any.cat);
+ m=matchPanelModel({family:any.family,main_amps:any.main,positions:any.espaces});
+ assert.ok(['candidates','none'].includes(m.status));if(m.status==='candidates')assert.ok(m.candidates.some(c=>c.cat===any.cat));
+ assert.equal(matchPanelModel({}).status,'none');
+});
+test('schéma : plaque et manettes reliées requis ; invite sur les pôles et le modèle',()=>{
+ assert.ok(SCAN_SCHEMA.required.includes('nameplate_text'));
+ const it=SCAN_SCHEMA.properties.breakers.items;assert.ok(it.required.includes('handle_tie'));assert.deepEqual(it.properties.handle_tie.enum,['common','separate','unknown']);
+ for(const k of Object.keys(it.properties))assert.ok(it.required.includes(k),k);
+ const p=scanPrompt({});assert.match(p,/BIPOLAIRE/);assert.match(p,/TRIPOLAIRE/);assert.match(p,/catalog_number/);
+});
+test('lecture : manettes non reliées → avertissement ; charge 240 V unipolaire → avertissement',()=>{
+ const base={is_panel:true,brand:'Siemens',series:'EQ',catalog_number:'',nameplate_text:'',family:'',main_amps:200,bus_amps:200,positions:12,voltage:'120/240 V monophasé',panel_kind:'Principal',empty_positions:[],confidence:.9,warnings:[],summary:''};
+ const b=(o)=>({position:1,poles:1,handle_tie:'unknown',half:'',spans_next:false,amps:30,label:'',label_source:'directory',protection:'Standard',confidence:.9,...o});
+ let r=scanToPanel({...base,breakers:[b({position:1,poles:2,handle_tie:'separate',label:'Chauffage'})]});
+ assert.ok(r.warnings.some(w=>/ne semblent pas reliées/.test(w)));
+ r=scanToPanel({...base,breakers:[b({position:1,label:'Cuisinière',amps:40})]});
+ assert.ok(r.warnings.some(w=>/normalement sur un bipolaire/.test(w)));
+ r=scanToPanel({...base,breakers:[b({position:1,poles:3,handle_tie:'common',label:'Pompe triphasée'})]});
+ assert.equal(r.circuits.find(c=>c.label==='Pompe triphasée').slots.length,6);
+});
